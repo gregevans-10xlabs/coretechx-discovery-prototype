@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const cc  = s => s>=0.95?"text-green-400":s>=0.80?"text-blue-400":s>=0.60?"text-yellow-400":s>=0.40?"text-orange-400":"text-red-400";
-const cb  = s => s>=0.80?"bg-green-400":s>=0.60?"bg-yellow-400":s>=0.40?"bg-orange-400":"bg-red-400";
-const cl  = s => s>=0.95?"On track":s>=0.80?"Likely":s>=0.60?"At risk":s>=0.40?"High risk":"Critical";
-const fmt = n => n.toLocaleString();
+const cc  = (s: number) => s>=0.95?"text-green-400":s>=0.80?"text-blue-400":s>=0.60?"text-yellow-400":s>=0.40?"text-orange-400":"text-red-400";
+const cb  = (s: number) => s>=0.80?"bg-green-400":s>=0.60?"bg-yellow-400":s>=0.40?"bg-orange-400":"bg-red-400";
+const fmt = (n: number) => n.toLocaleString();
 
 const LM = {
   1:{ label:"Level 1",  long:"Inform only",     desc:"AI prepares context. Human decides and acts.",              badge:"bg-gray-700 text-gray-300",       bar:"bg-gray-500",    ring:"border-gray-600" },
@@ -94,7 +93,7 @@ const TODAY_JOBS = [
   { id:"JOB-3208", trade:"Terry Huang",   type:"Starlink Install",  suburb:"Tamworth NSW",     window:"1–3pm",   conf:0.79, geo:"no_activity", geoTime:null,     minsToWindow:222 },
 ];
 
-const geoLabel = (geo, mins) => {
+const geoLabel = (geo: string, mins: number) => {
   if (geo==="confirmed")  return { label:`Confirmed en route`,                                  dot:"bg-green-400",              text:"text-green-400"  };
   if (geo==="en_route")   return { label:`GPS active`,                                          dot:"bg-blue-400",               text:"text-blue-400"   };
   if (geo==="unassigned") return { label:`No trade assigned`,                                   dot:"bg-gray-500",               text:"text-gray-400"   };
@@ -134,9 +133,9 @@ const SUPERVISORS = [
 ];
 
 // ─── AskAI ────────────────────────────────────────────────────────────────────
-function AskAI({ context, placeholder }) {
-  const [q,setQ]=useState(""); const [msgs,setMsgs]=useState([]); const [loading,setLoading]=useState(false);
-  const bot=useRef(null);
+function AskAI({ context, placeholder }: { context: string; placeholder?: string }) {
+  const [q,setQ]=useState(""); const [msgs,setMsgs]=useState<{role:string;content:string}[]>([]); const [loading,setLoading]=useState(false);
+  const bot=useRef<HTMLDivElement>(null);
   useEffect(()=>{ bot.current?.scrollIntoView({behavior:"smooth"}); },[msgs]);
   const ask=async()=>{
     if(!q.trim()||loading)return;
@@ -145,7 +144,7 @@ function AskAI({ context, placeholder }) {
     try {
       const res = await fetch("/api/anthropic", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:sys,messages:[...msgs.map(m=>({role:m.role,content:m.content})),{role:"user",content:u}]})});
       const d=await res.json();
-      setMsgs(m=>[...m,{role:"assistant",content:d.content?.find(b=>b.type==="text")?.text||"No response."}]);
+      setMsgs(m=>[...m,{role:"assistant",content:d.content?.find((b:{type:string;text:string})=>b.type==="text")?.text||"No response."}]);
     } catch { setMsgs(m=>[...m,{role:"assistant",content:"Unable to reach AI."}]); }
     setLoading(false);
   };
@@ -172,20 +171,21 @@ function AskAI({ context, placeholder }) {
 }
 
 // ─── Workflow Config View ─────────────────────────────────────────────────────
-function WorkflowConfig({ canConfig, onBack }) {
+function WorkflowConfig({ canConfig, onBack }: { canConfig: boolean; onBack: () => void }) {
   const [selectedTemplate, setSelectedTemplate] = useState("starlink");
-  const [pendingChange, setPendingChange] = useState(null); // {stepId, newLevel}
+  const [pendingChange, setPendingChange] = useState<{stepId:string;newLevel:number}|null>(null);
   const [changeReason, setChangeReason] = useState("");
-  const [committed, setCommitted] = useState({}); // stepId → {level, reason, date}
+  const [committed, setCommitted] = useState<Record<string,{level:number;reason:string;date:string}>>({});
   const [showAudit, setShowAudit] = useState(false);
 
-  const template = WORKFLOW_TEMPLATES.find(t=>t.id===selectedTemplate);
+  const template = WORKFLOW_TEMPLATES.find(t=>t.id===selectedTemplate)!;
 
-  const effectiveLevel = (step) => committed[step.id]?.level ?? step.level;
+  const effectiveLevel = (step: (typeof WORKFLOW_TEMPLATES)[0]['steps'][0]): keyof typeof LM =>
+    (committed[step.id]?.level ?? step.level) as keyof typeof LM;
 
   const commitChange = () => {
     if (!changeReason.trim()) return;
-    setCommitted(c=>({...c,[pendingChange.stepId]:{level:pendingChange.newLevel, reason:changeReason, date:"Now (prototype)"}}));
+    setCommitted(c=>({...c,[pendingChange!.stepId]:{level:pendingChange!.newLevel, reason:changeReason, date:"Now (prototype)"}}));
     setPendingChange(null);
     setChangeReason("");
   };
@@ -242,7 +242,7 @@ function WorkflowConfig({ canConfig, onBack }) {
           {[4,3,2,1].map(l=>{
             const count=template.steps.filter(s=>!s.hard&&effectiveLevel(s)===l).length;
             if(!count)return null;
-            return <span key={l} className={`px-2 py-0.5 rounded-full ${LM[l].badge}`}>{LM[l].long}: {count}</span>;
+            return <span key={l} className={`px-2 py-0.5 rounded-full ${LM[l as keyof typeof LM].badge}`}>{LM[l as keyof typeof LM].long}: {count}</span>;
           })}
           {template.steps.filter(s=>s.hard).length>0&&(
             <span className="px-2 py-0.5 rounded-full bg-red-950 text-red-400">🔒 Hard limits: {template.steps.filter(s=>s.hard).length}</span>
@@ -289,7 +289,7 @@ function WorkflowConfig({ canConfig, onBack }) {
                   {isPending&&canConfig&&(
                     <div className="bg-indigo-950/40 border border-indigo-800 rounded-lg p-3 mb-2">
                       <p className="text-indigo-300 text-xs font-semibold mb-2">
-                        Proposing: {lm.long} → {LM[pendingChange.newLevel].long}
+                        Proposing: {lm.long} → {LM[pendingChange!.newLevel as keyof typeof LM].long}
                       </p>
                       <textarea
                         className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-xs border border-gray-600 focus:outline-none focus:border-indigo-500 mb-2 resize-none"
@@ -322,16 +322,16 @@ function WorkflowConfig({ canConfig, onBack }) {
                   {/* Adjust controls */}
                   {canConfig&&!step.hard&&!isPending&&(
                     <div className="flex gap-1 mt-2 justify-end">
-                      {lv>1&&(
-                        <button onClick={()=>setPendingChange({stepId:step.id,newLevel:lv-1})}
+                      {(lv as number)>1&&(
+                        <button onClick={()=>setPendingChange({stepId:step.id,newLevel:(lv as number)-1})}
                           className="text-xs bg-gray-700 hover:bg-red-900 text-gray-400 hover:text-red-300 px-2 py-1 rounded font-mono transition-colors">
-                          ↓ Level {lv-1}
+                          ↓ Level {(lv as number)-1}
                         </button>
                       )}
-                      {lv<4&&(
-                        <button onClick={()=>setPendingChange({stepId:step.id,newLevel:lv+1})}
-                          className={`text-xs px-2 py-1 rounded font-mono transition-colors ${step.accuracy>=0.95?"bg-green-900 hover:bg-green-800 text-green-300":"bg-gray-700 hover:bg-blue-900 text-gray-400 hover:text-blue-300"}`}>
-                          ↑ Level {lv+1}
+                      {(lv as number)<4&&(
+                        <button onClick={()=>setPendingChange({stepId:step.id,newLevel:(lv as number)+1})}
+                          className={`text-xs px-2 py-1 rounded font-mono transition-colors ${(step.accuracy??0)>=0.95?"bg-green-900 hover:bg-green-800 text-green-300":"bg-gray-700 hover:bg-blue-900 text-gray-400 hover:text-blue-300"}`}>
+                          ↑ Level {(lv as number)+1}
                         </button>
                       )}
                     </div>
@@ -382,13 +382,13 @@ function WorkflowConfig({ canConfig, onBack }) {
 export default function App() {
   const [view, setView]     = useState("dashboard");
   const [persona, setPersona] = useState("logan");
-  const [expandedPattern, setExpandedPattern] = useState(null);
+  const [expandedPattern, setExpandedPattern] = useState<string|null>(null);
   const [briefingDismissed, setBriefingDismissed] = useState(false);
-  const [decisionsDone, setDecisionsDone] = useState({});
-  const [expandedSup, setExpandedSup] = useState(null);
-  const [loggedInspections, setLogged] = useState({});
+  const [decisionsDone, setDecisionsDone] = useState<Record<string,string>>({});
+  const [expandedSup, setExpandedSup] = useState<string|null>(null);
+  const [loggedInspections, setLogged] = useState<Record<string,boolean>>({});
 
-  const P = PERSONAS.find(p=>p.id===persona);
+  const P = PERSONAS.find(p=>p.id===persona)!;
   const jobTypes = JOB_TYPES.filter(jt=>P.types.includes(jt.id));
   const decisions = DECISIONS.filter(d=>{
     if(persona==="aaron"||persona==="national")return true;
@@ -407,7 +407,7 @@ export default function App() {
   const PATTERNS = [
     { id:"P-041", region:"North East", severity:"high",   icon:"📍", title:"Coverage gap — Starlink, QLD regional", detail:"4 unresponsive trade incidents in Tweed Heads this week. Shadow plans activating repeatedly. Targeted recruitment required.", type:"Systemic", affected:"11 Commitments", action:"Raise recruitment request" },
     { id:"P-039", region:"North East", severity:"high",   icon:"📷", title:"Evidence non-submission — NSW corridor", detail:"3 Starlink installers in Newcastle have zero photos across 28 combined jobs this week. Possible app issue or training gap.", type:"Quality", affected:"28 Commitments", action:"Investigate app + training" },
-  ].filter(p=>isLogan||isAaron||persona==="national");
+  ].filter(()=>isLogan||isAaron||persona==="national");
 
   const navBg = "min-h-screen bg-gray-900 text-white p-4 md:p-6";
   const maxW   = "max-w-4xl mx-auto";
@@ -428,7 +428,7 @@ export default function App() {
       <div><h2 className="text-white font-bold text-lg">Decision Queue</h2><p className="text-gray-500 text-xs">{decisions.length} items — {P.region}</p></div>
       <div className="space-y-3">
         {decisions.map(dec=>{
-          const done=decisionsDone[dec.id]; const lm=LM[dec.autonomyLevel];
+          const done=decisionsDone[dec.id]; const lm=LM[dec.autonomyLevel as keyof typeof LM];
           return (
             <div key={dec.id} className={`border rounded-xl p-4 ${done?"bg-green-950/20 border-green-900":"bg-gray-800 border-gray-700"}`}>
               {done?(<div className="flex justify-between"><span className="text-white font-mono text-sm">{dec.id}</span><span className="text-green-400 text-sm">✓ {done}</span></div>):(
@@ -539,7 +539,7 @@ export default function App() {
             <div className="text-right"><span className="text-yellow-300 font-bold">{noActivity.length} at risk</span><p className="text-gray-500 text-xs">{TODAY_JOBS.filter(j=>j.geo==="confirmed"||j.geo==="en_route").length} confirmed</p></div>
           </div>
           <div className="flex gap-0.5 rounded-full overflow-hidden h-2 mb-3">
-            {TODAY_JOBS.map(j=>{const g=geoLabel(j.geo,j.minsToWindow);return <div key={j.id} className={`flex-1 ${j.geo==="confirmed"||j.geo==="en_route"?"bg-green-500":j.geo==="no_activity"&&j.minsToWindow<0?"bg-red-500 animate-pulse":j.geo==="no_activity"?"bg-yellow-500":j.geo==="unassigned"?"bg-gray-600":"bg-blue-500"}`} title={j.trade}/>;} )}
+            {TODAY_JOBS.map(j=><div key={j.id} className={`flex-1 ${j.geo==="confirmed"||j.geo==="en_route"?"bg-green-500":j.geo==="no_activity"&&j.minsToWindow<0?"bg-red-500 animate-pulse":j.geo==="no_activity"?"bg-yellow-500":j.geo==="unassigned"?"bg-gray-600":"bg-blue-500"}`} title={j.trade}/>)}
           </div>
           <div className="space-y-1">
             {TODAY_JOBS.map(j=>{
@@ -668,7 +668,7 @@ export default function App() {
           </button>
         </div>
         <div className="flex gap-1 rounded-lg overflow-hidden h-2 mb-2">
-          {[4,3,2,1].map(l=>{const c=WORKFLOW_TEMPLATES[0].steps.filter(s=>s.level===l).length;return c>0?<div key={l} className={`${LM[l].bar} opacity-70`} style={{flex:c}}/>:null;})}
+          {[4,3,2,1].map(l=>{const c=WORKFLOW_TEMPLATES[0].steps.filter(s=>s.level===l).length;return c>0?<div key={l} className={`${LM[l as keyof typeof LM].bar} opacity-70`} style={{flex:c}}/>:null;})}
           <div className="bg-red-800 opacity-70" style={{flex:2}}/>
         </div>
         {!isAaron&&<p className="text-gray-600 text-xs mt-1">Adjusting autonomy levels requires Aaron sign-off.</p>}
