@@ -133,6 +133,53 @@ const SUPERVISORS = [
 ];
 
 // ─── AskAI ────────────────────────────────────────────────────────────────────
+function FormatAI({ text }: { text: string }) {
+  const renderInline = (s: string) =>
+    s.split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
+      p.startsWith("**") && p.endsWith("**")
+        ? <strong key={i} className="font-semibold text-white">{p.slice(2,-2)}</strong>
+        : p
+    );
+
+  const lines = text.split("\n");
+  const out: React.ReactNode[] = [];
+  let bullets: string[] = [];
+  let numbered: string[] = [];
+
+  const flushBullets = () => {
+    if (bullets.length) {
+      out.push(<ul key={out.length} className="list-disc list-inside space-y-0.5 my-1 pl-1">{bullets.map((b,i)=><li key={i}>{renderInline(b)}</li>)}</ul>);
+      bullets = [];
+    }
+  };
+  const flushNumbered = () => {
+    if (numbered.length) {
+      out.push(<ol key={out.length} className="list-decimal list-inside space-y-0.5 my-1 pl-1">{numbered.map((n,i)=><li key={i}>{renderInline(n)}</li>)}</ol>);
+      numbered = [];
+    }
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) { flushBullets(); flushNumbered(); continue; }
+    if (/^#{1,3}\s/.test(line)) {
+      flushBullets(); flushNumbered();
+      out.push(<p key={out.length} className="font-semibold text-white mt-2 mb-0.5">{renderInline(line.replace(/^#{1,3}\s/,""))}</p>);
+    } else if (/^[-*•]\s+/.test(line)) {
+      flushNumbered();
+      bullets.push(line.replace(/^[-*•]\s+/,""));
+    } else if (/^\d+\.\s+/.test(line)) {
+      flushBullets();
+      numbered.push(line.replace(/^\d+\.\s+/,""));
+    } else {
+      flushBullets(); flushNumbered();
+      out.push(<p key={out.length} className="my-0.5 leading-relaxed">{renderInline(line)}</p>);
+    }
+  }
+  flushBullets(); flushNumbered();
+  return <>{out}</>;
+}
+
 function AskAI({ context, placeholder }: { context: string; placeholder?: string }) {
   const [q,setQ]=useState(""); const [msgs,setMsgs]=useState<{role:string;content:string}[]>([]); const [loading,setLoading]=useState(false);
   const bot=useRef<HTMLDivElement>(null);
@@ -155,7 +202,7 @@ function AskAI({ context, placeholder }: { context: string; placeholder?: string
         {msgs.map((m,i)=>(
           <div key={i} className={`text-sm rounded-lg px-3 py-2 ${m.role==="user"?"bg-gray-700 text-gray-100 ml-6":"bg-indigo-950 text-indigo-100 mr-6 border border-indigo-800"}`}>
             <span className="font-semibold text-xs uppercase tracking-wide opacity-60 block mb-1">{m.role==="user"?"You":"CoreTechX AI"}</span>
-            {m.content}
+            {m.role==="assistant" ? <FormatAI text={m.content}/> : m.content}
           </div>
         ))}
         {loading&&<div className="bg-indigo-950 border border-indigo-800 rounded-lg px-3 py-2 text-indigo-300 text-sm mr-6 animate-pulse">Thinking...</div>}
