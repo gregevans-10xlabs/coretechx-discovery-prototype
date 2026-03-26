@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { cc, cb, fmt, LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, TODAY_JOBS, geoLabel, JOB_TYPES, DECISIONS, SUPERVISORS, ALL_PATTERNS, MORNING } from "./data/scenarios";
+import StaffPerformance from "./components/StaffPerformance";
 
 
 // ─── AskAI ────────────────────────────────────────────────────────────────────
@@ -440,6 +441,9 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Staff performance */}
+      <StaffPerformance persona={persona}/>
 
       {/* Today's schedule — Logan only */}
       {isLogan&&(

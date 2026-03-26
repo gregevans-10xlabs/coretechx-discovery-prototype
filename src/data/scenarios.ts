@@ -142,3 +142,102 @@ export const MORNING = [
   { severity:"high",   icon:"🔒", msg:"Ryan Patel's public liability expired. Removed from pool — 3 jobs tomorrow need reallocation." },
   { severity:"medium", icon:"📋", msg:"JOB-2862 (Harvey Norman) scheduled tomorrow. No trade allocated. 26h to deadline." },
 ];
+
+// ─── Staff performance ────────────────────────────────────────────────────────
+export type KPI = {
+  label: string;
+  current: number;
+  target: number;
+  unit: string;
+  lowerIsBetter?: boolean;
+};
+
+export type StaffPerf = {
+  name: string;
+  role: string;
+  rank: number;
+  rankTotal: number;
+  rankLabel: string;
+  weeklyTrend: "up" | "down" | "stable";
+  trendDetail: string;
+  highlight: string;
+  kpis: KPI[];
+};
+
+export const STAFF_PERFORMANCE: Record<string, StaffPerf> = {
+  logan: {
+    name: "Logan",
+    role: "Ops Manager — Installation Services",
+    rank: 2, rankTotal: 8, rankLabel: "coordinators",
+    weeklyTrend: "up",
+    trendDetail: "Up 2 positions this week",
+    highlight: "Your decision speed is creating capacity across the region — keep the momentum.",
+    kpis: [
+      { label: "On-time completion",   current: 91,  target: 95,  unit: "%"   },
+      { label: "Trade compliance",     current: 96,  target: 98,  unit: "%"   },
+      { label: "Customer satisfaction",current: 4.3, target: 4.5, unit: "/5.0"},
+      { label: "Decision response",    current: 1.4, target: 2.0, unit: "h", lowerIsBetter: true },
+      { label: "Evidence submission",  current: 94,  target: 98,  unit: "%"   },
+    ],
+  },
+  conner: {
+    name: "Conner",
+    role: "Ops Manager — Construction",
+    rank: 4, rankTotal: 6, rankLabel: "construction leads",
+    weeklyTrend: "stable",
+    trendDetail: "Consistent through a complex week",
+    highlight: "Construction is the highest-complexity vertical — your depth here is a genuine asset.",
+    kpis: [
+      { label: "On-time completion",   current: 84,  target: 90,  unit: "%"   },
+      { label: "Trade compliance",     current: 93,  target: 97,  unit: "%"   },
+      { label: "Customer satisfaction",current: 4.1, target: 4.5, unit: "/5.0"},
+      { label: "Decision response",    current: 2.8, target: 2.5, unit: "h", lowerIsBetter: true },
+      { label: "Evidence submission",  current: 89,  target: 95,  unit: "%"   },
+    ],
+  },
+  blake: {
+    name: "Blake",
+    role: "Ops Manager — Facilities Management",
+    rank: 3, rankTotal: 7, rankLabel: "FM coordinators",
+    weeklyTrend: "up",
+    trendDetail: "Up 1 position this week",
+    highlight: "Evidence and response time are standout strengths — FM complexity handled well.",
+    kpis: [
+      { label: "On-time completion",   current: 87,  target: 92,  unit: "%"   },
+      { label: "Trade compliance",     current: 95,  target: 98,  unit: "%"   },
+      { label: "Customer satisfaction",current: 4.4, target: 4.5, unit: "/5.0"},
+      { label: "Decision response",    current: 1.9, target: 2.5, unit: "h", lowerIsBetter: true },
+      { label: "Evidence submission",  current: 97,  target: 98,  unit: "%"   },
+    ],
+  },
+  national: {
+    name: "National",
+    role: "Senior Operations — All Regions",
+    rank: 1, rankTotal: 4, rankLabel: "regions",
+    weeklyTrend: "stable",
+    trendDetail: "Top region for the third consecutive week",
+    highlight: "National portfolio is performing. Biggest growth opportunity is in Insurance and FM.",
+    kpis: [
+      { label: "Portfolio on-time rate",current: 89, target: 93,  unit: "%"   },
+      { label: "Avg trade compliance",  current: 95, target: 97,  unit: "%"   },
+      { label: "Customer satisfaction", current: 4.2,target: 4.5, unit: "/5.0"},
+      { label: "Avg decision response", current: 2.1,target: 2.5, unit: "h", lowerIsBetter: true },
+      { label: "Evidence submission",   current: 93, target: 97,  unit: "%"   },
+    ],
+  },
+  aaron: {
+    name: "Aaron",
+    role: "Founder / CEO — All Regions",
+    rank: 1, rankTotal: 4, rankLabel: "regions",
+    weeklyTrend: "up",
+    trendDetail: "Platform momentum building week-on-week",
+    highlight: "The autonomy ladder is working — agents are earning their levels through accuracy.",
+    kpis: [
+      { label: "Platform on-time rate", current: 89, target: 93,  unit: "%"   },
+      { label: "Avg trade compliance",  current: 95, target: 97,  unit: "%"   },
+      { label: "Customer satisfaction", current: 4.2,target: 4.5, unit: "/5.0"},
+      { label: "Autonomous decisions",  current: 78, target: 80,  unit: "%"   },
+      { label: "Agent accuracy (avg)",  current: 91, target: 95,  unit: "%"   },
+    ],
+  },
+};
