@@ -77,6 +77,7 @@ export const PERSONAS = [
   { id:"blake",    label:"Blake",    title:"Ops Manager — FM",                    region:"National",             types:["fm"],                     canConfig:false },
   { id:"national", label:"National", title:"Senior Operations — All Regions",     region:"All Regions",          types:["starlink","hn","jbhifi","insurance","construction","fm"], canConfig:false },
   { id:"aaron",    label:"Aaron",    title:"Founder / CEO",                       region:"All Regions",          types:["starlink","hn","jbhifi","insurance","construction","fm"], canConfig:true },
+  { id:"kerrie",   label:"Kerrie",   title:"Insurance Coordinator",               region:"National",             types:["insurance"],              canConfig:false },
 ];
 
 // ─── Today jobs ───────────────────────────────────────────────────────────────
@@ -240,4 +241,125 @@ export const STAFF_PERFORMANCE: Record<string, StaffPerf> = {
       { label: "Agent accuracy (avg)",  current: 91, target: 95,  unit: "%"   },
     ],
   },
+  kerrie: {
+    name: "Kerrie",
+    role: "Insurance Coordinator",
+    rank: 3, rankTotal: 6, rankLabel: "insurance coordinators",
+    weeklyTrend: "up",
+    trendDetail: "Up 1 position this week",
+    highlight: "Portal compliance is the fastest lever right now — even 3 more on-time uploads this week moves your rank.",
+    kpis: [
+      { label: "Jobs within SLA",        current: 84,  target: 90,  unit: "%"   },
+      { label: "Portal update compliance",current: 89, target: 95,  unit: "%"   },
+      { label: "Customer satisfaction",  current: 4.2, target: 4.5, unit: "/5.0"},
+      { label: "Avg days to scope",      current: 4.1, target: 3.5, unit: "d", lowerIsBetter: true },
+      { label: "Trade confirmation rate",current: 94,  target: 97,  unit: "%"   },
+    ],
+  },
 };
+
+// ─── Kerrie's insurance jobs ──────────────────────────────────────────────────
+export type JobFlag = {
+  type: "kpi_timer" | "portal_update_due" | "trade_overdue";
+  detail: string;
+};
+
+export type InsuranceJob = {
+  id: string;
+  customer: string;
+  suburb: string;
+  insurer: string;
+  stage: "Assessment booked" | "Scope approved" | "Trades allocated" | "Work in progress" | "Awaiting completion" | "Pending portal update";
+  nextAction: string;
+  nextTradeDate: string | null;
+  flags: JobFlag[];
+};
+
+export const KERRIE_JOBS: InsuranceJob[] = [
+  // ── Urgent ───────────────────────────────────────────────────────────────────
+  {
+    id: "INS-7832", customer: "Brian Pak",      suburb: "Rockingham WA",   insurer: "IAG",
+    stage: "Pending portal update",
+    nextAction: "Upload scope docs to IAG EscapeNet — 48h SLA already breached",
+    nextTradeDate: null,
+    flags: [{ type:"portal_update_due", detail:"SLA breached. Insurer follow-up expected today." }],
+  },
+  {
+    id: "INS-7851", customer: "Lena Vasic",     suburb: "Manly NSW",       insurer: "Suncorp",
+    stage: "Awaiting completion",
+    nextAction: "Chase builder for completion photos — Suncorp 21-day SLA expires in 2 days",
+    nextTradeDate: null,
+    flags: [{ type:"kpi_timer", detail:"21-day completion SLA expires 27 Mar 2026." }],
+  },
+  {
+    id: "INS-7807", customer: "Tom Nguyen",     suburb: "Dandenong VIC",   insurer: "NRMA",
+    stage: "Trades allocated",
+    nextAction: "Confirm carpenter attendance — rescheduled twice, no confirmed date",
+    nextTradeDate: "Unconfirmed",
+    flags: [{ type:"trade_overdue", detail:"Carpenter 4 days overdue. Customer has called twice." }],
+  },
+  {
+    id: "INS-7841", customer: "Janet Morrison", suburb: "Epping NSW",      insurer: "Allianz",
+    stage: "Scope approved",
+    nextAction: "Upload approved scope to AllianzConnect by 5pm today",
+    nextTradeDate: null,
+    flags: [{ type:"portal_update_due", detail:"AllianzConnect portal deadline 5pm 25 Mar 2026." }],
+  },
+  {
+    id: "INS-7863", customer: "Diane Walsh",    suburb: "Caringbah NSW",   insurer: "QBE",
+    stage: "Assessment booked",
+    nextAction: "Book scope assessor — 5-day SLA from makesafe (20 Mar) expires today",
+    nextTradeDate: "TBC",
+    flags: [{ type:"kpi_timer", detail:"QBE scope-booking SLA expires today 25 Mar 2026." }],
+  },
+  // ── Standard ─────────────────────────────────────────────────────────────────
+  {
+    id: "INS-7818", customer: "Sam El-Amin",    suburb: "Penrith NSW",     insurer: "IAG",
+    stage: "Trades allocated",
+    nextAction: "Confirm plumber + tiler arrival for 28 Mar",
+    nextTradeDate: "28 Mar 2026",
+    flags: [],
+  },
+  {
+    id: "INS-7874", customer: "Rosie Chan",     suburb: "Geelong VIC",     insurer: "Suncorp",
+    stage: "Work in progress",
+    nextAction: "Check builder progress — completion expected 2 Apr",
+    nextTradeDate: "2 Apr 2026",
+    flags: [],
+  },
+  {
+    id: "INS-7856", customer: "Paul Okafor",    suburb: "Blacktown NSW",   insurer: "IAG",
+    stage: "Scope approved",
+    nextAction: "Await trade confirmation from subcontractor pool",
+    nextTradeDate: "TBC",
+    flags: [],
+  },
+  {
+    id: "INS-7829", customer: "Helen Marsh",    suburb: "Ballarat VIC",    insurer: "Allianz",
+    stage: "Assessment booked",
+    nextAction: "Confirm assessor attendance for 27 Mar visit",
+    nextTradeDate: "27 Mar 2026",
+    flags: [],
+  },
+  {
+    id: "INS-7845", customer: "Chris Duffy",    suburb: "Parramatta NSW",  insurer: "NRMA",
+    stage: "Trades allocated",
+    nextAction: "Send pre-work checklist to plasterer + painter",
+    nextTradeDate: "1 Apr 2026",
+    flags: [],
+  },
+  {
+    id: "INS-7880", customer: "Yuki Tanaka",    suburb: "Chatswood NSW",   insurer: "IAG",
+    stage: "Awaiting completion",
+    nextAction: "Request completion photos from trade — final step before closure",
+    nextTradeDate: null,
+    flags: [],
+  },
+  {
+    id: "INS-7892", customer: "Marcus Webb",    suburb: "Fitzroy VIC",     insurer: "QBE",
+    stage: "Pending portal update",
+    nextAction: "Upload completion certificate to QBE portal before EOD Friday",
+    nextTradeDate: null,
+    flags: [],
+  },
+];

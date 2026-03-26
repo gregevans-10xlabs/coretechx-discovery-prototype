@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { cc, cb, fmt, LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, TODAY_JOBS, geoLabel, JOB_TYPES, DECISIONS, SUPERVISORS, ALL_PATTERNS, MORNING } from "./data/scenarios";
 import StaffPerformance from "./components/StaffPerformance";
+import CoordinatorView from "./components/CoordinatorView";
 
 
 // ─── AskAI ────────────────────────────────────────────────────────────────────
@@ -313,6 +314,7 @@ export default function App() {
     if(persona==="logan")return d.type==="Appliance Install"||d.type==="Starlink Install";
     if(persona==="blake")return d.type==="FM Emergency";
     if(persona==="conner")return d.type==="Construction / AHO";
+    if(persona==="kerrie")return d.type==="Insurance Repair";
     return true;
   });
   const TOTAL     = jobTypes.reduce((a,t)=>a+t.total,0);
@@ -321,6 +323,7 @@ export default function App() {
   const noActivity = TODAY_JOBS.filter(j=>j.geo==="no_activity"||j.geo==="unassigned");
   const isLogan   = persona==="logan";
   const isAaron   = persona==="aaron";
+  const isKerrie  = persona==="kerrie";
 
   const PATTERNS = ALL_PATTERNS.filter(()=>isLogan||isAaron||persona==="national");
 
@@ -399,7 +402,7 @@ export default function App() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {!isKerrie&&<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="bg-gray-800 rounded-xl p-4 col-span-2 md:col-span-1">
           <p className="text-gray-400 text-xs mb-1">Active Commitments</p>
           <p className="text-3xl font-bold text-white">{fmt(TOTAL)}</p>
@@ -422,7 +425,7 @@ export default function App() {
           <p className="text-3xl font-bold text-green-400">{fmt(TOTAL_ON)}</p>
           <p className="text-gray-500 text-xs mt-1">{TOTAL>0?Math.round(TOTAL_ON/TOTAL*100):0}%</p>
         </div>
-      </div>
+      </div>}
 
       {/* Morning briefing */}
       {!briefingDismissed&&(
@@ -444,6 +447,9 @@ export default function App() {
 
       {/* Staff performance */}
       <StaffPerformance persona={persona}/>
+
+      {/* Coordinator view — Kerrie only */}
+      {isKerrie&&<CoordinatorView/>}
 
       {/* Today's schedule — Logan only */}
       {isLogan&&(
@@ -475,7 +481,7 @@ export default function App() {
       )}
 
       {/* Job type health */}
-      <div>
+      {!isKerrie&&<div>
         <h2 className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">Job Type Health</h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {jobTypes.map(jt=>(
@@ -493,7 +499,7 @@ export default function App() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Field supervisors — Logan only */}
       {isLogan&&(
