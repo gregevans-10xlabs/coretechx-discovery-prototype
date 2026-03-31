@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { cc, cb, fmt, LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, TODAY_JOBS, geoLabel, JOB_TYPES, DECISIONS, SUPERVISORS, ALL_PATTERNS, MORNING } from "./data/scenarios";
+import { cc, cb, fmt, LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, TODAY_JOBS, geoLabel, JOB_TYPES, ALL_DECISIONS, SUPERVISORS, ALL_PATTERNS, MORNING } from "./data/scenarios";
 import StaffPerformance from "./components/StaffPerformance";
 import CoordinatorView from "./components/CoordinatorView";
 
@@ -309,7 +309,7 @@ export default function App() {
 
   const P = PERSONAS.find(p=>p.id===persona)!;
   const jobTypes = JOB_TYPES.filter(jt=>P.types.includes(jt.id));
-  const decisions = DECISIONS.filter(d=>{
+  const decisions = ALL_DECISIONS.filter(d=>{
     if(persona==="aaron"||persona==="national")return true;
     if(persona==="logan")return d.type==="Appliance Install"||d.type==="Starlink Install";
     if(persona==="blake")return d.type==="FM Emergency";
