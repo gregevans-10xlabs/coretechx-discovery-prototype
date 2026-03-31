@@ -281,19 +281,31 @@ export const TRADE_NETWORK = {
 
 // ─── Kerrie's Coordinator View (80 concurrent insurance jobs — 12 shown) ──────
 // Uses real CG numbers from Allianz / Home Repair rows in the Prime export
-export const KERRIE_JOBS = [
-  { id:"CG36078", insurer:"Allianz",  customer:"R. Chen",      suburb:"Shailer Park QLD",    stage:"Assessment booked",         nextAction:"Virtual assessment — KPI 45 min remaining", tradeDate:"Today",    flag:"kpi",       flagLabel:"KPI: 45 min" },
-  { id:"CG36069", insurer:"Allianz",  customer:"P. Morrow",    suburb:"Mardi NSW",            stage:"Scope change pending",      nextAction:"Scope change +$1,800 awaiting Paul sign-off", tradeDate:"Today",  flag:"approval",  flagLabel:"Approval needed" },
-  { id:"CG36011", insurer:"Allianz",  customer:"D. Hartley",   suburb:"Port Macquarie NSW",   stage:"Trade allocation required", nextAction:"No compliant trade found — manual procurement", tradeDate:"Tomorrow",flag:"compliance",flagLabel:"No compliant trade" },
-  { id:"CG35949", insurer:"Home Repair",customer:"T. Nguyen",  suburb:"Karuah NSW",           stage:"Report/Quote Sent",         nextAction:"Awaiting insurer approval",                   tradeDate:"TBC",      flag:null,        flagLabel:null },
-  { id:"CG36029", insurer:"Home Repair",customer:"S. White",   suburb:"Bulahdelah NSW",       stage:"Works in progress",         nextAction:"Carpenter Day 3 of 5 — check photos today",   tradeDate:"Ongoing",  flag:"evidence",  flagLabel:"Photos due" },
-  { id:"CG36031", insurer:"Home Repair",customer:"M. Park",    suburb:"Bulahdelah NSW",       stage:"Completion pending",        nextAction:"Await completion cert — trade finished Fri",   tradeDate:"Done",     flag:"cert",      flagLabel:"Cert overdue" },
-  { id:"CG36025", insurer:"Home Repair",customer:"B. Torres",  suburb:"Coramba NSW",          stage:"Report/Quote Sent",         nextAction:"Josh to review quote — in his queue",         tradeDate:"TBC",      flag:null,        flagLabel:null },
-  { id:"CG35974", insurer:"Home Repair",customer:"L. Evans",   suburb:"Valla NSW",            stage:"Invoiced",                  nextAction:"Upload completion docs to insurer portal",    tradeDate:"Complete", flag:"portal",    flagLabel:"Portal update due" },
-  { id:"CG36078B",insurer:"Allianz",  customer:"A. Singh",     suburb:"Robina QLD",           stage:"Makesafe complete",         nextAction:"Post makesafe — book carpenter and plasterer", tradeDate:"Next week",flag:null,        flagLabel:null },
-  { id:"CG36091B",insurer:"Allianz",  customer:"G. Russo",     suburb:"Werribee VIC",         stage:"Trade allocated",           nextAction:"Confirm trade start date with customer",      tradeDate:"Mar 28",   flag:null,        flagLabel:null },
-  { id:"CG36102B",insurer:"Allianz",  customer:"H. Nielsen",   suburb:"Hornsby Heights NSW",  stage:"Works in progress",         nextAction:"Plasterer Day 2 — electrician booked Mar 30",tradeDate:"Ongoing",  flag:null,        flagLabel:null },
-  { id:"CG36077B",insurer:"Home Repair",customer:"F. Walsh",   suburb:"Morwell VIC",          stage:"Report/Quote Sent",         nextAction:"Awaiting scope approval — 3 days overdue",   tradeDate:"TBC",      flag:"overdue",   flagLabel:"3 days overdue" },
+export type JobFlag = { type: "kpi_timer" | "portal_update_due" | "trade_overdue"; detail: string };
+export type InsuranceJob = {
+  id: string;
+  customer: string;
+  suburb: string;
+  insurer: string;
+  stage: "Assessment booked" | "Scope approved" | "Trades allocated" | "Work in progress" | "Awaiting completion" | "Pending portal update";
+  nextAction: string;
+  nextTradeDate: string | null;
+  flags: JobFlag[];
+};
+
+export const KERRIE_JOBS: InsuranceJob[] = [
+  { id:"CG36078",  insurer:"Allianz",    customer:"R. Chen",    suburb:"Shailer Park QLD",   stage:"Assessment booked",   nextTradeDate:"Today",     nextAction:"Virtual assessment — KPI timer: 45 min remaining",                flags:[{type:"kpi_timer",         detail:"Virtual assessment KPI expires in 45 minutes"}] },
+  { id:"CG36031",  insurer:"Home Repair",customer:"M. Park",    suburb:"Bulahdelah NSW",     stage:"Awaiting completion", nextTradeDate:null,         nextAction:"Completion cert not received — trade finished Friday",             flags:[{type:"kpi_timer",         detail:"Completion cert overdue — insurer SLA at risk"}] },
+  { id:"CG36011",  insurer:"Allianz",    customer:"D. Hartley", suburb:"Port Macquarie NSW", stage:"Trades allocated",    nextTradeDate:"Tomorrow",  nextAction:"No compliant trade confirmed — manual outreach required today",     flags:[{type:"trade_overdue",     detail:"No compliant trade found for confirmed start date"}] },
+  { id:"CG36077B", insurer:"Home Repair",customer:"F. Walsh",   suburb:"Morwell VIC",        stage:"Scope approved",      nextTradeDate:null,         nextAction:"Awaiting scope approval response — 3 days past SLA",               flags:[{type:"trade_overdue",     detail:"Scope response 3 days overdue — insurer follow-up needed"}] },
+  { id:"CG35974",  insurer:"Home Repair",customer:"L. Evans",   suburb:"Valla NSW",          stage:"Pending portal update",nextTradeDate:null,         nextAction:"Upload completion docs to insurer portal — due today",             flags:[{type:"portal_update_due", detail:"Completion documents ready — portal upload overdue"}] },
+  { id:"CG36029",  insurer:"Home Repair",customer:"S. White",   suburb:"Bulahdelah NSW",     stage:"Work in progress",    nextTradeDate:"Ongoing",   nextAction:"Carpenter Day 3 of 5 — check progress photos uploaded",            flags:[{type:"portal_update_due", detail:"Daily photo evidence due in portal by 5pm"}] },
+  { id:"CG36069",  insurer:"Allianz",    customer:"P. Morrow",  suburb:"Mardi NSW",          stage:"Scope approved",      nextTradeDate:"Today",     nextAction:"Scope change +$1,800 awaiting sign-off — trades on hold",          flags:[] },
+  { id:"CG35949",  insurer:"Home Repair",customer:"T. Nguyen",  suburb:"Karuah NSW",         stage:"Scope approved",      nextTradeDate:null,         nextAction:"Awaiting insurer approval of submitted quote",                     flags:[] },
+  { id:"CG36078B", insurer:"Allianz",    customer:"A. Singh",   suburb:"Robina QLD",         stage:"Scope approved",      nextTradeDate:"Next week",  nextAction:"Makesafe complete — book carpenter and plasterer for scope works",  flags:[] },
+  { id:"CG36091B", insurer:"Allianz",    customer:"G. Russo",   suburb:"Werribee VIC",       stage:"Trades allocated",    nextTradeDate:"28 Mar",    nextAction:"Confirm trade start date with customer — call before 11am",        flags:[] },
+  { id:"CG36102B", insurer:"Allianz",    customer:"H. Nielsen", suburb:"Hornsby Heights NSW", stage:"Work in progress",   nextTradeDate:"Ongoing",   nextAction:"Plasterer Day 2 on site — electrician confirmed for 30 Mar",       flags:[] },
+  { id:"CG36025",  insurer:"Home Repair",customer:"B. Torres",  suburb:"Coramba NSW",        stage:"Scope approved",      nextTradeDate:null,         nextAction:"Quote in reviewer queue — follow up if no response by 3pm",        flags:[] },
 ];
 
 // ─── Autonomy Ladder ──────────────────────────────────────────────────────────
