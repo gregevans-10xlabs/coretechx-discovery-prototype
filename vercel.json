@@ -5,10 +5,5 @@
   "installCommand": "npm install",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
-  ],
-  "functions": {
-    "api/anthropic.ts": {
-      "runtime": "nodejs22.x"
-    }
-  }
+  ]
 }
