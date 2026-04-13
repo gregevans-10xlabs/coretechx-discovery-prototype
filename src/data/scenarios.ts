@@ -99,9 +99,9 @@ export const TODAY_JOBS = [
 // Uses real CG job numbers where applicable
 export const MORNING = [
   // Based on Logan's Facebook story — evidence non-submission pattern
-  { severity:"high",   icon:"📷", msg:"York Digital Solutions: CG35954, CG36003, CG36015 — 3 completed Starlink installs, 0 photos submitted (48+ hrs). Auto-reminder sent. No response.", jobRef:"CG35976" },
+  { severity:"high",   icon:"📷", msg:"York Digital Solutions: CG35954, CG36003, CG36015 — 3 completed Starlink installs, 0 photos submitted (48+ hrs). Auto-reminder sent. No response.", jobRef:"PATTERN:york-digital-photos" },
   // Compliance expiry — real scenario type
-  { severity:"high",   icon:"🔒", msg:"Sandbar Electrical Services: public liability renewed but SWMS outstanding. Removed from new allocations pending submission.", jobRef:null },
+  { severity:"high",   icon:"🔒", msg:"Sandbar Electrical Services: public liability renewed but SWMS outstanding. Removed from new allocations pending submission.", jobRef:"CG36110" },
   // Unallocated job approaching deadline
   { severity:"medium", icon:"📋", msg:"CG36003 (Starlink, Fern Bay NSW) scheduled today. No trade allocated — showing as 'Circl Customer Service' in Prime. 26h to window.", jobRef:null },
 ];
@@ -212,43 +212,206 @@ export const SUPERVISORS = [
 ];
 
 // ─── Staff Performance (Aaron hard requirement: gamified KPI visibility) ──────
-export const STAFF_PERFORMANCE = [
+export type KPI = { label: string; current: number; target: number; unit: string; trend: string; lowerIsBetter?: boolean };
+export type Badge = { icon: string; label: string; desc: string; earned: boolean };
+export type LeaderboardEntry = { label: string; score: number; isYou?: boolean };
+export type TeamMember = { name: string; role: string; tier: "Platinum"|"Gold"|"Silver"|"Bronze"; score: number; trend: "up"|"down"|"stable"; concern: string };
+
+export const STAFF_PERFORMANCE: {
+  persona: string; name: string; role: string;
+  tier: "Platinum" | "Gold" | "Silver" | "Bronze";
+  score: number;
+  rank: number | null; rankTotal: number | null; rankNoun: string | null;
+  streak: number;
+  weeklyTrend: "up" | "down" | "stable";
+  trendDetail: string;
+  highlight: string;
+  weeklyChallenge: string;
+  badges: Badge[];
+  leaderboard: LeaderboardEntry[];
+  kpis: KPI[];
+  teamMembers?: TeamMember[];
+  improvements?: string[];
+}[] = [
   {
     persona:"logan", name:"Logan", role:"Ops Manager — Installation Services",
-    rank:2, rankTotal:8, rankLabel:"2nd of 8 coordinators this week",
-    weeklyTrend:"improving",
-    kpis:[
-      { label:"Decisions resolved",     current:18, target:20, unit:"this week",        trend:"up" },
-      { label:"Jobs closed on time",    current:94, target:95, unit:"% (last 7 days)",  trend:"stable" },
-      { label:"Evidence reviewed",      current:47, target:50, unit:"this week",        trend:"up" },
-      { label:"Trade inspections (Safety)", current:8, target:20, unit:"this month",   trend:"behind" },
-      { label:"Trade inspections (Quality)",current:6, target:20, unit:"this month",   trend:"behind" },
+    tier:"Gold", score:88,
+    rank:2, rankTotal:8, rankNoun:"installation coordinators",
+    streak:3,
+    weeklyTrend:"up", trendDetail:"Up from 4th last week",
+    highlight:"Decision resolution is strong. Inspection targets need a push — 14 days left, 26 to go.",
+    weeklyChallenge:"🏗️ Inspection Sprint — log 8 safety inspections before Friday to unlock the Inspector badge.",
+    badges:[
+      { icon:"⚡", label:"Quick Draw",   desc:"Resolved 15+ decisions in a week",     earned:true  },
+      { icon:"🔥", label:"On a Roll",    desc:"Improving trend for 3+ weeks",         earned:true  },
+      { icon:"🔭", label:"Eagle Eye",    desc:"90%+ evidence review rate this week",  earned:true  },
+      { icon:"🏗️", label:"Inspector",   desc:"20+ safety inspections in a month",    earned:false },
+      { icon:"🏆", label:"Top of Board", desc:"Reach #1 in your peer group",          earned:false },
     ],
-    insight:"Your decision resolution is strong. Inspection targets need attention — 14 days left in the month, 26 inspections to go.",
+    leaderboard:[
+      { label:"Morgan B.", score:96 },
+      { label:"You",       score:88, isYou:true },
+      { label:"Sam W.",    score:85 },
+      { label:"Jordan T.", score:79 },
+      { label:"Casey L.",  score:71 },
+    ],
+    kpis:[
+      { label:"Decisions resolved",         current:18, target:20, unit:"this week",  trend:"up" },
+      { label:"Jobs closed on time",         current:94, target:95, unit:"%",          trend:"stable" },
+      { label:"Evidence reviewed",           current:47, target:50, unit:"this week",  trend:"up" },
+      { label:"Trade inspections (Safety)",  current:8,  target:20, unit:"this month", trend:"behind" },
+      { label:"Trade inspections (Quality)", current:6,  target:20, unit:"this month", trend:"behind" },
+    ],
   },
   {
     persona:"kerrie", name:"Kerrie", role:"Insurance Coordinator",
-    rank:4, rankTotal:8, rankLabel:"4th of 8 coordinators this week",
-    weeklyTrend:"stable",
-    kpis:[
-      { label:"Work orders scheduled",  current:12, target:15, unit:"this week",        trend:"stable" },
-      { label:"Portal updates on time", current:88, target:95, unit:"% (last 7 days)",  trend:"down" },
-      { label:"Completion certs filed", current:9,  target:12, unit:"this week",        trend:"stable" },
-      { label:"Scope changes reviewed", current:4,  target:5,  unit:"this week",        trend:"stable" },
+    tier:"Silver", score:74,
+    rank:4, rankTotal:8, rankNoun:"insurance coordinators",
+    streak:2,
+    weeklyTrend:"stable", trendDetail:"Holding 4th — portal rate dragging the score",
+    highlight:"Portal update rate is slipping. 3 Allianz jobs had updates logged >1h after status change.",
+    weeklyChallenge:"⚡ Portal Blitz — log 5 portal updates within 15 min of status change this week to unlock Portal Pro.",
+    badges:[
+      { icon:"📅", label:"Job Juggler",  desc:"Managing 80+ concurrent insurance jobs", earned:true  },
+      { icon:"🤝", label:"Trade Link",   desc:"All trades allocated with no gaps",       earned:true  },
+      { icon:"⚡", label:"Portal Pro",   desc:"95%+ portal updates on time",             earned:false },
+      { icon:"🎯", label:"Cert Hunter",  desc:"File 12+ completion certs in a week",     earned:false },
+      { icon:"🏆", label:"Top 3",        desc:"Break into the top 3 coordinators",       earned:false },
     ],
-    insight:"Portal update on-time rate is slipping. 3 Allianz jobs had updates logged more than 1 hour after status change this week.",
+    leaderboard:[
+      { label:"Tom H.",    score:94 },
+      { label:"Sophie K.", score:87 },
+      { label:"Josh H.",   score:82 },
+      { label:"You",       score:74, isYou:true },
+      { label:"Aiden R.",  score:68 },
+    ],
+    kpis:[
+      { label:"Work orders scheduled",  current:12, target:15, unit:"this week", trend:"stable" },
+      { label:"Portal updates on time", current:88, target:95, unit:"%",         trend:"down"   },
+      { label:"Completion certs filed", current:9,  target:12, unit:"this week", trend:"stable" },
+      { label:"Scope changes reviewed", current:4,  target:5,  unit:"this week", trend:"stable" },
+    ],
   },
   {
-    persona:"national", name:"National View", role:"All Regions",
-    rank:null, rankTotal:null, rankLabel:null,
-    weeklyTrend:"stable",
-    kpis:[
-      { label:"Decisions resolved",  current:87,  target:100, unit:"this week",        trend:"stable" },
-      { label:"Jobs closed on time", current:91,  target:95,  unit:"% (last 7 days)",  trend:"down" },
-      { label:"SLA breaches",        current:3,   target:0,   unit:"this week",        trend:"stable" },
-      { label:"Portal updates late", current:7,   target:0,   unit:"this week",        trend:"up" },
+    persona:"conner", name:"Conner", role:"Ops Manager — Construction",
+    tier:"Gold", score:88,
+    rank:2, rankTotal:6, rankNoun:"construction managers",
+    streak:4,
+    weeklyTrend:"stable", trendDetail:"Solid — holding 2nd for 4 weeks running",
+    highlight:"Safety audits are clean. One more trade confirmation would push you to first this week.",
+    weeklyChallenge:"🎯 Full House — hit all 4 KPI targets this week for your first Perfect Week badge.",
+    badges:[
+      { icon:"🏗️", label:"Builder",      desc:"5+ construction decisions resolved/week",  earned:true  },
+      { icon:"🛡️", label:"Safety First", desc:"Zero safety audit misses this month",       earned:true  },
+      { icon:"⚡", label:"Site Speed",    desc:"90%+ on-time trade starts",                earned:true  },
+      { icon:"🎯", label:"Perfect Week",  desc:"All KPIs on target in a single week",      earned:false },
+      { icon:"🏆", label:"#1 Builder",    desc:"Reach #1 among construction managers",     earned:false },
     ],
-    insight:"3 SLA breaches this week, all in insurance. Portal update latency is the primary driver.",
+    leaderboard:[
+      { label:"Ava S.",    score:93 },
+      { label:"You",       score:88, isYou:true },
+      { label:"Liam T.",   score:82 },
+      { label:"Maya H.",   score:76 },
+      { label:"Ethan F.",  score:70 },
+    ],
+    kpis:[
+      { label:"Build stages on schedule", current:13, target:15, unit:"this month", trend:"stable" },
+      { label:"Safety audits completed",  current:8,  target:8,  unit:"this week",  trend:"stable" },
+      { label:"Trades confirmed on-site", current:11, target:12, unit:"this week",  trend:"stable" },
+      { label:"Defects resolved <48h",    current:9,  target:10, unit:"this week",  trend:"up"     },
+    ],
+  },
+  {
+    persona:"blake", name:"Blake", role:"Ops Manager — Facilities Management",
+    tier:"Platinum", score:94,
+    rank:1, rankTotal:5, rankNoun:"FM managers",
+    streak:5,
+    weeklyTrend:"up", trendDetail:"Holding #1 for 5 consecutive weeks",
+    highlight:"Outstanding week — preventive maintenance is spotless. Two weeks from the Unbeatable badge.",
+    weeklyChallenge:"👑 Fortnight Reign — hold #1 again next week to unlock the Unbeatable badge.",
+    badges:[
+      { icon:"🔑", label:"FM Leader",     desc:"Reached #1 in FM manager rankings",        earned:true  },
+      { icon:"⚡", label:"Fast Response", desc:"Fastest average response time in the group",earned:true  },
+      { icon:"✅", label:"Perfect Week",  desc:"All KPIs on target in a single week",       earned:true  },
+      { icon:"👑", label:"Unbeatable",    desc:"Hold #1 for 4+ consecutive weeks",          earned:false },
+      { icon:"🌟", label:"Legend",        desc:"95%+ across all KPIs for a full month",     earned:false },
+    ],
+    leaderboard:[
+      { label:"You",       score:94, isYou:true },
+      { label:"Jade N.",   score:87 },
+      { label:"Marcus O.", score:79 },
+      { label:"Rosa T.",   score:73 },
+      { label:"Ben H.",    score:61 },
+    ],
+    kpis:[
+      { label:"Preventive maintenance tasks", current:23, target:23, unit:"this week", trend:"stable" },
+      { label:"Reactive jobs resolved",        current:17, target:18, unit:"this week", trend:"stable" },
+      { label:"Subcontractor compliance",      current:31, target:32, unit:"this week", trend:"stable" },
+      { label:"Avg response time",             current:2.1,target:4,  unit:"h",         trend:"stable", lowerIsBetter:true },
+    ],
+  },
+  {
+    persona:"national", name:"National View", role:"Senior Ops — All Regions",
+    tier:"Gold", score:84,
+    rank:null, rankTotal:null, rankNoun:null,
+    streak:1,
+    weeklyTrend:"down", trendDetail:"SLA performance declining — insurance backlog driving misses",
+    highlight:"3 SLA breaches this week, all in insurance. Portal update latency is the primary driver.",
+    weeklyChallenge:"✅ Zero Breach Week — coordinate with insurance team to clear the backlog and achieve zero SLA breaches.",
+    badges:[
+      { icon:"🌐", label:"Network",        desc:"All regions actively reporting",              earned:true  },
+      { icon:"📊", label:"Data Rich",      desc:"100% KPI coverage across all teams",         earned:true  },
+      { icon:"✅", label:"Zero Breaches",  desc:"No SLA breaches for a full week",            earned:false },
+      { icon:"🚀", label:"Peak Form",      desc:"95%+ team KPI average for a week",           earned:false },
+      { icon:"🏆", label:"Top Quartile",   desc:"Outperform industry benchmark on all metrics",earned:false },
+    ],
+    leaderboard:[
+      { label:"Blake (FM)",   score:94 },
+      { label:"Conner",       score:88 },
+      { label:"Logan",        score:88 },
+      { label:"Tom H.",       score:87 },
+      { label:"Kerrie",       score:74 },
+    ],
+    kpis:[
+      { label:"Decisions resolved",  current:87, target:100, unit:"this week", trend:"stable" },
+      { label:"Jobs closed on time", current:91, target:95,  unit:"%",         trend:"down"   },
+      { label:"SLA breaches",        current:3,  target:0,   unit:"this week", trend:"stable", lowerIsBetter:true },
+      { label:"Portal updates late", current:7,  target:0,   unit:"this week", trend:"up",     lowerIsBetter:true },
+    ],
+  },
+  {
+    persona:"aaron", name:"Aaron", role:"Founder / CEO",
+    tier:"Gold", score:86,
+    rank:null, rankTotal:null, rankNoun:null,
+    streak:2,
+    weeklyTrend:"stable", trendDetail:"Team average holding — insurance KPIs are the key drag",
+    highlight:"The team is performing well overall. Addressing insurance coordinator capacity is the clearest path to lifting the team average to Platinum.",
+    weeklyChallenge:"🏆 Team Platinum Push — coordinate one strong week across all four coordinators to break the 90-point team average.",
+    badges:[
+      { icon:"🌐", label:"Network",       desc:"All coordinators actively reporting",             earned:true  },
+      { icon:"📊", label:"Full Visibility",desc:"100% KPI coverage across all roles",            earned:true  },
+      { icon:"✅", label:"Zero Breaches",  desc:"Team achieves zero SLA breaches for a week",    earned:false },
+      { icon:"🚀", label:"Peak Form",      desc:"All coordinators above 85 in the same week",    earned:false },
+      { icon:"🏆", label:"Dream Team",     desc:"Team average reaches Platinum tier (90+)",      earned:false },
+    ],
+    leaderboard:[],
+    kpis:[
+      { label:"Team decisions resolved",  current:87, target:100, unit:"this week", trend:"stable" },
+      { label:"Jobs closed on time",       current:91, target:95,  unit:"%",         trend:"down"   },
+      { label:"SLA breaches",              current:3,  target:0,   unit:"this week", trend:"stable", lowerIsBetter:true },
+      { label:"Portal updates late",       current:7,  target:0,   unit:"this week", trend:"up",     lowerIsBetter:true },
+    ],
+    teamMembers:[
+      { name:"Blake",  role:"FM Ops Manager",           tier:"Platinum", score:94, trend:"up",     concern:"Holding #1 — on track for Unbeatable badge. No action needed." },
+      { name:"Logan",  role:"Installation Ops Manager", tier:"Gold",     score:88, trend:"up",     concern:"Inspection targets at 40% of monthly goal — 26 inspections needed in 14 days." },
+      { name:"Conner", role:"Construction Ops Manager", tier:"Gold",     score:88, trend:"stable", concern:"One trade confirmation gap this week — minor drag, otherwise consistent." },
+      { name:"Kerrie", role:"Insurance Coordinator",    tier:"Silver",   score:74, trend:"stable", concern:"Portal update latency is the primary SLA risk — 3 Allianz jobs flagged this week." },
+    ],
+    improvements:[
+      "Kerrie's portal update rate is the team's biggest drag and the primary SLA risk — consider redistributing 10–15 of her 80 concurrent jobs to reduce latency.",
+      "Logan needs 26 safety inspections in 14 days — block a focused inspection week now before month-end pressure compounds.",
+      "The team is 4 points from Platinum average — a coordinated challenge week targeting Kerrie's portal rate and Logan's inspections would likely get there.",
+    ],
   },
 ];
 

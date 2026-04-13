@@ -1,1 +1,36 @@
 @import "tailwindcss";
+
+:root {
+  --brand: #00BDFE;
+  --brand-dark: #0099d4;
+  --brand-light: #e0f7ff;
+}
+
+body {
+  background-color: #f5f6f8;
+  color: #1a1d23;
+}
+
+/* Fade-in for panel transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* Slim scrollbars inside cockpit columns */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
