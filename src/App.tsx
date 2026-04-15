@@ -333,7 +333,7 @@ export default function App() {
   const PATTERNS = ALL_PATTERNS.filter(()=>isLogan||isAaron||persona==="national");
 
   const bg  = "min-h-screen bg-[#f5f6f8] p-4 md:p-6";
-  const maxW = (isLogan||isKerrie||isPortfolio||isField||isChekku) ? "max-w-7xl mx-auto" : "max-w-4xl mx-auto";
+  const maxW = (isLogan||isKerrie||isPortfolio||isField||isChekku) ? "max-w-[1920px] mx-auto" : "max-w-4xl mx-auto";
 
   // ── Shared header + persona switcher ─────────────────────────────────────
   const sharedHeader = (

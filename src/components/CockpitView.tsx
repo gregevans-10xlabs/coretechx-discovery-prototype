@@ -273,6 +273,17 @@ function JobDetail({ job, persona, onAction }: {
         <ActivityLog items={job.aiLog} actionRequired={!isReadOnly ? job.actionRequired : null} />
       </div>
 
+      {/* Hard-limit notice — shown above actions */}
+      {isHardLimit(job) && !actionDone && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs">
+          <span className="text-red-500 flex-shrink-0 mt-0.5">🔒</span>
+          <div>
+            <p className="text-red-700 font-semibold">Hard limit — human sign-off required</p>
+            <p className="text-red-500 mt-0.5">This action cannot be deferred or reassigned. WHS, safety, and financial decisions above $1k are permanently Level 1.</p>
+          </div>
+        </div>
+      )}
+
       {/* Actions — only if not read-only */}
       {!isReadOnly && job.actionOptions.length > 0 && !actionDone && (
         <div className="flex flex-wrap gap-2 pt-1">
@@ -298,6 +309,84 @@ function JobDetail({ job, persona, onAction }: {
           ✓ {actionDone} — logged
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Hard-limit helper ────────────────────────────────────────────────────────
+// Jobs with compliance_gap (WHS/safety) or scope_change (financial >$1k) flags
+// are permanently Level 1 — they cannot be deferred or reassigned.
+function isHardLimit(job: Job): boolean {
+  return job.flags.some(f => f.type === "compliance_gap" || f.type === "scope_change");
+}
+
+// ─── Personal Performance Scorecard ──────────────────────────────────────────
+type ScorecardConfig = {
+  tier: "Gold" | "Silver" | "Bronze";
+  rank: number;
+  teamSize: number;
+  tasksLeft: number;
+  tasksGoal: number;
+  kpis: { label: string; you: number; avg: number; unit: string }[];
+};
+
+function PersonalScorecard({ cfg }: { cfg: ScorecardConfig }) {
+  const tierIcon  = cfg.tier === "Gold" ? "⭐" : cfg.tier === "Silver" ? "🥈" : "🥉";
+  const tierColor = cfg.tier === "Gold"
+    ? "text-amber-700 bg-amber-50 border-amber-300"
+    : cfg.tier === "Silver"
+    ? "text-slate-600 bg-slate-100 border-slate-300"
+    : "text-orange-700 bg-orange-50 border-orange-300";
+  const progress = Math.round(((cfg.tasksGoal - cfg.tasksLeft) / cfg.tasksGoal) * 100);
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2.5">
+      {/* Tier + rank */}
+      <div className="flex items-center justify-between">
+        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${tierColor}`}>
+          {tierIcon} {cfg.tier}
+        </span>
+        <span className="text-slate-500 text-xs">
+          <span className="font-bold text-slate-700">#{cfg.rank}</span> of {cfg.teamSize} in region
+        </span>
+      </div>
+
+      {/* Tasks-to-target */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-slate-500 text-[10px]">Today's target</span>
+          <span className="text-slate-500 text-[10px] font-semibold">
+            {cfg.tasksLeft > 0
+              ? `${cfg.tasksLeft} more to hold ${cfg.tier}`
+              : `Target met ✓`}
+          </span>
+        </div>
+        <div className="w-full bg-slate-100 rounded-full h-1.5">
+          <div
+            className={`h-1.5 rounded-full transition-all ${cfg.tier === "Gold" ? "bg-amber-400" : cfg.tier === "Silver" ? "bg-slate-400" : "bg-orange-400"}`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Personal KPIs vs team avg */}
+      <div className="space-y-1.5 pt-0.5">
+        {cfg.kpis.map(k => {
+          const delta = k.you - k.avg;
+          const isGood = delta >= 0;
+          return (
+            <div key={k.label} className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 truncate flex-1 min-w-0 mr-2">{k.label}</span>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="font-semibold text-slate-700">{k.you}{k.unit}</span>
+                <span className={`text-[10px] font-medium ${isGood ? "text-green-600" : "text-red-500"}`}>
+                  {isGood ? "↑" : "↓"}{Math.abs(delta)}{k.unit} vs avg
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -332,38 +421,34 @@ function LoganKPIs({ jobs, onInspect }: { jobs: Job[]; onInspect: (supervisor: s
   return (
     <div className="space-y-3">
 
-      {/* Region summary */}
+      <PersonalScorecard cfg={{
+        tier: "Gold",
+        rank: 2,
+        teamSize: 14,
+        tasksLeft: 3,
+        tasksGoal: 10,
+        kpis: [
+          { label: "On-time completion", you: 91, avg: 85, unit: "%" },
+          { label: "Evidence submitted", you: 94, avg: 88, unit: "%" },
+        ],
+      }} />
+
+      {/* Region snapshot — merged */}
       <div className="bg-[#e0f7ff] border border-[#00BDFE]/30 rounded-xl p-3">
-        <p className="text-[#0077a8] text-[10px] font-semibold uppercase tracking-wide mb-2">North East NSW/QLD</p>
-        <div className="grid grid-cols-3 gap-1.5">
-          <div className="text-center">
-            <p className="text-lg font-bold text-slate-800">3,450</p>
+        <p className="text-[#0077a8] text-[10px] font-semibold uppercase tracking-wide mb-2">North East NSW/QLD — Today</p>
+        <div className="grid grid-cols-3 gap-1.5 text-center">
+          <div>
+            <p className="text-base font-bold text-slate-800">3,450</p>
             <p className="text-slate-500 text-[10px]">Active</p>
           </div>
-          <div className="text-center">
-            <p className="text-lg font-bold text-green-600">91%</p>
-            <p className="text-slate-500 text-[10px]">On-time</p>
+          <div>
+            <p className={`text-base font-bold ${onTrackCount > 0 ? "text-green-600" : "text-slate-400"}`}>{onTrackCount}</p>
+            <p className="text-slate-500 text-[10px]">On track</p>
           </div>
-          <div className="text-center">
-            <p className="text-lg font-bold text-green-600">96%</p>
-            <p className="text-slate-500 text-[10px]">Compliance</p>
+          <div>
+            <p className={`text-base font-bold ${urgentCount > 0 ? "text-amber-600" : "text-slate-400"}`}>{urgentCount + jeopardyCount}</p>
+            <p className="text-slate-500 text-[10px]">Need action</p>
           </div>
-        </div>
-      </div>
-
-      {/* Today queue breakdown */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-green-50 border border-green-200 rounded-xl p-2 text-center">
-          <p className="text-lg font-bold text-green-600">{onTrackCount}</p>
-          <p className="text-slate-500 text-[10px] mt-0.5">On track</p>
-        </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-2 text-center">
-          <p className="text-lg font-bold text-amber-600">{urgentCount}</p>
-          <p className="text-slate-500 text-[10px] mt-0.5">Urgent</p>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-xl p-2 text-center">
-          <p className="text-lg font-bold text-red-600">{jeopardyCount}</p>
-          <p className="text-slate-500 text-[10px] mt-0.5">Jeopardy</p>
         </div>
       </div>
 
@@ -455,47 +540,6 @@ function LoganKPIs({ jobs, onInspect }: { jobs: Job[]; onInspect: (supervisor: s
         </div>
       </div>
 
-      {/* Skill profile */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3">
-        <p className="text-slate-500 text-xs font-semibold mb-2">Skill Profile</p>
-        <div className="space-y-1.5">
-          {[
-            { label: "Starlink", level: "Advanced", color: "text-green-700 bg-green-50 border-green-200" },
-            { label: "Harvey Norman", level: "Advanced", color: "text-green-700 bg-green-50 border-green-200" },
-            { label: "Total Install", level: "Intermediate", color: "text-blue-700 bg-blue-50 border-blue-200" },
-            { label: "Insurance", level: "Learning", color: "text-amber-700 bg-amber-50 border-amber-200" },
-            { label: "Construction", level: "Not assigned", color: "text-slate-400 bg-slate-50 border-slate-200" },
-          ].map(s => (
-            <div key={s.label} className="flex items-center justify-between text-xs">
-              <span className="text-slate-600">{s.label}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${s.color}`}>{s.level}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Reporting line */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3">
-        <p className="text-slate-500 text-xs font-semibold mb-2">Reporting Line</p>
-        <div className="space-y-2">
-          {[
-            { name: "Logan (You)", role: "Operations Manager", active: true },
-            { name: "Ben Burns", role: "COO — 10x Labs", active: false },
-            { name: "Aaron Aitken", role: "CEO — Circl", active: false },
-          ].map((e, i) => (
-            <div key={i} className={`flex items-center gap-2 text-xs rounded-lg px-2 py-1.5 ${e.active ? "bg-[#e0f7ff] border border-[#00BDFE]/30" : ""}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${e.active ? "bg-[#00BDFE] text-white" : "bg-slate-100 text-slate-500"}`}>
-                {e.name[0]}
-              </div>
-              <div>
-                <p className={`font-semibold text-xs ${e.active ? "text-[#0099d4]" : "text-slate-600"}`}>{e.name}</p>
-                <p className="text-slate-400 text-[10px]">{e.role}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
     </div>
   );
 }
@@ -506,6 +550,18 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
 
   return (
     <div className="space-y-3">
+      <PersonalScorecard cfg={{
+        tier: "Silver",
+        rank: 3,
+        teamSize: 8,
+        tasksLeft: 2,
+        tasksGoal: 6,
+        kpis: [
+          { label: "SLA compliance", you: 84, avg: 79, unit: "%" },
+          { label: "Portal update rate", you: 89, avg: 82, unit: "%" },
+        ],
+      }} />
+
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <p className="text-2xl font-bold text-green-500">4</p>
@@ -585,26 +641,6 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-3">
-        <p className="text-slate-500 text-xs font-semibold mb-2">Escalation Chain</p>
-        <div className="space-y-2">
-          {[
-            { name: "Kerrie (You)", tier: "Tier 2 — Specialist", active: true },
-            { name: "Nicole B.", tier: "Tier 3 — Lead", active: false },
-            { name: "Aaron A.", tier: "Management", active: false },
-          ].map((e, i) => (
-            <div key={i} className={`flex items-center gap-2 text-xs rounded-lg px-2 py-1.5 ${e.active ? "bg-[#e0f7ff] border border-[#00BDFE]/30" : ""}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${e.active ? "bg-[#00BDFE] text-white" : "bg-slate-100 text-slate-500"}`}>
-                {e.name[0]}
-              </div>
-              <div>
-                <p className={`font-semibold text-xs ${e.active ? "text-[#0099d4]" : "text-slate-600"}`}>{e.name}</p>
-                <p className="text-slate-400 text-[10px]">{e.tier}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
@@ -614,18 +650,27 @@ function LoganQueueItem({ job, selected, onClick }: { job: Job; selected: boolea
   const urgent = job.geoStatus === "no_checkin" || job.priority === "urgent";
   const jeopardy = job.priority === "jeopardy";
   const unassigned = job.geoStatus === "unassigned";
+  const hardLimit = isHardLimit(job);
 
   return (
     <button
       onClick={onClick}
       className={`w-full text-left rounded-xl border p-3 transition-all duration-150 ${
         selected ? "bg-[#e0f7ff] border-[#00BDFE] shadow-sm"
+        : hardLimit ? "bg-white border-red-300 hover:border-red-400 shadow-sm"
         : jeopardy ? "bg-red-50 border-red-200 hover:border-red-300"
         : urgent ? "bg-amber-50 border-amber-200 hover:border-amber-300"
         : unassigned ? "bg-amber-50 border-amber-200 hover:border-amber-300"
         : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
       }`}
     >
+      {/* Hard limit banner */}
+      {hardLimit && (
+        <div className="flex items-center gap-1 mb-2 px-1.5 py-0.5 bg-red-50 border border-red-200 rounded-md w-fit">
+          <span className="text-red-500 text-[10px]">🔒</span>
+          <span className="text-red-600 text-[10px] font-semibold uppercase tracking-wide">Cannot defer</span>
+        </div>
+      )}
       {/* Primary: customer name */}
       <p className="text-slate-800 font-semibold text-sm truncate leading-tight">{job.customer}</p>
       {/* Secondary: trade name */}
@@ -650,6 +695,7 @@ function LoganQueueItem({ job, selected, onClick }: { job: Job; selected: boolea
 function KerrieQueueItem({ job, selected, onClick }: { job: Job; selected: boolean; onClick: () => void }) {
   const hasFlags = job.flags.length > 0;
   const isJeopardy = job.priority === "jeopardy";
+  const hardLimit = isHardLimit(job);
   const insurerShort = job.insurer?.replace(" Australia Insurance Ltd", "").replace(" Insurance", "") ?? "";
 
   return (
@@ -657,11 +703,19 @@ function KerrieQueueItem({ job, selected, onClick }: { job: Job; selected: boole
       onClick={onClick}
       className={`w-full text-left rounded-xl border p-3 transition-all duration-150 ${
         selected ? "bg-[#e0f7ff] border-[#00BDFE] shadow-sm"
+        : hardLimit ? "bg-white border-red-300 hover:border-red-400 shadow-sm"
         : isJeopardy ? "bg-red-50 border-red-200 hover:border-red-300"
         : hasFlags ? "bg-amber-50 border-amber-200 hover:border-amber-300"
         : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
       }`}
     >
+      {/* Hard limit banner */}
+      {hardLimit && (
+        <div className="flex items-center gap-1 mb-2 px-1.5 py-0.5 bg-red-50 border border-red-200 rounded-md w-fit">
+          <span className="text-red-500 text-[10px]">🔒</span>
+          <span className="text-red-600 text-[10px] font-semibold uppercase tracking-wide">Cannot defer</span>
+        </div>
+      )}
       {/* Primary: customer name */}
       <p className="text-slate-800 font-semibold text-sm truncate leading-tight">{job.customer}</p>
       {/* Secondary: suburb + trade */}
@@ -730,7 +784,7 @@ export default function CockpitView({ persona }: { persona: string }) {
     <div className="flex rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden" style={{ minHeight: "calc(100vh - 220px)" }}>
 
       {/* ── Column 1: Work Queue ──────────────────────────────────────────────── */}
-      <div className="w-64 flex-shrink-0 flex flex-col border-r border-slate-200 bg-slate-50">
+      <div className="w-64 xl:w-72 2xl:w-80 flex-shrink-0 flex flex-col border-r border-slate-200 bg-slate-50">
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-200 bg-white">
           <h2 className="text-slate-700 font-semibold text-sm">My Work Queue</h2>
           {urgentCount > 0 && (
@@ -808,6 +862,7 @@ export default function CockpitView({ persona }: { persona: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
+          <div className="max-w-3xl mx-auto">
           {isPatternView ? (
             <div className="animate-fadeIn space-y-4">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
@@ -935,11 +990,12 @@ export default function CockpitView({ persona }: { persona: string }) {
               />
             </div>
           )}
+          </div>
         </div>
       </div>
 
       {/* ── Column 3: My KPIs ─────────────────────────────────────────────────── */}
-      <div className="w-56 flex-shrink-0 flex flex-col border-l border-slate-200">
+      <div className="w-56 xl:w-64 2xl:w-72 flex-shrink-0 flex flex-col border-l border-slate-200">
         <div className="px-4 pt-4 pb-3 border-b border-slate-200">
           <h2 className="text-slate-700 font-semibold text-sm">My KPIs — Today</h2>
         </div>

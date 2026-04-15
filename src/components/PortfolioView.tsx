@@ -715,7 +715,7 @@ export default function PortfolioView({ persona }: { persona: string }) {
       <div className="flex-1 flex min-h-0 mx-4 mt-4 mb-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
 
         {/* Column 1 — Exceptions Queue */}
-        <div className="w-72 flex-shrink-0 flex flex-col border-r border-slate-200">
+        <div className="w-72 xl:w-80 2xl:w-96 flex-shrink-0 flex flex-col border-r border-slate-200">
           <div className="px-4 py-3 border-b border-slate-200 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-bold text-slate-800">Exceptions Queue</h2>
@@ -775,7 +775,7 @@ export default function PortfolioView({ persona }: { persona: string }) {
         </div>
 
         {/* Column 3 — Platform Health */}
-        <div className="w-64 flex-shrink-0 flex flex-col">
+        <div className="w-64 xl:w-72 2xl:w-80 flex-shrink-0 flex flex-col">
           <div className="px-4 py-3 border-b border-slate-200 flex-shrink-0">
             <h2 className="text-sm font-bold text-slate-800">Platform Health</h2>
           </div>
