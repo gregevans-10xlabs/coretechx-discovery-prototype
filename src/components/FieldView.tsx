@@ -1,9 +1,27 @@
 import { useState } from "react";
 import { JOBS, type Job, STARLINK_JOURNEY, HN_JOURNEY, INSURANCE_JOURNEY, AHO_JOURNEY } from "../data/jobs";
+import PerformanceHub from "./PerformanceHub";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 // helpers used in sub-components
 function _cc(_v: number) { return ""; } void _cc;
+
+// Background volume (illustrative — dataset is a subset)
+const FIELD_REGION_TOTAL: Record<string, number> = {
+  conner: 420,
+  blake:  310,
+};
+
+// Sort: action-required first, then by priority, then rest
+function sortDecisionFirst(jobs: Job[]): Job[] {
+  const score = (j: Job) => {
+    if (j.actionRequired && j.priority === "jeopardy") return 0;
+    if (j.actionRequired && j.priority === "urgent")   return 1;
+    if (j.actionRequired)                              return 2;
+    return 10;
+  };
+  return [...jobs].sort((a, b) => score(a) - score(b));
+}
 function confBadge(v: number) {
   const base = "text-xs font-mono font-bold px-2 py-0.5 rounded-full border";
   if (v >= 0.75) return `${base} bg-green-50 text-green-700 border-green-200`;
@@ -199,43 +217,51 @@ const FIELD_CONFIG: Record<string, {
 };
 
 export default function FieldView({ persona }: { persona: string }) {
-  const config = FIELD_CONFIG[persona] ?? FIELD_CONFIG.blake;
-  const myJobs = JOBS.filter(j => j.visibleTo.includes(persona));
+  const config  = FIELD_CONFIG[persona] ?? FIELD_CONFIG.blake;
+  const allJobs = sortDecisionFirst(JOBS.filter(j => j.visibleTo.includes(persona)));
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filterTab, setFilterTab] = useState<"all" | "urgent" | "complete">("all");
+  const decisionJobs = allJobs.filter(j => j.actionRequired !== null);
+  const regionTotal  = FIELD_REGION_TOTAL[persona] ?? 300;
+  const aiHandling   = regionTotal - decisionJobs.length;
 
-  const selectedJob = selectedId ? myJobs.find(j => j.id === selectedId) ?? null : null;
+  const [filterTab, setFilterTab] = useState<"action" | "browse" | "complete">("action");
+  const [selectedId, setSelectedId] = useState<string | null>(decisionJobs[0]?.id ?? null);
 
-  const filteredJobs = myJobs.filter(j => {
-    if (filterTab === "urgent") return j.priority === "urgent" || j.priority === "jeopardy";
+  const selectedJob = selectedId ? allJobs.find(j => j.id === selectedId) ?? null : null;
+
+  const filteredJobs = allJobs.filter(j => {
+    if (filterTab === "action")   return j.actionRequired !== null;
     if (filterTab === "complete") return j.primeStatus === "Works Complete" || j.primeStatus === "Invoiced";
     return true;
   });
 
-  const urgentCount = myJobs.filter(j => j.priority === "urgent" || j.priority === "jeopardy").length;
-  const actionCount = myJobs.filter(j => j.actionRequired !== null).length;
+  const decisionCount = decisionJobs.length;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: "600px" }}>
       <div className="flex h-full">
 
-        {/* ── Column 1: My Work Queue ─────────────────────────────────────── */}
+        {/* ── Column 1: Decision Queue ─────────────────────────────────────── */}
         <div className="w-64 flex-shrink-0 flex flex-col border-r border-slate-200">
           <div className="px-4 pt-4 pb-3 border-b border-slate-200 flex-shrink-0">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-slate-700 font-semibold text-sm">My Work Queue</h2>
-              {urgentCount > 0 && (
-                <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
-                  {urgentCount} urgent
+            <div className="flex items-center justify-between mb-0.5">
+              <h2 className="text-slate-700 font-semibold text-sm">Action Required</h2>
+              {decisionCount > 0 && (
+                <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">
+                  {decisionCount}
                 </span>
               )}
             </div>
+            <p className="text-slate-400 text-[10px] mb-3">AI handling {aiHandling.toLocaleString()} others</p>
             <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
-              {(["all", "urgent", "complete"] as const).map(tab => (
-                <button key={tab} onClick={() => setFilterTab(tab)}
-                  className={`flex-1 text-xs py-1 rounded-md font-medium transition-colors capitalize ${filterTab === tab ? "bg-[#00BDFE] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-                  {tab}
+              {([
+                { key: "action",   label: `Decisions (${decisionCount})` },
+                { key: "browse",   label: "Browse all" },
+                { key: "complete", label: "Complete" },
+              ] as const).map(tab => (
+                <button key={tab.key} onClick={() => setFilterTab(tab.key)}
+                  className={`flex-1 text-[10px] py-1 rounded-md font-semibold transition-colors ${filterTab === tab.key ? "bg-[#00BDFE] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -243,9 +269,17 @@ export default function FieldView({ persona }: { persona: string }) {
 
           <div className="flex-1 overflow-y-auto py-2 scrollbar-thin relative">
             <div className="space-y-1 px-2">
-              {filteredJobs.length === 0 ? (
+              {filteredJobs.length === 0 && filterTab === "action" ? (
+                <div className="text-center px-3 py-8 space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto">
+                    <span className="text-green-500 text-lg">✓</span>
+                  </div>
+                  <p className="text-slate-600 text-xs font-semibold">Nothing needs your attention</p>
+                  <p className="text-slate-400 text-[10px] leading-relaxed">AI is handling all {regionTotal.toLocaleString()} active jobs</p>
+                </div>
+              ) : filteredJobs.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-slate-400 text-xs">No jobs in this filter</p>
+                  <p className="text-slate-400 text-xs">No jobs in this view</p>
                 </div>
               ) : filteredJobs.map(job => {
                 const isSelected = selectedId === job.id;
@@ -288,15 +322,22 @@ export default function FieldView({ persona }: { persona: string }) {
 
           {selectedJob === null ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-[#e0f7ff] border-2 border-[#00BDFE]/30 flex items-center justify-center mb-4">
-                <span className="text-2xl">🔧</span>
-              </div>
-              <p className="text-slate-700 font-semibold text-sm mb-1">Select a job from the queue</p>
-              <p className="text-slate-400 text-xs max-w-48 leading-relaxed">AI has handled everything — you only act when required</p>
-              {actionCount > 0 && (
-                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                  <p className="text-amber-700 text-xs font-semibold">⚡ {actionCount} job{actionCount > 1 ? "s" : ""} need{actionCount === 1 ? "s" : ""} your attention</p>
-                </div>
+              {decisionCount === 0 ? (
+                <>
+                  <div className="w-14 h-14 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center mb-4">
+                    <span className="text-green-500 text-2xl">✓</span>
+                  </div>
+                  <p className="text-slate-700 font-semibold text-sm mb-1">Nothing needs your attention</p>
+                  <p className="text-slate-400 text-xs max-w-48 leading-relaxed">AI is handling all {regionTotal.toLocaleString()} active jobs in your region</p>
+                </>
+              ) : (
+                <>
+                  <div className="w-14 h-14 rounded-full bg-[#e0f7ff] border-2 border-[#00BDFE]/30 flex items-center justify-center mb-4">
+                    <span className="text-2xl">🔧</span>
+                  </div>
+                  <p className="text-slate-700 font-semibold text-sm mb-1">Select a job to review</p>
+                  <p className="text-slate-400 text-xs max-w-48 leading-relaxed">AI is handling {aiHandling.toLocaleString()} others — only these {decisionCount} need you</p>
+                </>
               )}
             </div>
           ) : (
@@ -304,63 +345,18 @@ export default function FieldView({ persona }: { persona: string }) {
           )}
         </div>
 
-        {/* ── Column 3: My KPIs ───────────────────────────────────────────── */}
+        {/* ── Column 3: My Performance ────────────────────────────────────── */}
         <div className="w-60 flex-shrink-0 flex flex-col">
           <div className="px-4 pt-4 pb-3 border-b border-slate-200 flex-shrink-0">
-            <h2 className="text-slate-700 font-semibold text-sm">{config.kpiLabel}</h2>
+            <h2 className="text-slate-700 font-semibold text-sm">My Performance</h2>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
 
-            {/* KPI cards */}
-            <div className="space-y-2">
-              {config.kpis.map((kpi, i) => (
-                <div key={i} className="bg-white border border-slate-200 rounded-xl p-3">
-                  <p className="text-slate-400 text-xs mb-1">{kpi.label}</p>
-                  <p className={`text-2xl font-bold ${kpi.color ?? "text-slate-800"}`}>{kpi.value}</p>
-                  {kpi.sub && <p className="text-slate-400 text-xs mt-0.5">{kpi.sub}</p>}
-                </div>
-              ))}
-            </div>
-
-            {/* Skill profile */}
-            <div>
-              <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Skill Profile</p>
-              <div className="space-y-2">
-                {config.skills.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <p className="text-slate-600 text-xs">{s.label}</p>
-                    <span className={`text-xs font-semibold ${s.color}`}>{s.level}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Weekly progress */}
-            <div>
-              <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">This Week</p>
-              <div className="space-y-2.5">
-                {[
-                  { label: "Jobs completed", value: 8, target: 10 },
-                  { label: "On-time rate", value: 87, target: 90 },
-                  { label: "AI-automated", value: 92, target: 95 },
-                ].map((m, i) => (
-                  <div key={i}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-slate-600">{m.label}</span>
-                      <span className={`font-semibold ${m.value >= m.target ? "text-green-600" : "text-amber-500"}`}>{m.value}{i > 0 ? "%" : ""}</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div className={`h-1.5 rounded-full ${m.value >= m.target ? "bg-green-400" : "bg-amber-400"}`} style={{ width: `${Math.min(m.value / m.target * 100, 100)}%` }} />
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Target: {m.target}{i > 0 ? "%" : ""}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <PerformanceHub persona={persona} />
 
             {/* Escalation chain */}
             <div>
-              <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Escalation Chain</p>
+              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-2">Escalation Chain</p>
               <div className="space-y-1.5">
                 {[
                   { name: persona === "conner" ? "Conner" : "Blake", role: config.role, you: true },

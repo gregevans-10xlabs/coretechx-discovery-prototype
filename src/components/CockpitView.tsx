@@ -1,10 +1,29 @@
 import { useState } from "react";
 import { loganQueueJobs, kerrieQueueJobs, STARLINK_JOURNEY, HN_JOURNEY, INSURANCE_JOURNEY } from "../data/jobs";
 import type { Job } from "../data/jobs";
-import { MORNING } from "../data/scenarios";
+import { ALL_PATTERNS } from "../data/scenarios";
+import PerformanceHub from "./PerformanceHub";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type QueueFilter = "all" | "urgent" | "jeopardy" | "planned";
+type QueueFilter = "action" | "browse" | "planned";
+
+// ─── Sort: action-required items first, ranked by severity ───────────────────
+// Hard limits (🔒) → jeopardy → urgent → standard → AI-handled (by window time)
+function sortDecisionFirst(jobs: Job[]): Job[] {
+  const score = (j: Job) => {
+    const hard = j.flags.some(f => f.type === "compliance_gap" || f.type === "scope_change");
+    if (hard && j.actionRequired) return 0;
+    if (j.actionRequired && j.priority === "jeopardy") return 1;
+    if (j.actionRequired && j.priority === "urgent") return 2;
+    if (j.actionRequired) return 3;
+    return 10 + Math.max(0, j.minsToWindow) / 10000; // AI-handled: sort by window proximity
+  };
+  return [...jobs].sort((a, b) => score(a) - score(b));
+}
+
+// Background job volume (illustrative — prototype data is a regional slice)
+const LOGAN_REGION_TOTAL  = 3450;
+const KERRIE_REGION_TOTAL = 240;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function journeyForJob(job: Job): string[] {
@@ -285,25 +304,36 @@ function JobDetail({ job, persona, onAction }: {
       )}
 
       {/* Actions — only if not read-only */}
-      {!isReadOnly && job.actionOptions.length > 0 && !actionDone && (
-        <div className="flex flex-wrap gap-2 pt-1">
-          {job.actionOptions.map((a, i) => (
-            <button
-              key={a}
-              onClick={() => { setActionDone(a); onAction(job.id, a); }}
-              className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
-                i === 0
-                  ? `text-white shadow-sm ${isInsurance ? "bg-orange-500 hover:bg-orange-600" : "bg-[#00BDFE] hover:bg-[#0099d4]"}`
-                  : i === job.actionOptions.length - 1
-                  ? "bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs"
-                  : "bg-white border border-slate-300 hover:bg-slate-50 text-slate-700"
-              }`}
-            >
-              {a}
-            </button>
-          ))}
-        </div>
-      )}
+      {!isReadOnly && job.actionOptions.length > 0 && !actionDone && (() => {
+        const hardLimit = isHardLimit(job);
+        // Hard-limit jobs: strip any defer/reschedule/escalate escape options —
+        // Aaron's rule: safety, WHS, and financial >$1k cannot be reprioritised by the actor.
+        const DEFER_WORDS = /defer|reschedule|later|tomorrow|skip|reassign/i;
+        const visibleOptions = hardLimit
+          ? job.actionOptions.filter(a => !DEFER_WORDS.test(a))
+          : job.actionOptions;
+        return (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {visibleOptions.map((a, i) => (
+              <button
+                key={a}
+                onClick={() => { setActionDone(a); onAction(job.id, a); }}
+                className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
+                  i === 0
+                    ? `text-white shadow-sm ${isInsurance ? "bg-orange-500 hover:bg-orange-600" : "bg-[#00BDFE] hover:bg-[#0099d4]"}`
+                    : hardLimit
+                    ? "bg-white border border-red-200 hover:bg-red-50 text-red-700"
+                    : i === visibleOptions.length - 1
+                    ? "bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs"
+                    : "bg-white border border-slate-300 hover:bg-slate-50 text-slate-700"
+                }`}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
       {actionDone && (
         <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-green-700 text-sm">
           ✓ {actionDone} — logged
@@ -320,82 +350,31 @@ function isHardLimit(job: Job): boolean {
   return job.flags.some(f => f.type === "compliance_gap" || f.type === "scope_change");
 }
 
-// ─── Personal Performance Scorecard ──────────────────────────────────────────
-type ScorecardConfig = {
-  tier: "Gold" | "Silver" | "Bronze";
-  rank: number;
-  teamSize: number;
-  tasksLeft: number;
-  tasksGoal: number;
-  kpis: { label: string; you: number; avg: number; unit: string }[];
-};
-
-function PersonalScorecard({ cfg }: { cfg: ScorecardConfig }) {
-  const tierIcon  = cfg.tier === "Gold" ? "⭐" : cfg.tier === "Silver" ? "🥈" : "🥉";
-  const tierColor = cfg.tier === "Gold"
-    ? "text-amber-700 bg-amber-50 border-amber-300"
-    : cfg.tier === "Silver"
-    ? "text-slate-600 bg-slate-100 border-slate-300"
-    : "text-orange-700 bg-orange-50 border-orange-300";
-  const progress = Math.round(((cfg.tasksGoal - cfg.tasksLeft) / cfg.tasksGoal) * 100);
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2.5">
-      {/* Tier + rank */}
-      <div className="flex items-center justify-between">
-        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${tierColor}`}>
-          {tierIcon} {cfg.tier}
-        </span>
-        <span className="text-slate-500 text-xs">
-          <span className="font-bold text-slate-700">#{cfg.rank}</span> of {cfg.teamSize} in region
-        </span>
-      </div>
-
-      {/* Tasks-to-target */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-slate-500 text-[10px]">Today's target</span>
-          <span className="text-slate-500 text-[10px] font-semibold">
-            {cfg.tasksLeft > 0
-              ? `${cfg.tasksLeft} more to hold ${cfg.tier}`
-              : `Target met ✓`}
-          </span>
-        </div>
-        <div className="w-full bg-slate-100 rounded-full h-1.5">
-          <div
-            className={`h-1.5 rounded-full transition-all ${cfg.tier === "Gold" ? "bg-amber-400" : cfg.tier === "Silver" ? "bg-slate-400" : "bg-orange-400"}`}
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Personal KPIs vs team avg */}
-      <div className="space-y-1.5 pt-0.5">
-        {cfg.kpis.map(k => {
-          const delta = k.you - k.avg;
-          const isGood = delta >= 0;
-          return (
-            <div key={k.label} className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 truncate flex-1 min-w-0 mr-2">{k.label}</span>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <span className="font-semibold text-slate-700">{k.you}{k.unit}</span>
-                <span className={`text-[10px] font-medium ${isGood ? "text-green-600" : "text-red-500"}`}>
-                  {isGood ? "↑" : "↓"}{Math.abs(delta)}{k.unit} vs avg
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ─── KPI Panel — Logan ────────────────────────────────────────────────────────
 function LoganKPIs({ jobs, onInspect }: { jobs: Job[]; onInspect: (supervisor: string) => void }) {
   const urgentCount = jobs.filter(j => j.geoStatus === "no_checkin" || j.priority === "urgent").length;
   const jeopardyCount = jobs.filter(j => j.priority === "jeopardy").length;
   const onTrackCount = jobs.filter(j => j.geoStatus === "confirmed_en_route" || j.geoStatus === "gps_active").length;
+  const [deferralsOpen, setDeferralsOpen] = useState(true);
+
+  // Illustrative deferrals — tasks reprioritised by field team without manager sign-off
+  const deferrals = [
+    {
+      task: "Site audit — Penrith Install",
+      who: "Troy Macpherson", role: "Field Supervisor",
+      time: "07:42", jobId: "CG-2417931", urgent: true,
+    },
+    {
+      task: "Photo evidence upload — Minto",
+      who: "MJ Electrical", role: "Trade",
+      time: "08:15", jobId: "CG-2418042", urgent: false,
+    },
+    {
+      task: "Customer call-back — Coffs Harbour",
+      who: "Kylie Tran", role: "Field Supervisor",
+      time: "09:03", jobId: "CG-2418109", urgent: false,
+    },
+  ];
 
   const fieldSupervisors = [
     {
@@ -421,17 +400,7 @@ function LoganKPIs({ jobs, onInspect }: { jobs: Job[]; onInspect: (supervisor: s
   return (
     <div className="space-y-3">
 
-      <PersonalScorecard cfg={{
-        tier: "Gold",
-        rank: 2,
-        teamSize: 14,
-        tasksLeft: 3,
-        tasksGoal: 10,
-        kpis: [
-          { label: "On-time completion", you: 91, avg: 85, unit: "%" },
-          { label: "Evidence submitted", you: 94, avg: 88, unit: "%" },
-        ],
-      }} />
+      <PerformanceHub persona="logan" />
 
       {/* Region snapshot — merged */}
       <div className="bg-[#e0f7ff] border border-[#00BDFE]/30 rounded-xl p-3">
@@ -483,6 +452,44 @@ function LoganKPIs({ jobs, onInspect }: { jobs: Job[]; onInspect: (supervisor: s
           })}
         </div>
       </div>
+
+      {/* Deferred by Team — exception-driven: only shown when deferrals exist */}
+      {deferrals.length > 0 && (
+        <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
+          <button
+            onClick={() => setDeferralsOpen(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-amber-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-amber-500 text-xs">⚠</span>
+              <p className="text-amber-700 text-xs font-semibold">Deferred by team</p>
+              <span className="bg-amber-100 text-amber-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-amber-200">
+                {deferrals.length}
+              </span>
+            </div>
+            <span className="text-slate-400 text-[10px]">{deferralsOpen ? "▲" : "▼"}</span>
+          </button>
+          {deferralsOpen && (
+            <div className="border-t border-amber-100 divide-y divide-slate-100">
+              {deferrals.map((d, i) => (
+                <div key={i} className="px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-1 mb-0.5">
+                    <p className="text-slate-700 text-xs font-semibold leading-tight">{d.task}</p>
+                    {d.urgent && (
+                      <span className="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold flex-shrink-0">urgent</span>
+                    )}
+                  </div>
+                  <p className="text-slate-500 text-[10px]">{d.who} · {d.role}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-slate-400 text-[10px]">Deferred {d.time}</span>
+                    <span className="text-[#0077a8] text-[10px] font-mono cursor-pointer hover:underline">{d.jobId}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Field Supervisors */}
       <div className="bg-white rounded-xl border border-slate-200 p-3">
@@ -550,17 +557,7 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
 
   return (
     <div className="space-y-3">
-      <PersonalScorecard cfg={{
-        tier: "Silver",
-        rank: 3,
-        teamSize: 8,
-        tasksLeft: 2,
-        tasksGoal: 6,
-        kpis: [
-          { label: "SLA compliance", you: 84, avg: 79, unit: "%" },
-          { label: "Portal update rate", you: 89, avg: 82, unit: "%" },
-        ],
-      }} />
+      <PerformanceHub persona="kerrie" />
 
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
@@ -740,113 +737,251 @@ function KerrieQueueItem({ job, selected, onClick }: { job: Job; selected: boole
   );
 }
 
+// ─── Pattern Queue Card (Logan only) ─────────────────────────────────────────
+type LoganPattern = typeof ALL_PATTERNS[0];
+
+function PatternQueueCard({ pattern: p, selected, onClick }: {
+  pattern: LoganPattern; selected: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left rounded-xl border p-3 transition-all duration-150 ${
+        selected        ? "bg-[#e0f7ff] border-[#00BDFE] shadow-sm"
+        : p.severity === "high" ? "bg-red-50 border-red-200 hover:border-red-300"
+        : "bg-amber-50 border-amber-200 hover:border-amber-300"
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <span className="text-lg flex-shrink-0 mt-0.5">{p.icon}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-slate-700 font-semibold text-xs leading-tight">{p.title}</p>
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+              p.severity === "high" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
+            }`}>{p.severity}</span>
+            <span className="text-[10px] text-slate-400">AI Pattern</span>
+            <span className="text-[10px] text-slate-300">·</span>
+            <span className="text-[10px] text-slate-400">{p.affected}</span>
+          </div>
+          <p className="text-amber-700 text-[10px] mt-1.5 font-medium truncate">⚡ {p.action}</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// ─── Pattern Detail Panel (CockpitView — Logan) ───────────────────────────────
+const PATTERN_LOGS: Record<string, { time: string; action: string; auto: boolean }[]> = {
+  "P-041": [
+    { time: "Mon 09:14", action: "Sandbar Electrical Services unresponsive — shadow plan activated for CG36110", auto: true },
+    { time: "Mon 11:30", action: "DRC Solar declined CG35978 — no available capacity in zone", auto: true },
+    { time: "Tue 08:00", action: "CG36015 rescheduled — third attempt. Pattern threshold exceeded.", auto: true },
+    { time: "Now",       action: "Coverage gap confirmed. Targeted recruitment required for 2428–2430 postcodes.", auto: false },
+  ],
+  "P-039": [
+    { time: "Sat 18:00",     action: "CG35954 completed — photo submission window opened (48h)", auto: true },
+    { time: "Sun 14:00",     action: "CG36003 completed — photo submission window opened (48h)", auto: true },
+    { time: "Mon 07:01",     action: "Auto-reminder sent to York Digital Solutions via Chekku", auto: true },
+    { time: "Mon 07:30",     action: "CG36015 completed — 3rd job, 0 photos. Pattern threshold exceeded.", auto: true },
+    { time: "Now",           action: "Escalated to Logan — invoicing blocked on all 3 jobs. Human action required.", auto: false },
+  ],
+};
+
+function CockpitPatternDetail({ pattern: p, onClose }: { pattern: LoganPattern; onClose: () => void }) {
+  const [actioned, setActioned] = useState(false);
+  const log = PATTERN_LOGS[p.id] ?? [];
+  const isHigh = p.severity === "high";
+
+  return (
+    <div className="animate-fadeIn space-y-4">
+      {/* Header */}
+      <div className={`rounded-xl p-4 border ${isHigh ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">{p.icon}</span>
+            <div>
+              <p className={`font-bold text-sm ${isHigh ? "text-red-800" : "text-amber-800"}`}>{p.title}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs bg-white border border-slate-200 text-slate-500 px-2 py-0.5 rounded">{p.type}</span>
+                <span className="text-xs text-slate-400">{p.affected}</span>
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs flex-shrink-0">✕ close</button>
+        </div>
+        <p className={`text-xs leading-relaxed ${isHigh ? "text-red-700" : "text-amber-700"}`}>{p.detail}</p>
+      </div>
+
+      {/* AI Activity Log */}
+      {log.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">AI Activity Log</p>
+          {log.map((entry, i) => (
+            <div key={i} className={`flex items-start gap-2.5 rounded-lg px-3 py-2 text-xs ${
+              !entry.auto ? "bg-amber-50 border-2 border-amber-300" : "bg-slate-50 border border-slate-200"
+            }`}>
+              <span className={`mt-0.5 flex-shrink-0 ${entry.auto ? "text-[#00BDFE]" : "text-amber-500"}`}>
+                {entry.auto ? "✦" : "⚡"}
+              </span>
+              <div className="flex-1">
+                <p className={entry.auto ? "text-slate-600" : "text-amber-700 font-semibold"}>{entry.action}</p>
+                <p className="text-slate-400 text-[10px] mt-0.5">{entry.time}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Actions */}
+      {!actioned ? (
+        <div className="space-y-2 pt-1">
+          <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Action Required</p>
+          <button
+            onClick={() => setActioned(true)}
+            className="w-full bg-[#00BDFE] text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-[#009fd6] transition-colors"
+          >
+            ⚡ {p.action}
+          </button>
+          <button className="w-full border border-slate-300 text-slate-600 text-xs font-medium py-2 rounded-lg hover:bg-slate-50 transition-colors">
+            📋 Log for review — escalate to National Ops
+          </button>
+        </div>
+      ) : (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-green-500 text-lg">✓</span>
+          <div>
+            <p className="text-green-700 text-sm font-semibold">Action logged</p>
+            <p className="text-green-600 text-xs mt-0.5">Recorded in audit trail</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main CockpitView ─────────────────────────────────────────────────────────
 export default function CockpitView({ persona }: { persona: string }) {
   const isKerrie = persona === "kerrie";
-  const [filter, setFilter] = useState<QueueFilter>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [, setActionsDone] = useState<Record<string, string>>({});
 
-  const loganQueue = loganQueueJobs();
-  const kerrieQueue = kerrieQueueJobs();
+  const loganQueue  = sortDecisionFirst(loganQueueJobs());
+  const kerrieQueue = sortDecisionFirst(kerrieQueueJobs());
+  const fullQueue   = isKerrie ? kerrieQueue : loganQueue;
 
-  const filteredLogan = loganQueue.filter(j => {
-    if (filter === "all") return true;
-    if (filter === "urgent") return j.geoStatus === "no_checkin" || j.priority === "urgent";
-    if (filter === "jeopardy") return j.priority === "jeopardy" || j.conf < 0.5;
-    if (filter === "planned") return j.minsToWindow > 60 && j.geoStatus !== "no_checkin";
-    return true;
+  // Decision queue: only jobs that need a human decision
+  const decisionQueue = fullQueue.filter(j => j.actionRequired !== null);
+  // First decision job auto-selected on load
+  const [filter, setFilter]       = useState<QueueFilter>("action");
+  const [selectedId, setSelectedId] = useState<string | null>(decisionQueue[0]?.id ?? null);
+  const [, setActionsDone]        = useState<Record<string, string>>({});
+
+  const filteredQueue = fullQueue.filter(j => {
+    if (filter === "action")  return j.actionRequired !== null;
+    if (filter === "planned") return j.minsToWindow > 60 && j.geoStatus !== "no_checkin" && !j.actionRequired;
+    return true; // "browse"
   });
 
-  const filteredKerrie = kerrieQueue.filter(j => {
-    if (filter === "all") return true;
-    if (filter === "urgent") return j.flags.length > 0;
-    if (filter === "jeopardy") return j.priority === "jeopardy";
-    if (filter === "planned") return j.flags.length === 0;
-    return true;
-  });
-
-  const isPatternView = selectedId?.startsWith("PATTERN:") ?? false;
-  const isInspectView = selectedId?.startsWith("INSPECT:") ?? false;
-  const selectedJob = selectedId && !isPatternView && !isInspectView
-    ? (isKerrie ? kerrieQueue : loganQueue).find(j => j.id === selectedId) ?? null
+  const isPatternView    = selectedId?.startsWith("PATTERN:") ?? false;
+  const isInspectView    = selectedId?.startsWith("INSPECT:") ?? false;
+  const selectedJob      = selectedId && !isPatternView && !isInspectView
+    ? fullQueue.find(j => j.id === selectedId) ?? null
     : null;
   const inspectSupervisor = isInspectView ? selectedId!.replace("INSPECT:", "") : null;
 
-  const urgentCount = isKerrie
-    ? kerrieQueue.filter(j => j.flags.length > 0).length
-    : loganQueue.filter(j => j.geoStatus === "no_checkin" || j.priority === "urgent").length;
+  // Logan only: region patterns (P-041 and P-039 are North East; P-037 is National)
+  const loganPatterns = ALL_PATTERNS.filter(p => p.region === "North East");
+  const selectedPattern = isPatternView
+    ? ALL_PATTERNS.find(p => selectedId === `PATTERN:${p.id}`) ?? null
+    : null;
 
-  const briefingItems = MORNING.filter(m => m.severity === "high").slice(0, 2);
-  const queueList = isKerrie ? filteredKerrie : filteredLogan;
+  const decisionCount   = decisionQueue.length;
+  const aiHandlingCount = isKerrie ? KERRIE_REGION_TOTAL - decisionCount : LOGAN_REGION_TOTAL - decisionCount;
+
+  // Tab labels
+  const TABS: { key: QueueFilter; label: string }[] = [
+    { key: "action",  label: `Decisions (${decisionCount})` },
+    { key: "planned", label: "Planned" },
+    { key: "browse",  label: "Browse all" },
+  ];
 
   return (
     <div className="flex rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden" style={{ minHeight: "calc(100vh - 220px)" }}>
 
-      {/* ── Column 1: Work Queue ──────────────────────────────────────────────── */}
+      {/* ── Column 1: Decision Queue ──────────────────────────────────────────── */}
       <div className="w-64 xl:w-72 2xl:w-80 flex-shrink-0 flex flex-col border-r border-slate-200 bg-slate-50">
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-200 bg-white">
-          <h2 className="text-slate-700 font-semibold text-sm">My Work Queue</h2>
-          {urgentCount > 0 && (
-            <span className="text-xs bg-red-100 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-semibold">
-              {urgentCount} urgent
-            </span>
-          )}
+
+        {/* Header */}
+        <div className="px-4 pt-4 pb-3 border-b border-slate-200 bg-white">
+          <div className="flex items-center justify-between mb-0.5">
+            <h2 className="text-slate-700 font-semibold text-sm">Action Required</h2>
+            {decisionCount > 0 && (
+              <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">
+                {decisionCount}
+              </span>
+            )}
+          </div>
+          <p className="text-slate-400 text-[10px]">AI handling {aiHandlingCount.toLocaleString()} others</p>
         </div>
 
-        <div className="flex gap-1 px-3 py-2.5 border-b border-slate-200 bg-white">
-          {(["all", "urgent", "jeopardy", "planned"] as QueueFilter[]).map(f => (
+        {/* Tabs */}
+        <div className="flex gap-0.5 px-3 py-2 border-b border-slate-200 bg-white">
+          {TABS.map(t => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`flex-1 text-xs py-1 rounded-md font-medium capitalize transition-colors ${
-                filter === f
+              key={t.key}
+              onClick={() => setFilter(t.key)}
+              className={`flex-1 text-[10px] py-1 rounded-md font-semibold transition-colors ${
+                filter === t.key
                   ? "bg-[#00BDFE] text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
               }`}
             >
-              {f}
+              {t.label}
             </button>
           ))}
         </div>
 
-        {!isKerrie && briefingItems.length > 0 && (
-          <div className="px-3 pt-2.5 space-y-1.5">
-            {briefingItems.map((item, i) => {
-              const hasLink = !!(item as {jobRef?: string | null}).jobRef;
-              const jobRef = (item as {jobRef?: string | null}).jobRef;
-              return hasLink ? (
-                <button
-                  key={i}
-                  onClick={() => setSelectedId(jobRef!)}
-                  className={`w-full text-left bg-amber-50 border rounded-lg px-2.5 py-2 text-xs text-amber-700 leading-snug transition-colors hover:bg-amber-100 hover:border-amber-300 ${selectedId === jobRef ? 'border-[#00BDFE] bg-[#e0f7ff] text-[#0077a8]' : 'border-amber-200'}`}
-                >
-                  <span className="mr-1">{item.icon}</span>
-                  {item.msg.slice(0, 80)}{item.msg.length > 80 ? "…" : ""}
-                  <span className="ml-1 text-[10px] font-semibold opacity-60">→ view job</span>
-                </button>
-              ) : (
-                <div key={i} className="bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 text-xs text-amber-700 leading-snug">
-                  <span className="mr-1">{item.icon}</span>{item.msg.slice(0, 80)}{item.msg.length > 80 ? "…" : ""}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
+        {/* Queue list */}
         <div className="flex-1 overflow-y-auto px-3 py-2.5 space-y-2 relative">
-          {queueList.length === 0 ? (
-            <p className="text-slate-400 text-xs text-center py-6">No jobs match this filter</p>
+          {filteredQueue.length === 0 && filter === "action" ? (
+            <div className="text-center px-3 py-8 space-y-2">
+              <div className="w-10 h-10 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto">
+                <span className="text-green-500 text-lg">✓</span>
+              </div>
+              <p className="text-slate-600 text-xs font-semibold">Nothing needs your attention</p>
+              <p className="text-slate-400 text-[10px] leading-relaxed">
+                AI is handling all {(isKerrie ? KERRIE_REGION_TOTAL : LOGAN_REGION_TOTAL).toLocaleString()} active jobs in your region
+              </p>
+            </div>
+          ) : filteredQueue.length === 0 ? (
+            <p className="text-slate-400 text-xs text-center py-6">No jobs in this view</p>
           ) : isKerrie ? (
-            (filteredKerrie as Job[]).map(j => (
+            filteredQueue.map(j => (
               <KerrieQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} />
             ))
           ) : (
-            (filteredLogan as Job[]).map(j => (
-              <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} />
-            ))
+            <>
+              {filteredQueue.map(j => (
+                <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} />
+              ))}
+              {/* Pattern cards — Logan only, shown in Decisions tab */}
+              {filter === "action" && loganPatterns.length > 0 && (
+                <>
+                  <div className="px-1 pt-2 pb-0.5">
+                    <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider">AI Patterns Detected</p>
+                  </div>
+                  {loganPatterns.map(p => (
+                    <PatternQueueCard
+                      key={p.id}
+                      pattern={p}
+                      selected={selectedId === `PATTERN:${p.id}`}
+                      onClick={() => setSelectedId(`PATTERN:${p.id}`)}
+                    />
+                  ))}
+                </>
+              )}
+            </>
           )}
-          {queueList.length > 4 && (
+          {filteredQueue.length > 4 && (
             <div className="sticky bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-50 to-transparent pointer-events-none" />
           )}
         </div>
@@ -863,67 +998,10 @@ export default function CockpitView({ persona }: { persona: string }) {
 
         <div className="flex-1 overflow-y-auto p-5">
           <div className="max-w-3xl mx-auto">
-          {isPatternView ? (
-            <div className="animate-fadeIn space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <div className="flex items-start gap-3 mb-3">
-                  <span className="text-xl">📷</span>
-                  <div>
-                    <p className="text-amber-800 font-semibold text-sm">Evidence non-submission — York Digital Solutions</p>
-                    <p className="text-amber-600 text-xs mt-0.5">Pattern detected · 3 affected jobs · Invoicing blocked</p>
-                  </div>
-                </div>
-                <p className="text-amber-700 text-xs leading-relaxed">
-                  York Digital Solutions completed 3 Starlink installs over 4 days with 0 photos submitted.
-                  Invoicing is blocked on all 3 jobs. Auto-reminder sent at 07:01. No response after 48+ hours.
-                  Pattern threshold exceeded — formal action required.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Affected Jobs</p>
-                {[
-                  { id: "CG35954", suburb: "Broke NSW", date: "7 Apr", status: "Complete — awaiting evidence" },
-                  { id: "CG36003", suburb: "Fern Bay NSW", date: "5 Apr", status: "Complete — awaiting evidence" },
-                  { id: "CG36015", suburb: "Moruya NSW", date: "3 Apr", status: "Complete — awaiting evidence" },
-                ].map(j => (
-                  <div key={j.id} className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 flex items-center justify-between">
-                    <div>
-                      <p className="text-slate-700 text-xs font-semibold">{j.id} · {j.suburb}</p>
-                      <p className="text-slate-400 text-[10px] mt-0.5">{j.date} · {j.status}</p>
-                    </div>
-                    <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-medium">Invoice blocked</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">AI Activity Log</p>
-                {[
-                  { time: "07:01", action: "Auto-reminder sent to York Digital Solutions via Chekku", auto: true },
-                  { time: "Yesterday 18:00", action: "Pattern threshold exceeded — 3 jobs, 0 photos, 48h+", auto: true },
-                  { time: "Yesterday 14:00", action: "Second reminder sent — no response", auto: true },
-                  { time: "Now", action: "Escalated to Logan — human action required", auto: false },
-                ].map((entry, i) => (
-                  <div key={i} className={`flex items-start gap-2.5 rounded-lg px-3 py-2 text-xs ${
-                    !entry.auto ? "bg-amber-50 border-2 border-amber-300" : "bg-slate-50 border border-slate-200"
-                  }`}>
-                    <span className={`mt-0.5 flex-shrink-0 ${entry.auto ? "text-[#00BDFE]" : "text-amber-500"}`}>{entry.auto ? "✦" : "⚡"}</span>
-                    <div className="flex-1">
-                      <p className={entry.auto ? "text-slate-600" : "text-amber-700 font-semibold"}>{entry.action}</p>
-                      <p className="text-slate-400 text-[10px] mt-0.5">{entry.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Action Required</p>
-                <button className="w-full bg-[#00BDFE] text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-[#009fd6] transition-colors">📞 Call York Digital Solutions</button>
-                <button className="w-full border border-slate-300 text-slate-600 text-xs font-medium py-2 rounded-lg hover:bg-slate-50 transition-colors">📋 Log formal warning</button>
-                <button className="w-full border border-slate-300 text-slate-500 text-xs font-medium py-2 rounded-lg hover:bg-slate-50 transition-colors">🔄 Reassign future jobs</button>
-              </div>
-            </div>
+          {isPatternView && selectedPattern ? (
+            <CockpitPatternDetail pattern={selectedPattern} onClose={() => setSelectedId(null)} />
+          ) : isPatternView && !selectedPattern ? (
+            <p className="text-slate-400 text-xs text-center py-8">Pattern not found</p>
           ) : isInspectView ? (
             <div className="animate-fadeIn space-y-4">
               <div className="bg-red-50 border border-red-200 rounded-xl p-4">
@@ -974,11 +1052,11 @@ export default function CockpitView({ persona }: { persona: string }) {
           ) : !selectedJob ? (
             <div className="h-full flex items-center justify-center" style={{ minHeight: 300 }}>
               <div className="text-center px-8 py-12 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 max-w-xs">
-                <div className="w-12 h-12 rounded-full bg-[#e0f7ff] border border-[#00BDFE]/30 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-[#00BDFE] text-xl">✦</span>
+                <div className="w-12 h-12 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-green-500 text-xl">✓</span>
                 </div>
-                <p className="text-slate-600 text-sm font-medium">Select a job from the queue</p>
-                <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">AI has handled everything — you only act when required</p>
+                <p className="text-slate-600 text-sm font-medium">Nothing needs your attention</p>
+                <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">AI is handling {aiHandlingCount.toLocaleString()} active jobs — select a decision from the queue to act</p>
               </div>
             </div>
           ) : (

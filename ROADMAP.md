@@ -38,9 +38,12 @@ _Source: Aaron's Vision Direction Pack v2, April 2026_
 `StaffPerformance.tsx` exists but is not reachable via the main nav. Wire it up and refine: peer comparison, trajectory arrow, tier progression (Gold/Silver/Bronze/Platinum), self-review mode.
 _Source: Aaron's Vision Direction Pack v2, April 2026_
 
-**7. "Deferred by team" manager exception strip**
-Logan's right panel should include a collapsible section showing tasks his field supervisors have deferred or skipped. Only appears when deferrals exist (exception-driven). Compact list: who deferred, what task, when, with a link to the job.
-_Aaron's exact words (Apr 10 meeting): "the manager should see all the things that have been reprioritized by someone — that's the stuff that will cause us issues."_
+**7. "Deferred by team" manager exception strip** ✓ _Done_
+Logan's right panel — collapsible amber strip, exception-driven, showing who deferred, what task, when, with job ID link. 3 illustrative deferrals (Troy/Kylie/MJ Electrical).
+_Source: April 10 steering meeting_
+
+**8. Problematic trades section — Logan's right panel**
+Logan's KPI panel should include a ranked list of the trades dragging his region's performance down — not just pattern cards, but a persistent "watch list" showing trade name, performance score, last inspection, open complaints, and a recommended action. Aaron's words: *"Here's your list of our most problematic guys in your area. Get him fixed and your whole team's going to be performing better."* This is distinct from AI patterns (which are event-triggered) — this is a standing operational view.
 _Source: April 10 steering meeting_
 
 ### Not yet started (lower priority for discovery phase)

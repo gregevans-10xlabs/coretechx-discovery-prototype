@@ -190,7 +190,8 @@ function PatternDetailPanel({ pattern, onClose }: { pattern: PatternItem; onClos
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs">✕ close</button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">
+        <div className="max-w-3xl mx-auto space-y-4">
         <div className={`rounded-xl p-4 border ${pattern.severity === "high" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
           <p className={`text-sm leading-relaxed ${pattern.severity === "high" ? "text-red-700" : "text-amber-700"}`}>{pattern.detail}</p>
         </div>
@@ -250,6 +251,7 @@ function PatternDetailPanel({ pattern, onClose }: { pattern: PatternItem; onClos
             </div>
           )}
         </div>
+        </div>
       </div>
     </div>
   );
@@ -272,7 +274,8 @@ function DecisionDetailPanel({ dec, onClose }: { dec: DecisionItem; onClose: () 
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs">✕ close</button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">
+        <div className="max-w-3xl mx-auto space-y-4">
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <p className="text-xs font-semibold text-amber-700 mb-1">AI Recommendation</p>
           <p className="text-sm text-amber-800 leading-relaxed">{dec.rec}</p>
@@ -307,6 +310,7 @@ function DecisionDetailPanel({ dec, onClose }: { dec: DecisionItem; onClose: () 
           )}
         </div>
         <div className="font-mono text-[10px] text-slate-300 pt-2">{dec.id}</div>
+        </div>
       </div>
     </div>
   );
@@ -332,7 +336,8 @@ function JobTypeDetailPanel({ jtLabel, onClose }: { jtLabel: string; onClose: ()
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs">✕ close</button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">
+        <div className="max-w-3xl mx-auto space-y-3">
         {jt && (
           <div className="grid grid-cols-3 gap-2">
             {[
@@ -362,6 +367,7 @@ function JobTypeDetailPanel({ jtLabel, onClose }: { jtLabel: string; onClose: ()
             <p className="font-mono text-slate-300 text-[10px] mt-1">{j.id}</p>
           </div>
         ))}
+        </div>
       </div>
     </div>
   );
@@ -390,7 +396,8 @@ function JobDetailPanel({ job, onClose }: { job: Job; onClose: () => void }) {
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs">✕ close</button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">
+        <div className="max-w-3xl mx-auto space-y-4">
         {/* Journey */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey</p>
@@ -475,6 +482,7 @@ function JobDetailPanel({ job, onClose }: { job: Job; onClose: () => void }) {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -497,7 +505,8 @@ function BriefingDetailPanel({ msg, icon, onClose }: { msg: string; icon: string
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs">✕ close</button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">
+        <div className="max-w-3xl mx-auto space-y-4">
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <p className="text-amber-700 text-sm leading-relaxed">{msg}</p>
         </div>
@@ -541,6 +550,7 @@ function BriefingDetailPanel({ msg, icon, onClose }: { msg: string; icon: string
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
