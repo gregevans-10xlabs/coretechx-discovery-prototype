@@ -9,8 +9,11 @@ const TIER_META = {
   Bronze:   { icon: "🥉", color: "text-orange-700 bg-orange-50 border-orange-300",bar: "bg-orange-400", next: "Silver"   },
 };
 
+type Badge = typeof STAFF_PERFORMANCE[0]["badges"][0];
+
 export default function PerformanceHub({ persona }: { persona: string }) {
   const [tab, setTab] = useState<"standing" | "kpis" | "challenge">("standing");
+  const [hoveredBadge, setHoveredBadge] = useState<Badge | null>(null);
   const perf = STAFF_PERFORMANCE.find(p => p.persona === persona);
   if (!perf) return null;
 
@@ -103,11 +106,15 @@ export default function PerformanceHub({ persona }: { persona: string }) {
                       e.isYou ? "bg-[#e0f7ff] border border-[#00BDFE]/30 font-semibold" : "bg-slate-50"
                     }`}>
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold w-4 text-center ${e.isYou ? "text-[#0077a8]" : "text-slate-400"}`}>#{i + 1}</span>
-                        <span className={e.isYou ? "text-[#0077a8]" : "text-slate-600"}>{e.label}</span>
-                        {e.isYou && <span className="text-[9px] text-[#00BDFE] font-semibold">YOU</span>}
+                        <span className={`text-[10px] font-bold w-4 text-center flex-shrink-0 ${e.isYou ? "text-[#0077a8]" : "text-slate-400"}`}>
+                          #{i + 1}
+                        </span>
+                        {e.isYou
+                          ? <span className="text-[#0077a8]">You</span>
+                          : <span className="text-slate-400 text-[10px] italic">anonymous</span>
+                        }
                       </div>
-                      <span className={`font-bold ${e.isYou ? "text-[#0077a8]" : "text-slate-500"}`}>{e.score}</span>
+                      <span className={`font-bold tabular-nums ${e.isYou ? "text-[#0077a8]" : "text-slate-400"}`}>{e.score}</span>
                     </div>
                   ))}
                 </div>
@@ -117,20 +124,41 @@ export default function PerformanceHub({ persona }: { persona: string }) {
             {/* Badges */}
             <div>
               <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Badges</p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5" onMouseLeave={() => setHoveredBadge(null)}>
                 {perf.badges.map((b, i) => (
-                  <div key={i} title={b.desc}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] border transition-all ${
+                  <div key={i}
+                    onMouseEnter={() => setHoveredBadge(b)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] border cursor-default transition-all ${
                       b.earned
-                        ? "bg-white border-slate-200 text-slate-700 font-semibold"
-                        : "bg-slate-50 border-slate-100 text-slate-300"
+                        ? `bg-white border-slate-200 text-slate-700 font-semibold ${hoveredBadge?.label === b.label ? "border-slate-400 shadow-sm" : "hover:border-slate-300"}`
+                        : `bg-slate-50 border-slate-100 text-slate-300 ${hoveredBadge?.label === b.label ? "border-slate-300" : "hover:border-slate-200"}`
                     }`}>
                     <span className={b.earned ? "" : "opacity-30"}>{b.icon}</span>
                     <span>{b.label}</span>
                   </div>
                 ))}
               </div>
-              <p className="text-slate-300 text-[9px] mt-1.5">Hover a badge for description</p>
+              {/* Hover detail panel — replaces plain browser tooltip */}
+              {hoveredBadge ? (
+                <div className="mt-2 bg-slate-800 rounded-xl px-3 py-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">{hoveredBadge.icon}</span>
+                      <span className="text-white text-xs font-semibold">{hoveredBadge.label}</span>
+                    </div>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                      hoveredBadge.earned
+                        ? "bg-green-500/20 text-green-400"
+                        : "bg-amber-500/20 text-amber-400"
+                    }`}>
+                      {hoveredBadge.earned ? "✓ Earned" : "Not yet"}
+                    </span>
+                  </div>
+                  <p className="text-slate-300 text-[10px] leading-relaxed">{hoveredBadge.desc}</p>
+                </div>
+              ) : (
+                <p className="text-slate-400 text-[9px] mt-1.5">Hover a badge to see what it means</p>
+              )}
             </div>
           </>
         )}
