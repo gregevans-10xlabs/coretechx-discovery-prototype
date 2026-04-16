@@ -216,6 +216,14 @@ export type KPI = { label: string; current: number; target: number; unit: string
 export type Badge = { icon: string; label: string; desc: string; earned: boolean };
 export type LeaderboardEntry = { label: string; score: number; isYou?: boolean };
 export type TeamMember = { name: string; role: string; tier: "Platinum"|"Gold"|"Silver"|"Bronze"; score: number; trend: "up"|"down"|"stable"; concern: string };
+export type ImprovementAction = {
+  task: string;        // Imperative action: "Upload 3 evidence packs"
+  detail: string;      // Progress context: "47 of 50 — 3 remaining"
+  kpi: string;         // KPI label this action moves
+  badge: string | null;// Badge it closes or progresses (null if none)
+  pts: number;         // Estimated point impact
+  urgent: boolean;     // Time-sensitive (show "Today" flag)
+};
 
 export const STAFF_PERFORMANCE: {
   persona: string; name: string; role: string;
@@ -230,6 +238,8 @@ export const STAFF_PERFORMANCE: {
   badges: Badge[];
   leaderboard: LeaderboardEntry[];
   kpis: KPI[];
+  improvementActions: ImprovementAction[];
+  nextRankGap: string | null;
   teamMembers?: TeamMember[];
   improvements?: string[];
 }[] = [
@@ -260,6 +270,12 @@ export const STAFF_PERFORMANCE: {
       { label:"Trade inspections (Safety)",  current:8,  target:20, unit:"this month", trend:"behind" },
       { label:"Trade inspections (Quality)", current:6,  target:20, unit:"this month", trend:"behind" },
     ],
+    nextRankGap: "8 pts to reach #1 — inspections and a clean close-out week",
+    improvementActions:[
+      { task:"Log 4 safety inspections with field supervisors", detail:"8 of 20 this month — 12 remaining. Friday is the best window before month-end pressure compounds.", kpi:"Trade inspections (Safety)",  badge:"Safety Inspector", pts:4, urgent:true  },
+      { task:"Log 4 quality inspections with field supervisors", detail:"6 of 20 this month — 14 remaining. Both inspection KPIs are below 50% of target with 14 days left.", kpi:"Trade inspections (Quality)", badge:"Safety Inspector", pts:3, urgent:true  },
+      { task:"Resolve the 2 remaining decisions in queue",      detail:"18 of 20 decisions actioned this week — 2 left to lock in the KPI target.",                           kpi:"Decisions resolved",          badge:null,              pts:1, urgent:false },
+    ],
   },
   {
     persona:"kerrie", name:"Kerrie", role:"Insurance Coordinator",
@@ -288,6 +304,12 @@ export const STAFF_PERFORMANCE: {
       { label:"Completion certs filed", current:9,  target:12, unit:"this week", trend:"stable" },
       { label:"Scope changes reviewed", current:4,  target:5,  unit:"this week", trend:"stable" },
     ],
+    nextRankGap: "8 pts to break into top 3 — close the portal rate gap first",
+    improvementActions:[
+      { task:"Log 5 portal updates within 15 min of status change", detail:"On-time rate is 88% — target is 95%. 3 Allianz jobs were updated >1h late this week. Every timely update shifts this number.", kpi:"Portal updates on time", badge:"Portal Hawk",  pts:6, urgent:true  },
+      { task:"File 3 more completion certificates before Friday",   detail:"9 of 12 filed this week — 3 more hits the KPI target and unlocks the Cert Machine badge.",                                     kpi:"Completion certs filed", badge:"Cert Machine", pts:3, urgent:false },
+      { task:"Schedule the 3 remaining work orders",                detail:"12 of 15 scheduled — the last 3 are straightforward Allianz jobs already scoped.",                                              kpi:"Work orders scheduled",  badge:null,          pts:1, urgent:false },
+    ],
   },
   {
     persona:"conner", name:"Conner", role:"Ops Manager — Construction",
@@ -315,6 +337,12 @@ export const STAFF_PERFORMANCE: {
       { label:"Trades confirmed on-site", current:11, target:12, unit:"this week",  trend:"stable" },
       { label:"Defects resolved <48h",    current:9,  target:10, unit:"this week",  trend:"up"     },
     ],
+    nextRankGap: "5 pts to reach #1 — confirm the last trade and close the open defect",
+    improvementActions:[
+      { task:"Confirm the 1 remaining trade for this week", detail:"11 of 12 confirmed — 1 outstanding. This is the only thing between you and a Perfect Build week.", kpi:"Trades confirmed on-site", badge:"Perfect Build", pts:4, urgent:true  },
+      { task:"Resolve the 1 outstanding defect within 48h", detail:"9 of 10 defects resolved — this one is flagged to a Penrith site. Closing it hits the KPI and completes a Perfect Build week.", kpi:"Defects resolved <48h",    badge:"Perfect Build", pts:3, urgent:false },
+      { task:"Progress 2 AHO build stages to next milestone", detail:"13 of 15 stages on schedule this month — 2 more milestone completions closes the monthly KPI.", kpi:"Build stages on schedule",  badge:null,           pts:2, urgent:false },
+    ],
   },
   {
     persona:"blake", name:"Blake", role:"Ops Manager — Facilities Management",
@@ -341,6 +369,12 @@ export const STAFF_PERFORMANCE: {
       { label:"Reactive jobs resolved",        current:17, target:18, unit:"this week", trend:"stable" },
       { label:"Subcontractor compliance",      current:31, target:32, unit:"this week", trend:"stable" },
       { label:"Avg response time",             current:2.1,target:4,  unit:"h",         trend:"stable", lowerIsBetter:true },
+    ],
+    nextRankGap: null,
+    improvementActions:[
+      { task:"Resolve the 1 remaining reactive job this week",          detail:"17 of 18 resolved — this last one is a Karuah commercial callout. Closing it locks the reactive KPI.",             kpi:"Reactive jobs resolved",       badge:null,        pts:3, urgent:false },
+      { task:"Log the 1 remaining subcontractor compliance check",      detail:"31 of 32 checks logged — 1 subcontractor pending compliance verification. Quick task, clears the KPI.",            kpi:"Subcontractor compliance",     badge:"Legend",    pts:2, urgent:false },
+      { task:"Hold response time below 2.5h for the rest of the week", detail:"Currently averaging 2.1h — best in the group. Holding this through Friday adds weight to the Unbeatable badge run.", kpi:"Avg response time",           badge:"Unbeatable",pts:2, urgent:false },
     ],
   },
   {
@@ -371,6 +405,12 @@ export const STAFF_PERFORMANCE: {
       { label:"SLA breaches",        current:3,  target:0,   unit:"this week", trend:"stable", lowerIsBetter:true },
       { label:"Portal updates late", current:7,  target:0,   unit:"this week", trend:"up",     lowerIsBetter:true },
     ],
+    nextRankGap: null,
+    improvementActions:[
+      { task:"Coordinate with Kerrie to clear 5 overdue portal updates", detail:"7 portal updates are late — Allianz is the primary insurer. Each cleared update reduces breach risk and improves team SLA rate.", kpi:"Portal updates late", badge:"Zero Breaches", pts:5, urgent:true  },
+      { task:"Review Logan's inspection schedule for the next 2 weeks",  detail:"Logan needs 12 more safety inspections in 14 days. Blocking focused inspection days now prevents a month-end scramble.",         kpi:"Jobs closed on time", badge:null,           pts:3, urgent:true  },
+      { task:"Clear the 13 remaining decisions in the queue",            detail:"87 of 100 decisions resolved — 13 remaining to hit the weekly team KPI target.",                                                    kpi:"Decisions resolved",  badge:null,           pts:2, urgent:false },
+    ],
   },
   {
     persona:"aaron", name:"Aaron", role:"Founder / CEO",
@@ -393,6 +433,12 @@ export const STAFF_PERFORMANCE: {
       { label:"Jobs closed on time",       current:91, target:95,  unit:"%",         trend:"down"   },
       { label:"SLA breaches",              current:3,  target:0,   unit:"this week", trend:"stable", lowerIsBetter:true },
       { label:"Portal updates late",       current:7,  target:0,   unit:"this week", trend:"up",     lowerIsBetter:true },
+    ],
+    nextRankGap: null,
+    improvementActions:[
+      { task:"Redistribute 15 jobs from Kerrie's queue to cut portal latency", detail:"Kerrie carries 80 concurrent jobs — 15% above comfortable capacity. Redistribution would cut late portal updates from 7 to ~2.",         kpi:"Portal updates late",        badge:"Zero Breaches", pts:5, urgent:true  },
+      { task:"Block an inspection week for Logan — 26 audits in 14 days",      detail:"Logan is at 40% of his monthly inspection target. A focused 3-day inspection block would close it without impacting other KPIs.",         kpi:"Jobs closed on time",        badge:"Peak Form",     pts:4, urgent:true  },
+      { task:"Assign the 13 unresolved decisions to the right coordinators",   detail:"87 of 100 team decisions resolved. Routing the remaining 13 to the right skill sets would close the weekly team KPI.",                    kpi:"Team decisions resolved",    badge:"Dream Team",    pts:2, urgent:false },
     ],
     teamMembers:[
       { name:"Blake",  role:"FM Ops Manager",           tier:"Platinum", score:94, trend:"up",     concern:"Holding #1 — on track for Unbeatable badge. No action needed." },

@@ -12,7 +12,7 @@ const TIER_META = {
 type Badge = typeof STAFF_PERFORMANCE[0]["badges"][0];
 
 export default function PerformanceHub({ persona }: { persona: string }) {
-  const [tab, setTab] = useState<"standing" | "kpis" | "challenge">("standing");
+  const [tab, setTab] = useState<"standing" | "kpis" | "improve">("standing");
   const [hoveredBadge, setHoveredBadge] = useState<Badge | null>(null);
   const perf = STAFF_PERFORMANCE.find(p => p.persona === persona);
   if (!perf) return null;
@@ -31,12 +31,12 @@ export default function PerformanceHub({ persona }: { persona: string }) {
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       {/* Tab bar */}
       <div className="flex border-b border-slate-100">
-        {(["standing", "kpis", "challenge"] as const).map(t => (
+        {(["standing", "kpis", "improve"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-2 text-[10px] font-semibold transition-colors ${
               tab === t ? "bg-[#00BDFE] text-white" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
             }`}>
-            {t === "standing" ? "Standing" : t === "kpis" ? "My KPIs" : "Challenge"}
+            {t === "standing" ? "Standing" : t === "kpis" ? "My KPIs" : "Improve"}
           </button>
         ))}
       </div>
@@ -93,6 +93,14 @@ export default function PerformanceHub({ persona }: { persona: string }) {
               <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
                 <span className="text-base">🔥</span>
                 <p className="text-orange-700 text-xs font-semibold">{perf.streak}-day improvement streak</p>
+              </div>
+            )}
+
+            {/* Next rank gap */}
+            {perf.nextRankGap && (
+              <div className="bg-[#e0f7ff] border border-[#00BDFE]/30 rounded-lg px-3 py-2 flex items-start gap-2">
+                <span className="text-[#00BDFE] text-xs flex-shrink-0 mt-0.5">→</span>
+                <p className="text-[#0077a8] text-[10px] leading-snug">{perf.nextRankGap}</p>
               </div>
             )}
 
@@ -202,52 +210,67 @@ export default function PerformanceHub({ persona }: { persona: string }) {
           </>
         )}
 
-        {/* ── CHALLENGE tab ── */}
-        {tab === "challenge" && (
+        {/* ── IMPROVE tab ── */}
+        {tab === "improve" && (
           <>
-            <div className="bg-gradient-to-br from-[#e0f7ff] to-white border border-[#00BDFE]/30 rounded-xl p-3">
+            {/* Weekly challenge — headline goal */}
+            <div className="bg-gradient-to-br from-[#e0f7ff] to-white border border-[#00BDFE]/30 rounded-xl px-3 py-2.5">
               <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1">This week's challenge</p>
               <p className="text-slate-800 text-sm font-bold leading-snug">{perf.weeklyChallenge}</p>
             </div>
 
-            <div className="space-y-2">
-              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider">Challenge progress</p>
-              {perf.kpis.filter(k => !k.lowerIsBetter).slice(0, 2).map(k => {
-                const pct  = Math.min(Math.round((k.current / k.target) * 100), 100);
-                const done = k.current >= k.target;
-                return (
-                  <div key={k.label}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-slate-500 truncate">{k.label}</span>
-                      <span className={`font-semibold flex-shrink-0 ml-2 ${done ? "text-green-600" : "text-amber-600"}`}>
-                        {done ? "✓ Done" : `${k.target - k.current} to go`}
-                      </span>
+            {/* Action plan */}
+            <div>
+              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Today's action plan</p>
+              <div className="space-y-2">
+                {perf.improvementActions.map((action, i) => (
+                  <div key={i} className={`rounded-xl border p-2.5 ${action.urgent ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="text-slate-800 text-xs font-semibold leading-snug flex-1">{action.task}</p>
+                      <span className="text-[#0077a8] text-[10px] font-bold flex-shrink-0 bg-[#e0f7ff] px-1.5 py-0.5 rounded-full whitespace-nowrap">+{action.pts} pts</span>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2">
-                      <div className={`h-2 rounded-full transition-all ${done ? "bg-green-400" : "bg-[#00BDFE]"}`} style={{ width: `${pct}%` }} />
+                    <p className="text-slate-500 text-[10px] leading-snug mb-1.5">{action.detail}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-400 italic truncate">{action.kpi}</span>
+                      {action.badge && (
+                        <>
+                          <span className="text-slate-200 flex-shrink-0">·</span>
+                          <span className="text-[10px] text-amber-600 font-semibold flex-shrink-0">→ {action.badge}</span>
+                        </>
+                      )}
+                      {action.urgent && (
+                        <span className="text-[10px] text-amber-600 font-bold ml-auto flex-shrink-0">⏰ Today</span>
+                      )}
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
 
-            {/* Next badge unlock */}
+            {/* Score projection */}
             {(() => {
-              const nextBadge = perf.badges.find(b => !b.earned);
-              return nextBadge ? (
-                <div className="border border-dashed border-slate-200 rounded-xl p-3">
-                  <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Next badge unlock</p>
-                  <div className="flex items-start gap-2">
-                    <span className="text-xl opacity-40">{nextBadge.icon}</span>
-                    <div>
-                      <p className="text-slate-700 text-xs font-semibold">{nextBadge.label}</p>
-                      <p className="text-slate-400 text-[10px] mt-0.5">{nextBadge.desc}</p>
-                    </div>
+              const totalPts = perf.improvementActions.reduce((sum, a) => sum + a.pts, 0);
+              const projected = perf.score + totalPts;
+              const projTier  = projected >= 100 ? "Platinum" : projected >= 90 ? "Gold" : projected >= 80 ? "Silver" : "Bronze";
+              const tierUp    = projTier !== perf.tier;
+              return (
+                <div className={`rounded-xl border px-3 py-2.5 ${tierUp ? "bg-amber-50 border-amber-300" : "bg-slate-50 border-slate-200"}`}>
+                  <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-2">If you complete all of the above</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 text-sm tabular-nums">{perf.score}</span>
+                    <span className="text-slate-300 text-xs">→</span>
+                    <span className={`text-2xl font-black tabular-nums ${tierUp ? "text-amber-600" : "text-slate-800"}`}>{projected}</span>
+                    <span className="text-slate-400 text-xs">pts</span>
+                    {tierUp && (
+                      <span className="ml-auto text-xs font-bold text-amber-600 flex-shrink-0">{TIER_META[projTier as keyof typeof TIER_META].icon} {projTier}!</span>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-                  <p className="text-green-700 text-xs font-semibold">All badges earned 🎉</p>
+                  <p className="text-slate-400 text-[10px] mt-1">
+                    {tierUp
+                      ? `+${totalPts} pts earned — tier promotion unlocked`
+                      : `+${totalPts} pts earned this week`
+                    }
+                  </p>
                 </div>
               );
             })()}
