@@ -548,14 +548,6 @@ function LoganKPIs({ jobs, onInspect }: { jobs: Job[]; onInspect: (supervisor: s
         </div>
       </div>
 
-      {/* Ask AI */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3">
-        <p className="text-slate-500 text-xs font-semibold mb-2">Ask AI</p>
-        <AskAI
-          context={`Logan — Ops Manager, North East NSW/QLD. ${jobs.filter(j => j.actionRequired).length} decisions pending from ${jobs.length} visible jobs. ${LOGAN_REGION_TOTAL.toLocaleString()} total in region. Active AI patterns: P-041 coverage gap, P-039 evidence non-submission.`}
-          placeholder="e.g. Which jobs are closest to jeopardy?"
-        />
-      </div>
 
     </div>
   );
@@ -648,14 +640,6 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
         </div>
       </div>
 
-      {/* Ask AI */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3">
-        <p className="text-slate-500 text-xs font-semibold mb-2">Ask AI</p>
-        <AskAI
-          context={`Kerrie — Insurance Coordinator, National. ${jobs.filter(j => j.actionRequired).length} decisions pending. ${jobs.length} active insurance jobs. ${jobs.filter(j => j.flags.length > 0).length} flagged. ${KERRIE_REGION_TOTAL} jobs in portfolio.`}
-          placeholder="e.g. Which insurer SLA is most at risk today?"
-        />
-      </div>
 
     </div>
   );
@@ -916,6 +900,18 @@ export default function CockpitView({ persona }: { persona: string }) {
   const decisionCount   = decisionQueue.length;
   const aiHandlingCount = isKerrie ? KERRIE_REGION_TOTAL - decisionCount : LOGAN_REGION_TOTAL - decisionCount;
 
+  // AI bar: context shifts to match whatever is selected
+  const aiContext = selectedJob
+    ? `${isKerrie ? "Kerrie — Insurance Coordinator, National" : "Logan — Ops Manager, North East NSW/QLD"}. Reviewing: ${selectedJob.id} (${selectedJob.type}), ${selectedJob.customer}, ${selectedJob.suburb}. Priority: ${selectedJob.priority}. Confidence: ${selectedJob.conf.toFixed(2)}. Action required: ${selectedJob.actionRequired ?? "none (AI handling)"}. ${selectedJob.flags.length > 0 ? `Flags: ${selectedJob.flags.map(f => f.detail).join("; ")}.` : ""}`
+    : isPatternView && selectedPattern
+    ? `${isKerrie ? "Kerrie" : "Logan"} reviewing AI-detected pattern ${selectedPattern.id}: "${selectedPattern.title}". ${selectedPattern.detail} Severity: ${selectedPattern.severity}. Affects: ${selectedPattern.affected}.`
+    : `${isKerrie ? "Kerrie — Insurance Coordinator. National insurance portfolio." : "Logan — Ops Manager. North East NSW/QLD."} ${decisionCount} decisions pending. AI handling ${aiHandlingCount.toLocaleString()} others autonomously.`;
+  const aiContextLabel = selectedJob
+    ? `Focused on ${selectedJob.id}`
+    : isPatternView && selectedPattern
+    ? `Pattern ${selectedPattern.id}`
+    : `Watching ${isKerrie ? "National" : "North East"} queue`;
+
   // Tab labels
   const TABS: { key: QueueFilter; label: string }[] = [
     { key: "action",  label: `Decisions (${decisionCount})` },
@@ -1008,14 +1004,14 @@ export default function CockpitView({ persona }: { persona: string }) {
 
       {/* ── Column 2: Current Focus ───────────────────────────────────────────── */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="px-5 pt-4 pb-3 border-b border-slate-200">
+        <div className="px-5 pt-4 pb-3 border-b border-slate-200 flex-shrink-0">
           <h2 className="text-slate-700 font-semibold text-sm">Current Focus</h2>
           {selectedJob && (
             <p className="text-slate-400 text-xs mt-0.5">{selectedJob.customer} · {selectedJob.suburb}</p>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-5 min-h-0">
           <div className="max-w-3xl mx-auto">
           {isPatternView && selectedPattern ? (
             <CockpitPatternDetail pattern={selectedPattern} onClose={() => setSelectedId(null)} />
@@ -1089,6 +1085,22 @@ export default function CockpitView({ persona }: { persona: string }) {
           )}
           </div>
         </div>
+
+        {/* ── AI Bar: pinned to bottom of column 2 ─────────────────────────── */}
+        <div className="flex-shrink-0 border-t border-slate-200">
+          <div className="bg-[#00BDFE] px-4 py-2 flex items-center gap-2.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
+            <span className="text-white text-xs font-semibold">CoreTechX AI</span>
+            <span className="text-white/60 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
+          </div>
+          <div className="bg-white px-4 pt-2 pb-3">
+            <AskAI
+              context={aiContext}
+              placeholder={selectedJob ? `Ask about ${selectedJob.id}...` : "Ask about your queue..."}
+            />
+          </div>
+        </div>
+
       </div>
 
       {/* ── Column 3: My KPIs ─────────────────────────────────────────────────── */}

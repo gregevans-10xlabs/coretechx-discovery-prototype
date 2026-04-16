@@ -558,7 +558,7 @@ function BriefingDetailPanel({ msg, icon, onClose }: { msg: string; icon: string
 }
 
 // ─── Platform Health (Column 3) ───────────────────────────────────────────────
-function PlatformHealth({ isAaron, onWorkflowConfig, aiContext }: { isAaron: boolean; onWorkflowConfig?: () => void; aiContext: string }) {
+function PlatformHealth({ isAaron, onWorkflowConfig }: { isAaron: boolean; onWorkflowConfig?: () => void }) {
   return (
     <div className="h-full overflow-y-auto scrollbar-thin px-4 py-4 space-y-5">
       <div className="bg-gradient-to-br from-[#00BDFE]/10 to-[#00BDFE]/5 border border-[#00BDFE]/30 rounded-xl p-4">
@@ -683,15 +683,6 @@ function PlatformHealth({ isAaron, onWorkflowConfig, aiContext }: { isAaron: boo
         }
       </div>
 
-      {/* Ask AI */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3">
-        <p className="text-slate-500 text-xs font-semibold mb-2">Ask AI</p>
-        <AskAI
-          context={aiContext}
-          placeholder="e.g. Which workflow step has the most room for autonomy promotion?"
-        />
-      </div>
-
     </div>
   );
 }
@@ -746,6 +737,22 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
 
   const highCount = exceptions.filter(e => e.severity === "high").length;
 
+  // AI bar: context tracks the current focus item
+  const aiContext = focus?.type === "job"
+    ? `${isAaron ? "Aaron (CEO)" : "National Operations"} reviewing job ${focus.job.id} — ${focus.job.type}, ${focus.job.suburb}. Priority: ${focus.job.priority}. Confidence: ${focus.job.conf.toFixed(2)}. Action: ${focus.job.actionRequired ?? "AI handling"}.`
+    : focus?.type === "pattern"
+    ? `${isAaron ? "Aaron" : "National"} reviewing AI-detected pattern ${focus.pattern.id}: "${focus.pattern.title}". Severity: ${focus.pattern.severity}. ${focus.pattern.detail}`
+    : focus?.type === "decision"
+    ? `${isAaron ? "Aaron" : "National"} reviewing decision ${focus.dec.id}: ${focus.dec.label}. AI recommendation: ${focus.dec.rec}.`
+    : `${isAaron ? "Aaron (CEO/Founder)" : "National Operations"} — portfolio view. ${exceptions.filter(e => e.kind === "decision").length} decisions pending, ${exceptions.filter(e => e.kind === "pattern").length} AI patterns detected, ${exceptions.filter(e => e.severity === "high").length} high-severity items.${isAaron ? " Has workflow configuration access." : ""}`;
+  const aiContextLabel = focus?.type === "job"
+    ? `Focused on ${focus.job.id}`
+    : focus?.type === "pattern"
+    ? `Pattern ${focus.pattern.id}`
+    : focus?.type === "decision"
+    ? `Decision ${focus.dec.id}`
+    : "Watching portfolio";
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {isAaron && (
@@ -794,7 +801,7 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
           <div className="px-5 py-3 border-b border-slate-200 flex-shrink-0">
             <h2 className="text-sm font-bold text-slate-800">Current Focus</h2>
           </div>
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
             {!focus ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-8 py-12">
                 <div className="w-14 h-14 rounded-full bg-[#00BDFE]/10 flex items-center justify-center mb-4">
@@ -815,6 +822,21 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
               <BriefingDetailPanel msg={focus.msg} icon={focus.icon} onClose={() => setFocus(null)} />
             ) : null}
           </div>
+
+          {/* ── AI Bar: pinned to bottom of column 2 ─────────────────────── */}
+          <div className="flex-shrink-0 border-t border-slate-200">
+            <div className="bg-[#00BDFE] px-4 py-2 flex items-center gap-2.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
+              <span className="text-white text-xs font-semibold">CoreTechX AI</span>
+              <span className="text-white/60 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
+            </div>
+            <div className="bg-white px-4 pt-2 pb-3">
+              <AskAI
+                context={aiContext}
+                placeholder={focus ? `Ask about this ${focus.type}...` : "Ask about your portfolio..."}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Column 3 — Platform Health */}
@@ -823,11 +845,7 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
             <h2 className="text-sm font-bold text-slate-800">Platform Health</h2>
           </div>
           <div className="flex-1 overflow-hidden">
-            <PlatformHealth
-              isAaron={isAaron}
-              onWorkflowConfig={onWorkflowConfig}
-              aiContext={`${isAaron ? "Aaron (CEO/Founder)" : "National Operations"} — portfolio view. ${exceptions.filter(e => e.kind === "decision").length} decisions pending, ${exceptions.filter(e => e.kind === "pattern").length} AI patterns detected, ${exceptions.filter(e => e.severity === "high").length} high-severity items.${isAaron ? " Has workflow configuration access." : ""}`}
-            />
+            <PlatformHealth isAaron={isAaron} onWorkflowConfig={onWorkflowConfig} />
           </div>
         </div>
 

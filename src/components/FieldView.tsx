@@ -238,6 +238,12 @@ export default function FieldView({ persona }: { persona: string }) {
 
   const decisionCount = decisionJobs.length;
 
+  // AI bar: context shifts to the selected job when one is open
+  const aiContext = selectedJob
+    ? `${persona === "conner" ? "Conner — Construction / AHO Ops Manager" : "Blake — FM & Home Repair Ops Manager"}. Reviewing: ${selectedJob.id} (${selectedJob.type}), ${selectedJob.suburb}. Priority: ${selectedJob.priority}. Confidence: ${selectedJob.conf.toFixed(2)}. Action required: ${selectedJob.actionRequired ?? "none (AI handling)"}. ${selectedJob.flags.length > 0 ? `Flags: ${selectedJob.flags.map(f => f.detail).join("; ")}.` : ""}`
+    : `${persona === "conner" ? "Conner — Construction / AHO Ops Manager" : "Blake — FM & Home Repair Ops Manager"}. ${decisionJobs.length} decisions pending. Region total: ${regionTotal.toLocaleString()} (AI handling ${aiHandling.toLocaleString()} others).`;
+  const aiContextLabel = selectedJob ? `Focused on ${selectedJob.id}` : `Watching ${persona === "conner" ? "Construction" : "FM"} queue`;
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: "600px" }}>
       <div className="flex h-full">
@@ -321,29 +327,46 @@ export default function FieldView({ persona }: { persona: string }) {
             <h2 className="text-slate-700 font-semibold text-sm">Current Focus</h2>
           </div>
 
-          {selectedJob === null ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-              {decisionCount === 0 ? (
-                <>
-                  <div className="w-14 h-14 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center mb-4">
-                    <span className="text-green-500 text-2xl">✓</span>
-                  </div>
-                  <p className="text-slate-700 font-semibold text-sm mb-1">Nothing needs your attention</p>
-                  <p className="text-slate-400 text-xs max-w-48 leading-relaxed">AI is handling all {regionTotal.toLocaleString()} active jobs in your region</p>
-                </>
-              ) : (
-                <>
-                  <div className="w-14 h-14 rounded-full bg-[#e0f7ff] border-2 border-[#00BDFE]/30 flex items-center justify-center mb-4">
-                    <span className="text-2xl">🔧</span>
-                  </div>
-                  <p className="text-slate-700 font-semibold text-sm mb-1">Select a job to review</p>
-                  <p className="text-slate-400 text-xs max-w-48 leading-relaxed">AI is handling {aiHandling.toLocaleString()} others — only these {decisionCount} need you</p>
-                </>
-              )}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {selectedJob === null ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                {decisionCount === 0 ? (
+                  <>
+                    <div className="w-14 h-14 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center mb-4">
+                      <span className="text-green-500 text-2xl">✓</span>
+                    </div>
+                    <p className="text-slate-700 font-semibold text-sm mb-1">Nothing needs your attention</p>
+                    <p className="text-slate-400 text-xs max-w-48 leading-relaxed">AI is handling all {regionTotal.toLocaleString()} active jobs in your region</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-14 h-14 rounded-full bg-[#e0f7ff] border-2 border-[#00BDFE]/30 flex items-center justify-center mb-4">
+                      <span className="text-2xl">🔧</span>
+                    </div>
+                    <p className="text-slate-700 font-semibold text-sm mb-1">Select a job to review</p>
+                    <p className="text-slate-400 text-xs max-w-48 leading-relaxed">AI is handling {aiHandling.toLocaleString()} others — only these {decisionCount} need you</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <JobDetailPanel job={selectedJob} onClose={() => setSelectedId(null)} />
+            )}
+          </div>
+
+          {/* ── AI Bar: pinned to bottom of column 2 ─────────────────────── */}
+          <div className="flex-shrink-0 border-t border-slate-200">
+            <div className="bg-[#00BDFE] px-4 py-2 flex items-center gap-2.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
+              <span className="text-white text-xs font-semibold">CoreTechX AI</span>
+              <span className="text-white/60 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
             </div>
-          ) : (
-            <JobDetailPanel job={selectedJob} onClose={() => setSelectedId(null)} />
-          )}
+            <div className="bg-white px-4 pt-2 pb-3">
+              <AskAI
+                context={aiContext}
+                placeholder={selectedJob ? `Ask about ${selectedJob.id}...` : "Ask about your queue..."}
+              />
+            </div>
+          </div>
         </div>
 
         {/* ── Column 3: My Performance ────────────────────────────────────── */}
@@ -372,15 +395,6 @@ export default function FieldView({ persona }: { persona: string }) {
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Ask AI */}
-            <div className="bg-white rounded-xl border border-slate-200 p-3">
-              <p className="text-slate-500 text-xs font-semibold mb-2">Ask AI</p>
-              <AskAI
-                context={`${persona === "conner" ? "Conner — Construction / AHO Ops Manager" : "Blake — FM & Home Repair Ops Manager"}. ${decisionJobs.length} decision${decisionJobs.length !== 1 ? "s" : ""} pending from ${allJobs.length} visible jobs. Region total: ${regionTotal.toLocaleString()} (AI handling ${aiHandling.toLocaleString()} others).`}
-                placeholder="e.g. What's the best next action on the jeopardy job?"
-              />
             </div>
 
           </div>
