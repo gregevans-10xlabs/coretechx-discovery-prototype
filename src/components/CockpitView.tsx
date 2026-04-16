@@ -3,6 +3,7 @@ import { loganQueueJobs, kerrieQueueJobs, STARLINK_JOURNEY, HN_JOURNEY, INSURANC
 import type { Job } from "../data/jobs";
 import { ALL_PATTERNS } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
+import AskAI from "./AskAI";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned";
@@ -547,6 +548,15 @@ function LoganKPIs({ jobs, onInspect }: { jobs: Job[]; onInspect: (supervisor: s
         </div>
       </div>
 
+      {/* Ask AI */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3">
+        <p className="text-slate-500 text-xs font-semibold mb-2">Ask AI</p>
+        <AskAI
+          context={`Logan — Ops Manager, North East NSW/QLD. ${jobs.filter(j => j.actionRequired).length} decisions pending from ${jobs.length} visible jobs. ${LOGAN_REGION_TOTAL.toLocaleString()} total in region. Active AI patterns: P-041 coverage gap, P-039 evidence non-submission.`}
+          placeholder="e.g. Which jobs are closest to jeopardy?"
+        />
+      </div>
+
     </div>
   );
 }
@@ -636,6 +646,15 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Ask AI */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3">
+        <p className="text-slate-500 text-xs font-semibold mb-2">Ask AI</p>
+        <AskAI
+          context={`Kerrie — Insurance Coordinator, National. ${jobs.filter(j => j.actionRequired).length} decisions pending. ${jobs.length} active insurance jobs. ${jobs.filter(j => j.flags.length > 0).length} flagged. ${KERRIE_REGION_TOTAL} jobs in portfolio.`}
+          placeholder="e.g. Which insurer SLA is most at risk today?"
+        />
       </div>
 
     </div>

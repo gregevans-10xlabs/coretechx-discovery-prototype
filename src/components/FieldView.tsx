@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { JOBS, type Job, STARLINK_JOURNEY, HN_JOURNEY, INSURANCE_JOURNEY, AHO_JOURNEY } from "../data/jobs";
 import PerformanceHub from "./PerformanceHub";
+import AskAI from "./AskAI";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 // helpers used in sub-components
@@ -372,6 +373,16 @@ export default function FieldView({ persona }: { persona: string }) {
                 ))}
               </div>
             </div>
+
+            {/* Ask AI */}
+            <div className="bg-white rounded-xl border border-slate-200 p-3">
+              <p className="text-slate-500 text-xs font-semibold mb-2">Ask AI</p>
+              <AskAI
+                context={`${persona === "conner" ? "Conner — Construction / AHO Ops Manager" : "Blake — FM & Home Repair Ops Manager"}. ${decisionJobs.length} decision${decisionJobs.length !== 1 ? "s" : ""} pending from ${allJobs.length} visible jobs. Region total: ${regionTotal.toLocaleString()} (AI handling ${aiHandling.toLocaleString()} others).`}
+                placeholder="e.g. What's the best next action on the jeopardy job?"
+              />
+            </div>
+
           </div>
         </div>
 

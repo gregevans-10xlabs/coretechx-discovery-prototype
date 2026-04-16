@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES } from "../data/scenarios";
+import AskAI from "./AskAI";
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 type DecisionItem = typeof ALL_DECISIONS[0];
@@ -557,7 +558,7 @@ function BriefingDetailPanel({ msg, icon, onClose }: { msg: string; icon: string
 }
 
 // ─── Platform Health (Column 3) ───────────────────────────────────────────────
-function PlatformHealth({ isAaron }: { isAaron: boolean }) {
+function PlatformHealth({ isAaron, onWorkflowConfig, aiContext }: { isAaron: boolean; onWorkflowConfig?: () => void; aiContext: string }) {
   return (
     <div className="h-full overflow-y-auto scrollbar-thin px-4 py-4 space-y-5">
       <div className="bg-gradient-to-br from-[#00BDFE]/10 to-[#00BDFE]/5 border border-[#00BDFE]/30 rounded-xl p-4">
@@ -659,12 +660,44 @@ function PlatformHealth({ isAaron }: { isAaron: boolean }) {
           </div>
         </div>
       )}
+
+      {/* Workflow configuration entry point */}
+      <div className={`rounded-xl border p-3 ${isAaron ? "bg-[#e0f7ff] border-[#00BDFE]/40" : "bg-white border-slate-200"}`}>
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div>
+            <p className="text-slate-800 text-xs font-semibold">Workflow Configuration</p>
+            <p className="text-slate-400 text-[10px] mt-0.5">Autonomy levels per step, per job type. Accuracy-tracked. Audit-logged.</p>
+          </div>
+          {onWorkflowConfig && (
+            <button
+              onClick={onWorkflowConfig}
+              className={`text-xs underline flex-shrink-0 ${isAaron ? "text-[#0099d4] hover:text-[#00BDFE]" : "text-slate-400 hover:text-slate-600"}`}
+            >
+              {isAaron ? "Configure →" : "View →"}
+            </button>
+          )}
+        </div>
+        {isAaron
+          ? <p className="text-green-600 text-[10px]">You have configuration access. All changes are immutably logged.</p>
+          : <p className="text-slate-400 text-[10px]">Adjusting autonomy levels requires Aaron sign-off.</p>
+        }
+      </div>
+
+      {/* Ask AI */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3">
+        <p className="text-slate-500 text-xs font-semibold mb-2">Ask AI</p>
+        <AskAI
+          context={aiContext}
+          placeholder="e.g. Which workflow step has the most room for autonomy promotion?"
+        />
+      </div>
+
     </div>
   );
 }
 
 // ─── PortfolioView ────────────────────────────────────────────────────────────
-export default function PortfolioView({ persona }: { persona: string }) {
+export default function PortfolioView({ persona, onWorkflowConfig }: { persona: string; onWorkflowConfig?: () => void }) {
   const isAaron = persona === "aaron";
   const exceptions = buildExceptions(isAaron);
   const [focus, setFocus] = useState<FocusState>(null);
@@ -790,7 +823,11 @@ export default function PortfolioView({ persona }: { persona: string }) {
             <h2 className="text-sm font-bold text-slate-800">Platform Health</h2>
           </div>
           <div className="flex-1 overflow-hidden">
-            <PlatformHealth isAaron={isAaron} />
+            <PlatformHealth
+              isAaron={isAaron}
+              onWorkflowConfig={onWorkflowConfig}
+              aiContext={`${isAaron ? "Aaron (CEO/Founder)" : "National Operations"} — portfolio view. ${exceptions.filter(e => e.kind === "decision").length} decisions pending, ${exceptions.filter(e => e.kind === "pattern").length} AI patterns detected, ${exceptions.filter(e => e.severity === "high").length} high-severity items.${isAaron ? " Has workflow configuration access." : ""}`}
+            />
           </div>
         </div>
 
