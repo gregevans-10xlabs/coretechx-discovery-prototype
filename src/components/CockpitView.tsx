@@ -833,17 +833,44 @@ export default function CockpitView({ persona, onPersonaSwitch }: { persona: str
   const decisionCount   = decisionQueue.length;
   const aiHandlingCount = isKerrie ? KERRIE_REGION_TOTAL - decisionCount : LOGAN_REGION_TOTAL - decisionCount;
 
-  // AI bar: context shifts to match whatever is selected
-  const aiContext = selectedJob
+  // Queue summary — one compact line per visible job, included in every AI context
+  // so the agent can answer lookups by customer, trade, address, or job number
+  // without needing tool calls. Chat-as-search per Discovery OS decision 17 Apr 2026.
+  const queueSummary = fullQueue.map(j => {
+    const flagPart = j.flags.length > 0 ? ` · flag: ${j.flags[0].detail}` : "";
+    const actionPart = j.actionRequired ? ` · ACTION: ${j.actionRequired}` : "";
+    return `- ${j.id} · ${j.customer} · ${j.trade} · ${j.suburb} · ${j.type} · ${j.window} · priority:${j.priority} · ${j.primeStatus}${flagPart}${actionPart}`;
+  }).join("\n");
+  const queueSummaryBlock = `\nFull visible queue (${fullQueue.length} jobs):\n${queueSummary}`;
+
+  // AI bar: context shifts to match whatever is selected, but the full queue
+  // summary is always appended so search/filter questions work.
+  const aiContext = (selectedJob
     ? `${isKerrie ? "Kerrie — Insurance Coordinator, National" : "Logan — Ops Manager, North East NSW/QLD"}. Reviewing: ${selectedJob.id} (${selectedJob.type}), ${selectedJob.customer}, ${selectedJob.suburb}. Priority: ${selectedJob.priority}. Confidence: ${selectedJob.conf.toFixed(2)}. Action required: ${selectedJob.actionRequired ?? "none (AI handling)"}. ${selectedJob.flags.length > 0 ? `Flags: ${selectedJob.flags.map(f => f.detail).join("; ")}.` : ""}`
     : isPatternView && selectedPattern
     ? `${isKerrie ? "Kerrie" : "Logan"} reviewing AI-detected pattern ${selectedPattern.id}: "${selectedPattern.title}". ${selectedPattern.detail} Severity: ${selectedPattern.severity}. Affects: ${selectedPattern.affected}.`
-    : `${isKerrie ? "Kerrie — Insurance Coordinator. National insurance portfolio." : "Logan — Ops Manager. North East NSW/QLD."} ${decisionCount} decisions pending. AI handling ${aiHandlingCount.toLocaleString()} others autonomously.`;
+    : `${isKerrie ? "Kerrie — Insurance Coordinator. National insurance portfolio." : "Logan — Ops Manager. North East NSW/QLD."} ${decisionCount} decisions pending. AI handling ${aiHandlingCount.toLocaleString()} others autonomously.`)
+    + queueSummaryBlock;
   const aiContextLabel = selectedJob
     ? `Focused on ${selectedJob.id}`
     : isPatternView && selectedPattern
     ? `Pattern ${selectedPattern.id}`
     : `Watching ${isKerrie ? "National" : "North East"} queue`;
+
+  // Suggestion chips — chat-as-search demonstrations per persona (Discovery OS,
+  // 17 Apr 2026: operators don't search, they ask the agent). Chip 1 is
+  // conversational (prompts AI to ask back); chips 2 and 3 fire direct queries.
+  const aiSuggestions = isKerrie
+    ? [
+        { label: "📞 Insurer's calling about a claim", question: "An insurer is on the phone about a claim. Please ask me for the job number, claim reference, customer name, or insurer, and I'll bring up the full picture so I can help them." },
+        { label: "🏢 All open work for this insurer", question: "An insurer's name has come up — please ask me which insurer, then walk me through all their open jobs, where they sit against SLA, and any concerns." },
+        { label: "⏱ Insurance jobs near SLA breach today", question: "Which insurance jobs are at risk of breaching SLA today, and what's driving the risk for each?" },
+      ]
+    : [
+        { label: "📞 Customer/trade on the phone", question: "A customer or trade is calling about a job. Please ask me for the job number, customer name, or address, then bring up the full picture — trade, status, AI activity, geo, flags, and what I need to know to help them." },
+        { label: "🔧 What else does this trade have?", question: "A trade's name has come up — please ask me which trade, then walk me through all their open jobs, how they're tracking, and any concerns." },
+        { label: "⚠ What's at risk today?", question: "Which jobs are at risk of missing their window today, and what's driving the risk for each?" },
+      ];
 
   // Tab labels
   const TABS: { key: QueueFilter; label: string }[] = [
@@ -1035,6 +1062,7 @@ export default function CockpitView({ persona, onPersonaSwitch }: { persona: str
               context={aiContext}
               placeholder={selectedJob ? `Ask about ${selectedJob.id}...` : "Ask about your queue..."}
               trigger={aiTrigger}
+              suggestions={aiSuggestions}
             />
           </div>
         </div>

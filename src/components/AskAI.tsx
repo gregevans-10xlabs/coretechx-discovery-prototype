@@ -49,11 +49,16 @@ function FormatAI({ text }: { text: string }) {
 }
 
 // ─── AskAI chat widget ────────────────────────────────────────────────────────
-export default function AskAI({ context, placeholder, trigger }: {
+export type AskAISuggestion = { label: string; question: string };
+
+export default function AskAI({ context, placeholder, trigger, suggestions }: {
   context: string;
   placeholder?: string;
   // Parent can fire a one-shot question by setting trigger.text and bumping nonce.
   trigger?: { text: string; nonce: number };
+  // Optional chip row above the input — each chip fires its question on click.
+  // Disappears once the conversation has started so it doesn't compete for space.
+  suggestions?: AskAISuggestion[];
 }) {
   const [q,setQ]=useState("");
   const [msgs,setMsgs]=useState<{role:string;content:string}[]>([]);
@@ -109,6 +114,21 @@ export default function AskAI({ context, placeholder, trigger }: {
         {loading&&<div className="bg-[#e0f7ff] border border-[#00BDFE]/30 rounded-lg px-3 py-2 text-[#0099d4] text-sm mr-6 animate-pulse">Thinking...</div>}
         <div ref={bot}/>
       </div>
+      {/* Suggestion chips — only shown before the conversation starts */}
+      {suggestions && suggestions.length > 0 && msgs.length === 0 && !loading && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {suggestions.map((s,i)=>(
+            <button
+              key={i}
+              onClick={()=>void ask(s.question)}
+              title={s.question}
+              className="text-[11px] bg-[#e0f7ff] hover:bg-[#00BDFE] hover:text-white text-[#0077a8] border border-[#00BDFE]/30 rounded-full px-2.5 py-1 font-medium transition-colors"
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2">
         <input
           className="flex-1 bg-white text-slate-800 rounded-lg px-3 py-2 text-sm border border-slate-300 focus:outline-none focus:border-[#00BDFE]"

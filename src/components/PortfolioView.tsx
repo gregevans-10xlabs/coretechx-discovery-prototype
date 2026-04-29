@@ -749,14 +749,46 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
 
   const highCount = exceptions.filter(e => e.severity === "high").length;
 
-  // AI bar: context tracks the current focus item
-  const aiContext = focus?.type === "job"
+  // Portfolio-level summary block — appended to every AI context so synthesis
+  // questions ("which job type is declining most?", "where am I exposed?") work
+  // without needing the AI to traverse separate data calls.
+  const jobTypeBlock = JOB_TYPES.map(jt =>
+    `- ${jt.label}: ${jt.total} active · avg conf ${(jt.avgConf*100).toFixed(0)}% · trend ${jt.trend} · ${jt.atRisk} at risk · ${jt.critical} critical · ${jt.needsDecision} need decision`
+  ).join("\n");
+  const patternBlock = ALL_PATTERNS.map(p =>
+    `- ${p.id} (${p.severity}) · ${p.title} · affects ${p.affected} · suggested action: ${p.action}`
+  ).join("\n");
+  const decisionBlock = ALL_DECISIONS.map(d =>
+    `- ${d.id} (autonomy L${d.autonomyLevel}) · ${d.type} · ${d.label} · AI recommends: ${d.rec}`
+  ).join("\n");
+  const portfolioBlock = `\nJob type health:\n${jobTypeBlock}\n\nActive AI-detected patterns:\n${patternBlock}\n\nDecisions awaiting human:\n${decisionBlock}`;
+
+  // AI bar: context tracks the current focus item, but the portfolio block is
+  // always appended so platform-level questions can be answered.
+  const aiContext = (focus?.type === "job"
     ? `${isAaron ? "Aaron (CEO)" : "National Operations"} reviewing job ${focus.job.id} — ${focus.job.type}, ${focus.job.suburb}. Priority: ${focus.job.priority}. Confidence: ${focus.job.conf.toFixed(2)}. Action: ${focus.job.actionRequired ?? "AI handling"}.`
     : focus?.type === "pattern"
     ? `${isAaron ? "Aaron" : "National"} reviewing AI-detected pattern ${focus.pattern.id}: "${focus.pattern.title}". Severity: ${focus.pattern.severity}. ${focus.pattern.detail}`
     : focus?.type === "decision"
     ? `${isAaron ? "Aaron" : "National"} reviewing decision ${focus.dec.id}: ${focus.dec.label}. AI recommendation: ${focus.dec.rec}.`
-    : `${isAaron ? "Aaron (CEO/Founder)" : "National Operations"} — portfolio view. ${exceptions.filter(e => e.kind === "decision").length} decisions pending, ${exceptions.filter(e => e.kind === "pattern").length} AI patterns detected, ${exceptions.filter(e => e.severity === "high").length} high-severity items.${isAaron ? " Has workflow configuration access." : ""}`;
+    : `${isAaron ? "Aaron (CEO/Founder)" : "National Operations"} — portfolio view. ${exceptions.filter(e => e.kind === "decision").length} decisions pending, ${exceptions.filter(e => e.kind === "pattern").length} AI patterns detected, ${exceptions.filter(e => e.severity === "high").length} high-severity items.${isAaron ? " Has workflow configuration access." : ""}`)
+    + portfolioBlock;
+
+  // Suggestion chips — Aaron/National operate at portfolio level, so chips ask
+  // synthesis questions (where's the exposure, what's slipping, what needs my
+  // attention), not job-level lookups. Aaron's first chip is the
+  // workflow-config angle since he's the only one who can adjust autonomy.
+  const aiSuggestions = isAaron
+    ? [
+        { label: "🎯 Where should I focus?", question: "I have limited time today. Looking across the platform — which 1 or 2 things would most benefit from my attention right now? Be direct about the trade-offs." },
+        { label: "📉 What's slipping?", question: "Which job type or AI workflow step is showing the most concerning trend, and what's driving the decline? Use the data you can see." },
+        { label: "🔓 Anything I should sign off?", question: "Are there workflow autonomy changes you'd recommend I review — promotions where the data justifies it, or demotions I should make permanent? Walk me through the case." },
+      ]
+    : [
+        { label: "🎯 What's exposed today?", question: "Across all regions, where is the platform most exposed today — which decisions, patterns, or jobs need senior eyes? Prioritise by risk." },
+        { label: "📉 What's slipping?", question: "Which job type or region is showing the most concerning trend, and what's driving the decline?" },
+        { label: "📊 How are we tracking this week?", question: "Give me a frank read on platform health this week. What's healthy, what's slipping, where's the biggest exposure?" },
+      ];
   const aiContextLabel = focus?.type === "job"
     ? `Focused on ${focus.job.id}`
     : focus?.type === "pattern"
@@ -854,6 +886,7 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
                 context={aiContext}
                 placeholder={focus ? `Ask about this ${focus.type}...` : "Ask about your portfolio..."}
                 trigger={aiTrigger}
+                suggestions={aiSuggestions}
               />
             </div>
           </div>
