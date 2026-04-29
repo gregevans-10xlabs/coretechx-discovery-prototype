@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
+import JourneyBar from "./JourneyBar";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
@@ -389,8 +390,6 @@ function JobTypeDetailPanel({ jtLabel, onClose }: { jtLabel: string; onClose: ()
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
 function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => void; onAskWhy: () => void }) {
   const [chosen, setChosen] = useState<string | null>(null);
-  const stages = ["Intake", "Triage", "Qualify", "Match", "Allocate", "Schedule", "Execute", "Complete"];
-  const currentStage = Math.min(job.journeyStep, stages.length - 1);
 
   return (
     <div className="h-full flex flex-col animate-fadeIn">
@@ -420,14 +419,7 @@ function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => v
         {/* Journey */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey</p>
-          <div className="flex items-center gap-0.5">
-            {stages.map((s, i) => (
-              <div key={s} className="flex-1 flex flex-col items-center gap-1">
-                <div className={`h-1.5 w-full rounded-full ${i < currentStage ? "bg-[#00BDFE]" : i === currentStage ? "bg-amber-400" : "bg-slate-200"}`} />
-                <span className={`text-[8px] font-medium ${i === currentStage ? "text-amber-600" : i < currentStage ? "text-[#00BDFE]" : "text-slate-300"}`}>{s}</span>
-              </div>
-            ))}
-          </div>
+          <JourneyBar job={job} size="compact" />
         </div>
 
         {/* Flags */}

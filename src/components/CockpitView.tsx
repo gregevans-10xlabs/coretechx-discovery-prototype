@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { loganQueueJobs, kerrieQueueJobs, STARLINK_JOURNEY, HN_JOURNEY, INSURANCE_JOURNEY } from "../data/jobs";
+import { loganQueueJobs, kerrieQueueJobs } from "../data/jobs";
 import type { Job } from "../data/jobs";
 import { ALL_PATTERNS, FIELD_DEFERRALS, SUPERVISORS, riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
+import JourneyBar from "./JourneyBar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned";
@@ -27,12 +28,6 @@ const LOGAN_REGION_TOTAL  = 3450;
 const KERRIE_REGION_TOTAL = 240;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function journeyForJob(job: Job): string[] {
-  if (job.type === "Insurance Repair") return INSURANCE_JOURNEY;
-  if (job.type === "Harvey Norman Install") return HN_JOURNEY;
-  return STARLINK_JOURNEY;
-}
-
 function geoStatusLabel(job: Job): string {
   switch (job.geoStatus) {
     case "confirmed_en_route": return `Trade confirmed en route (${job.geoTime})`;
@@ -77,55 +72,6 @@ function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) 
   );
 }
 
-// ─── Journey Progress Bar ─────────────────────────────────────────────────────
-function JourneyBar({ steps, currentStep, accentColor }: { steps: string[]; currentStep: number; accentColor: string }) {
-  return (
-    <div className="mb-4">
-      <div className="flex items-start">
-        {steps.map((step, i) => {
-          const done = i < currentStep;
-          const active = i === currentStep;
-          const isLast = i === steps.length - 1;
-          return (
-            <div key={step} className="flex items-center flex-1 min-w-0">
-              <div className="flex flex-col items-center flex-shrink-0">
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-all ${
-                    done ? "border-transparent text-white"
-                    : active ? "bg-white"
-                    : "bg-white border-slate-200 text-slate-300"
-                  }`}
-                  style={
-                    done ? { background: accentColor, borderColor: accentColor }
-                    : active ? { borderColor: accentColor, color: accentColor }
-                    : {}
-                  }
-                >
-                  {done ? "✓" : i + 1}
-                </div>
-                <span
-                  className={`text-[9px] mt-1 text-center leading-tight max-w-[44px] ${
-                    active ? "font-semibold" : done ? "text-slate-400" : "text-slate-300"
-                  }`}
-                  style={active ? { color: accentColor } : {}}
-                >
-                  {step}
-                </span>
-              </div>
-              {!isLast && (
-                <div
-                  className="flex-1 h-0.5 mx-0.5 mb-4 rounded"
-                  style={{ background: done ? accentColor : "#e2e8f0", opacity: done ? 0.7 : 1 }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ─── Activity Log ─────────────────────────────────────────────────────────────
 function ActivityLog({ items, actionRequired }: {
   items: { time: string; actor: "ai" | "human"; msg: string }[];
@@ -165,7 +111,6 @@ function JobDetail({ job, persona, onAction, onAskWhy }: {
   const [actionDone, setActionDone] = useState<string | null>(null);
   const isInsurance = job.type === "Insurance Repair";
   const accentColor = isInsurance ? "#f97316" : "#00BDFE";
-  const journey = journeyForJob(job);
 
   const isReadOnly = job.readOnlyFor.includes(persona);
 
@@ -288,7 +233,7 @@ function JobDetail({ job, persona, onAction, onAskWhy }: {
       {/* Journey */}
       <div>
         <p className="text-slate-500 text-xs font-medium mb-2">Journey Progress</p>
-        <JourneyBar steps={journey} currentStep={job.journeyStep} accentColor={accentColor} />
+        <JourneyBar job={job} accentColor={accentColor} />
       </div>
 
       {/* Activity log */}

@@ -105,10 +105,59 @@ export type Job = {
 };
 
 // ─── Journey step definitions ─────────────────────────────────────────────────
+// Per-job-type client labels (kept for reference; AI log strings still use these).
 export const STARLINK_JOURNEY  = ["Intake", "Triage", "Qualify", "Match", "Allocate", "Schedule", "Execute", "Complete"];
 export const HN_JOURNEY        = ["Intake", "Qualify", "Match", "Allocate", "Schedule", "Execute", "QA", "Complete"];
 export const INSURANCE_JOURNEY = ["Assessment", "Scope", "Approved", "Allocated", "In Progress", "Awaiting", "Portal", "Closed"];
 export const AHO_JOURNEY       = ["Intake", "Site Survey", "Scope", "Approved", "Allocated", "In Progress", "Inspection", "Complete"];
+
+// ─── 8 Universal Stages — platform backbone (Discovery OS, 7 Apr 2026) ──────
+// Every job type maps onto this same backbone. Client-specific labels are
+// configurable presentation; the universal stages are the canonical structure.
+export const UNIVERSAL_STAGES = [
+  "Intake", "Triage", "Qualify", "Plan", "Allocate", "Execute", "Complete", "Settle",
+] as const;
+
+// Per-job-type mapping: client step index → universal stage index (0–7).
+// Plus the inverse: client labels living under each universal stage (for display).
+export type JourneyMap = {
+  toUniversal: number[];      // length matches client journey; value = universal stage 0–7
+  clientLabels: string[][];   // length 8 (one per universal stage); each entry is client labels at that stage
+};
+
+// Starlink: Match→Plan, Schedule co-locates with Allocate, Complete→Complete.
+// No client step lives in Settle today (post-job invoice/feedback handled in workflow agents).
+export const STARLINK_MAP: JourneyMap = {
+  toUniversal:  [0, 1, 2, 3, 4, 4, 5, 6],
+  clientLabels: [["Intake"], ["Triage"], ["Qualify"], ["Match"], ["Allocate", "Schedule"], ["Execute"], ["Complete"], []],
+};
+
+// Harvey Norman / JB Hi-Fi: no Triage step; QA sits in Complete; "Complete" → Settle.
+export const HN_MAP: JourneyMap = {
+  toUniversal:  [0, 2, 3, 4, 4, 5, 6, 7],
+  clientLabels: [["Intake"], [], ["Qualify"], ["Match"], ["Allocate", "Schedule"], ["Execute"], ["QA"], ["Complete"]],
+};
+
+// Insurance: Prime statuses mapped to universal backbone. Synthesized "Received
+// from insurer" label completes the visual story for Intake (today's data starts at Assessment).
+export const INSURANCE_MAP: JourneyMap = {
+  toUniversal:  [1, 2, 3, 4, 5, 5, 6, 7],
+  clientLabels: [["Received from insurer"], ["Assessment"], ["Scope"], ["Approved"], ["Allocated"], ["In Progress", "Awaiting"], ["Portal"], ["Closed"]],
+};
+
+// AHO Construction: clean 1:1 with universal backbone (its 8 client steps already align).
+export const AHO_MAP: JourneyMap = {
+  toUniversal:  [0, 1, 2, 3, 4, 5, 6, 7],
+  clientLabels: [["Intake"], ["Site Survey"], ["Scope"], ["Approved"], ["Allocated"], ["In Progress"], ["Inspection"], ["Complete"]],
+};
+
+// Lookup helper — single source of truth for journey mapping by job type.
+export function journeyMapForJob(job: Job): JourneyMap {
+  if (job.type === "Insurance Repair") return INSURANCE_MAP;
+  if (job.type === "AHO Construction") return AHO_MAP;
+  if (job.type === "Harvey Norman Install" || job.type === "JB Hi-Fi Install") return HN_MAP;
+  return STARLINK_MAP;
+}
 
 // ─── The 22-job dataset ───────────────────────────────────────────────────────
 

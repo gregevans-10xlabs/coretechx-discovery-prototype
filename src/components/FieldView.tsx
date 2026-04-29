@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { JOBS, type Job, STARLINK_JOURNEY, HN_JOURNEY, INSURANCE_JOURNEY, AHO_JOURNEY } from "../data/jobs";
+import { JOBS, type Job } from "../data/jobs";
 import { riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
+import JourneyBar from "./JourneyBar";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -29,16 +30,8 @@ function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) 
   );
 }
 
-function getJourney(job: Job) {
-  if (job.type === "Insurance Repair")  return INSURANCE_JOURNEY;
-  if (job.type === "AHO Construction")  return AHO_JOURNEY;
-  if (job.type === "Harvey Norman Install" || job.type === "JB Hi-Fi Install") return HN_JOURNEY;
-  return STARLINK_JOURNEY;
-}
-
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
 function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => void; onAskWhy: () => void }) {
-  const journey = getJourney(job);
   const [actionDone, setActionDone] = useState<string | null>(null);
 
   return (
@@ -110,29 +103,7 @@ function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => v
         {/* Journey */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey Progress</p>
-          <div className="flex items-center gap-0 overflow-x-auto pb-1">
-            {journey.map((step, i) => {
-              const done = i < job.journeyStep;
-              const active = i === job.journeyStep;
-              return (
-                <div key={i} className="flex items-center flex-shrink-0">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                      done   ? "bg-[#00BDFE] border-[#00BDFE] text-white" :
-                      active ? "bg-white border-[#00BDFE] text-[#00BDFE]" :
-                               "bg-white border-slate-200 text-slate-300"
-                    }`}>
-                      {done ? "✓" : i + 1}
-                    </div>
-                    <p className={`text-[9px] mt-1 text-center w-12 leading-tight ${active ? "text-[#00BDFE] font-semibold" : done ? "text-slate-400" : "text-slate-300"}`}>{step}</p>
-                  </div>
-                  {i < journey.length - 1 && (
-                    <div className={`h-0.5 w-4 flex-shrink-0 mb-4 ${i < job.journeyStep ? "bg-[#00BDFE]" : "bg-slate-200"}`} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <JourneyBar job={job} />
         </div>
 
         {/* AI Log */}
