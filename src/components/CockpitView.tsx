@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { loganQueueJobs, kerrieQueueJobs } from "../data/jobs";
 import type { Job } from "../data/jobs";
-import { ALL_PATTERNS, SUPERVISORS, TAG_VOCABULARY, type FieldDeferral, type DeferralEscalation, riskState, riskBadgeClass } from "../data/scenarios";
+import { ALL_PATTERNS, SUPERVISORS, TAG_VOCABULARY, SILENT_DECISIONS, type FieldDeferral, type DeferralEscalation, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
 import DeferralReasonModal from "./DeferralReasonModal";
+import AIAuditTab from "./AIAuditTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type QueueFilter = "action" | "browse" | "planned";
+type QueueFilter = "action" | "browse" | "planned" | "audit";
 
 // ─── Sort: action-required items first, ranked by severity ───────────────────
 // Hard limits (🔒) → jeopardy → urgent → standard → AI-handled (by window time)
@@ -881,7 +882,7 @@ function CockpitPatternDetail({ pattern: p, onClose }: { pattern: LoganPattern; 
 }
 
 // ─── Main CockpitView ─────────────────────────────────────────────────────────
-export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag, deferrals, onAddEscalation }: {
+export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag, deferrals, onAddEscalation, modelFeedback, onAddModelFeedback }: {
   persona: string;
   onPersonaSwitch?: (id: string) => void;
   tagsByJob: Record<string, string[]>;
@@ -889,6 +890,8 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   onRemoveTag: (jobId: string, tag: string) => void;
   deferrals: FieldDeferral[];
   onAddEscalation: (jobId: string, esc: DeferralEscalation) => void;
+  modelFeedback: ModelFeedback[];
+  onAddModelFeedback: (entry: ModelFeedback) => void;
 }) {
   const isKerrie = persona === "kerrie";
 
@@ -969,11 +972,21 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
         { label: "What's at risk today?", question: "Which jobs are at risk of missing their window today, and what's driving the risk for each?" },
       ];
 
+  // AI Audit — silent decisions scoped to this persona's region/job-types.
+  // Discovery OS Req 3 (17 Apr 2026): operators must see what AI chose NOT
+  // to surface, to catch cases where the prioritisation model is wrong.
+  const auditDecisions = SILENT_DECISIONS.filter(d => {
+    if (isKerrie) return d.jobType === "Insurance Repair";
+    // Logan: starlink/HN/JBHF in his region
+    return d.region === "North East NSW/QLD" && (d.jobType === "Starlink Install" || d.jobType === "Harvey Norman Install" || d.jobType === "JB Hi-Fi Install");
+  });
+
   // Tab labels
   const TABS: { key: QueueFilter; label: string }[] = [
     { key: "action",  label: `Decisions (${decisionCount})` },
     { key: "planned", label: "Planned" },
     { key: "browse",  label: "Browse all" },
+    { key: "audit",   label: `AI Audit (${auditDecisions.length})` },
   ];
 
   return (
@@ -1013,7 +1026,17 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
         </div>
 
         {/* Queue list */}
-        <div className="flex-1 overflow-y-auto px-3 py-2.5 space-y-2 relative">
+        <div className="flex-1 overflow-y-auto relative">
+          {filter === "audit" ? (
+            <AIAuditTab
+              decisions={auditDecisions}
+              feedback={modelFeedback}
+              onAddFeedback={onAddModelFeedback}
+              flaggedByName={isKerrie ? "Kerrie Tran" : "Logan Reilly"}
+              flaggedById={persona}
+            />
+          ) : (
+          <div className="px-3 py-2.5 space-y-2">
           {filteredQueue.length === 0 && filter === "action" ? (
             <div className="text-center px-3 py-8 space-y-2">
               <div className="w-10 h-10 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto">
@@ -1055,6 +1078,8 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
           )}
           {filteredQueue.length > 4 && (
             <div className="sticky bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-50 to-transparent pointer-events-none" />
+          )}
+          </div>
           )}
         </div>
       </div>

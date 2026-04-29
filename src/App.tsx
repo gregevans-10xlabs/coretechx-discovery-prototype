@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, ALL_DECISIONS, INITIAL_FIELD_DEFERRALS, type FieldDeferral, type DeferralEscalation, riskState, riskBadgeClass } from "./data/scenarios";
+import { LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, ALL_DECISIONS, INITIAL_FIELD_DEFERRALS, type FieldDeferral, type DeferralEscalation, type ModelFeedback, riskState, riskBadgeClass } from "./data/scenarios";
 import { JOBS } from "./data/jobs";
 import AskAI from "./components/AskAI";
 import CockpitView from "./components/CockpitView";
@@ -238,6 +238,19 @@ export default function App() {
   // creates new entries from operator action; addEscalation pushes an item one
   // tier higher with a new reason in the chain.
   const [deferrals, setDeferrals] = useState<FieldDeferral[]>(INITIAL_FIELD_DEFERRALS);
+
+  // Model feedback — operator flags on AI silent decisions become labelled
+  // training examples for the per-step CNN models (Discovery OS Req 3 +
+  // 22 Apr 2026 architecture decision).
+  const [modelFeedback, setModelFeedback] = useState<ModelFeedback[]>([]);
+  const addModelFeedback = (entry: ModelFeedback) => setModelFeedback(curr => {
+    // De-duplicate: if this user already feedback'd this decision, replace
+    const existing = curr.findIndex(f => f.decisionId === entry.decisionId && f.flaggedById === entry.flaggedById);
+    if (existing >= 0) {
+      const next = [...curr]; next[existing] = entry; return next;
+    }
+    return [entry, ...curr];
+  });
   const addDeferral = (entry: FieldDeferral) => setDeferrals(curr => [entry, ...curr]);
   const addEscalation = (jobId: string, esc: DeferralEscalation) => setDeferrals(curr =>
     curr.map(d => d.jobId === jobId
@@ -304,7 +317,7 @@ export default function App() {
   if (isPortfolio) return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <PortfolioView persona={persona} onWorkflowConfig={() => setView("workflow")} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} />
+      <PortfolioView persona={persona} onWorkflowConfig={() => setView("workflow")} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} modelFeedback={modelFeedback} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
@@ -313,7 +326,7 @@ export default function App() {
   if (isField) return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <FieldView persona={persona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} />
+      <FieldView persona={persona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
@@ -373,7 +386,7 @@ export default function App() {
   return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} onAddEscalation={addEscalation}/>
+      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} onAddEscalation={addEscalation} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback}/>
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
-import { riskState, riskBadgeClass, TAG_VOCABULARY } from "../data/scenarios";
+import { riskState, riskBadgeClass, TAG_VOCABULARY, SILENT_DECISIONS, type ModelFeedback } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
+import AIAuditTab from "./AIAuditTab";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -215,11 +216,13 @@ const FIELD_CONFIG: Record<string, {
   },
 };
 
-export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag }: {
+export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, modelFeedback, onAddModelFeedback }: {
   persona: string;
   tagsByJob: Record<string, string[]>;
   onAddTag: (jobId: string, tag: string) => void;
   onRemoveTag: (jobId: string, tag: string) => void;
+  modelFeedback: ModelFeedback[];
+  onAddModelFeedback: (entry: ModelFeedback) => void;
 }) {
   const config  = FIELD_CONFIG[persona] ?? FIELD_CONFIG.blake;
   const allJobs = sortDecisionFirst(JOBS.filter(j => j.visibleTo.includes(persona)));
@@ -228,7 +231,14 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag }:
   const regionTotal  = FIELD_REGION_TOTAL[persona] ?? 300;
   const aiHandling   = regionTotal - decisionJobs.length;
 
-  const [filterTab, setFilterTab] = useState<"action" | "browse" | "complete">("action");
+  const [filterTab, setFilterTab] = useState<"action" | "browse" | "complete" | "audit">("action");
+
+  // AI Audit — silent decisions scoped to this persona's job type.
+  const auditDecisions = SILENT_DECISIONS.filter(d => {
+    if (persona === "conner") return d.jobType === "AHO Construction";
+    if (persona === "blake")  return d.jobType === "Facilities Management";
+    return false;
+  });
   const [selectedId, setSelectedId] = useState<string | null>(decisionJobs[0]?.id ?? null);
   // Prefill question fired into the AI bar by the "Why is this here?" button.
   const [aiTrigger, setAiTrigger] = useState<{ text: string; nonce: number } | undefined>(undefined);
@@ -271,8 +281,9 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag }:
             <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
               {([
                 { key: "action",   label: `Decisions (${decisionCount})` },
-                { key: "browse",   label: "Browse all" },
+                { key: "browse",   label: "Browse" },
                 { key: "complete", label: "Complete" },
+                { key: "audit",    label: `AI Audit (${auditDecisions.length})` },
               ] as const).map(tab => (
                 <button key={tab.key} onClick={() => setFilterTab(tab.key)}
                   className={`flex-1 text-[10px] py-1 rounded-md font-semibold transition-colors ${filterTab === tab.key ? "bg-[#00BDFE] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
@@ -282,8 +293,17 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag }:
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto py-2 scrollbar-thin relative">
-            <div className="space-y-1 px-2">
+          <div className="flex-1 overflow-y-auto py-0 scrollbar-thin relative">
+            {filterTab === "audit" ? (
+              <AIAuditTab
+                decisions={auditDecisions}
+                feedback={modelFeedback}
+                onAddFeedback={onAddModelFeedback}
+                flaggedByName={persona === "conner" ? "Conner Reilly" : "Blake Henderson"}
+                flaggedById={persona}
+              />
+            ) : (
+            <div className="space-y-1 px-2 py-2">
               {filteredJobs.length === 0 && filterTab === "action" ? (
                 <div className="text-center px-3 py-8 space-y-2">
                   <div className="w-10 h-10 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto">
@@ -326,6 +346,7 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag }:
                 );
               })}
             </div>
+            )}
             <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent" />
           </div>
         </div>

@@ -289,6 +289,134 @@ export const DEFERRAL_REASON_CHIPS = [
   "Other",
 ];
 
+// ─── AI Audit / Missed-prioritisation surface ────────────────────────────────
+// Per Discovery OS req (17 Apr 2026, High priority): operators must be able to
+// see what the system chose NOT to put on their queue, to catch cases where
+// the prioritisation model is wrong. Operator flags become labelled training
+// examples that feed the per-step CNN models (architecture decision 22 Apr 2026).
+
+export type SilentDecisionCategory =
+  | "auto_allocated"
+  | "auto_classified"
+  | "shadow_activated"
+  | "pattern_suppressed"
+  | "evidence_accepted"
+  | "auto_rescheduled"
+  | "rate_card_applied";
+
+export const SILENT_DECISION_CATEGORY_META: Record<SilentDecisionCategory, { label: string; tone: string }> = {
+  auto_allocated:     { label: "Auto-allocated",        tone: "bg-slate-100 text-slate-700 border-slate-200" },
+  auto_classified:    { label: "Auto-classified",       tone: "bg-slate-100 text-slate-700 border-slate-200" },
+  shadow_activated:   { label: "Shadow plan activated", tone: "bg-amber-50 text-amber-700 border-amber-200" },
+  pattern_suppressed: { label: "Pattern suppressed",    tone: "bg-amber-50 text-amber-700 border-amber-200" },
+  evidence_accepted:  { label: "Evidence accepted",     tone: "bg-slate-100 text-slate-700 border-slate-200" },
+  auto_rescheduled:   { label: "Auto-rescheduled",      tone: "bg-amber-50 text-amber-700 border-amber-200" },
+  rate_card_applied:  { label: "Rate card applied",     tone: "bg-slate-100 text-slate-700 border-slate-200" },
+};
+
+export type SilentDecision = {
+  id: string;
+  category: SilentDecisionCategory;
+  jobId: string;            // or pattern id for pattern_suppressed
+  what: string;             // human-readable summary of what the AI did
+  reasoning: string;        // why — plain-English explanation
+  confidence: number;       // 0–1 at the moment of decision
+  time: string;             // relative time, illustrative
+  step: string;             // CNN model name (matches MODEL_STATS.step)
+  region?: string;          // for persona scoping
+  jobType?: string;         // for persona scoping
+};
+
+export const SILENT_DECISIONS: SilentDecision[] = [
+  // — Logan / Starlink + HN/JBHF —
+  { id:"AID-001", category:"auto_allocated",     jobId:"CG36120", what:"Allocated to Sandbar Electrical Services",            reasoning:"Closest available trade (12km), 4.2★ rating, on-time history 96%, in zone for Coomba Bay corridor.",                          confidence:0.97, time:"14m ago", step:"trade_matching",      region:"North East NSW/QLD", jobType:"Starlink Install" },
+  { id:"AID-002", category:"shadow_activated",   jobId:"CG36079", what:"Swapped Metro Handyman → North Coast Comms",          reasoning:"Original trade did not confirm by T-30. Shadow plan activated automatically. Customer SMS sent.",                              confidence:0.71, time:"23m ago", step:"shadow_plan_trigger", region:"North East NSW/QLD", jobType:"Starlink Install" },
+  { id:"AID-003", category:"pattern_suppressed", jobId:"P-061",   what:"Suppressed 4 attendance-lag flags (Wollongong corridor)", reasoning:"Pattern: pre-9am attendance lag typical for 2500–2599 postcodes, self-resolves by 10:00 in 94% of cases over last 8 weeks.", confidence:0.62, time:"1h ago",  step:"pattern_suppression", region:"North East NSW/QLD", jobType:"Starlink Install" },
+  { id:"AID-004", category:"auto_classified",    jobId:"CG36205", what:"Classified as Starlink Install — Standard rate card",  reasoning:"Order matches 99.4% with Starlink standard scope; no scope-change indicators; rate card $310 applied.",                          confidence:0.99, time:"2h ago",  step:"scope_classification",region:"North East NSW/QLD", jobType:"Starlink Install" },
+  { id:"AID-005", category:"auto_rescheduled",   jobId:"CG36088", what:"Window moved 2pm → 4pm (BoM weather alert)",            reasoning:"BoM severe-storm warning issued for Hunter region 2pm–3pm. Window moved 2h to next available slot. Customer notified.",       confidence:0.84, time:"3h ago",  step:"reschedule_trigger",  region:"North East NSW/QLD", jobType:"Starlink Install" },
+  { id:"AID-006", category:"evidence_accepted",  jobId:"CG36019", what:"Install evidence pack auto-validated",                  reasoning:"6 photos passed quality check, customer signature present, serial number scanned and matches order. Invoice released.",        confidence:0.96, time:"4h ago",  step:"evidence_validation", region:"North East NSW/QLD", jobType:"Starlink Install" },
+  { id:"AID-007", category:"auto_allocated",     jobId:"CG35968", what:"Allocated to UNITED INFOCOM TECH (Harvey Norman)",      reasoning:"Trade has 99% on-time record across 47 HN jobs in last 90 days. Within delivery window. No flags.",                              confidence:0.98, time:"5h ago",  step:"trade_matching",      region:"North East NSW/QLD", jobType:"Harvey Norman Install" },
+  { id:"AID-008", category:"rate_card_applied",  jobId:"CG36190", what:"JB Hi-Fi commercial rate applied ($382)",               reasoning:"Order tagged commercial in JB portal. Commercial rate card applied (vs standard $310).",                                          confidence:0.93, time:"6h ago",  step:"rate_card_application",region:"North East NSW/QLD", jobType:"JB Hi-Fi Install" },
+  { id:"AID-009", category:"pattern_suppressed", jobId:"P-058",   what:"Suppressed 'no GPS ping' flag (Mid North Coast)",       reasoning:"Pattern: GPS dead zones around Coomba Bay / Pacific Palms — confirmed via 12-month history. Trade reliability remains high.",   confidence:0.55, time:"7h ago",  step:"pattern_suppression", region:"North East NSW/QLD", jobType:"Starlink Install" },
+
+  // — Kerrie / Insurance —
+  { id:"AID-010", category:"auto_classified",    jobId:"CG36277", what:"Allianz claim classified as Roof Repair (Tier ST)",    reasoning:"Description matches roof-leak template 0.94. Photos confirm visible damage. Standard estimating workflow applied.",            confidence:0.94, time:"30m ago", step:"insurance_scope",     region:"National",          jobType:"Insurance Repair" },
+  { id:"AID-011", category:"auto_allocated",     jobId:"CG36192", what:"Allocated to TAYLOR MADE for Mardi roofing job",        reasoning:"Licensed roofer in zone. Allianz-approved. SWMS current. 4.1★ quality, no recent complaints.",                                  confidence:0.89, time:"45m ago", step:"trade_matching",      region:"National",          jobType:"Insurance Repair" },
+  { id:"AID-012", category:"pattern_suppressed", jobId:"P-052",   what:"Suppressed 'Suncorp portal sync delay' alert",           reasoning:"Pattern: Suncorp portal sync delays of 4–6 hours typical post-7pm AEDT. Self-corrects overnight in 98% of cases.",                confidence:0.58, time:"2h ago",  step:"pattern_suppression", region:"National",          jobType:"Insurance Repair" },
+  { id:"AID-013", category:"evidence_accepted",  jobId:"CG36088", what:"Makesafe photos accepted (NRMA portal updated)",        reasoning:"4 photos passed quality check. Trade GPS confirms on-site duration 1h 12m. NRMA portal acknowledged.",                            confidence:0.91, time:"3h ago",  step:"evidence_validation", region:"National",          jobType:"Insurance Repair" },
+
+  // — Conner / Construction —
+  { id:"AID-014", category:"auto_allocated",     jobId:"CG36412", what:"AHO Tweed Heads — AusCorp + J1 Air Conditioning",       reasoning:"Both trades selected together: AusCorp lead (builder), J1 sub (HVAC). Past pairing 4 sites this quarter, 100% on-schedule.",    confidence:0.86, time:"1h ago",  step:"multi_trade_match",   region:"National",          jobType:"AHO Construction" },
+  { id:"AID-015", category:"auto_classified",    jobId:"CG36418", what:"AHO Mt Druitt — classified Tier C (Complex)",            reasoning:"Multi-trade scope, 4-week build, custom kitchen — all complexity indicators present. Tier C workflow applied.",                  confidence:0.92, time:"4h ago",  step:"complexity_tiering",  region:"National",          jobType:"AHO Construction" },
+  { id:"AID-016", category:"pattern_suppressed", jobId:"P-064",   what:"Suppressed 3 'low-comms during fix stage' flags",        reasoning:"Pattern: construction sites typically reduce daily comms during fix stage (no progress photos). Self-resolves at lock-up.",        confidence:0.66, time:"5h ago",  step:"pattern_suppression", region:"National",          jobType:"AHO Construction" },
+
+  // — Blake / FM —
+  { id:"AID-017", category:"auto_allocated",     jobId:"CG36322", what:"Reactive callout → nearest plumber (Sydney metro)",      reasoning:"Highest-rated available trade within 8km, all certifications current, accepted via Chekku in 4m.",                                confidence:0.88, time:"55m ago", step:"trade_matching",      region:"National",          jobType:"Facilities Management" },
+  { id:"AID-018", category:"pattern_suppressed", jobId:"P-067",   what:"Suppressed 'after-hours request' flag (low severity)",   reasoning:"Pattern: after-hours requests for non-emergency lighting requests typical for office strata, batched to next-day handling.",      confidence:0.64, time:"6h ago",  step:"pattern_suppression", region:"National",          jobType:"Facilities Management" },
+  { id:"AID-019", category:"auto_classified",    jobId:"CG36340", what:"Preventive maintenance — quarterly schedule applied",   reasoning:"Site contract active, quarterly cycle due, no special instructions. Standard PM workflow auto-instantiated.",                    confidence:0.99, time:"7h ago",  step:"scope_classification",region:"National",          jobType:"Facilities Management" },
+
+  // — Cross-region / Aaron-level —
+  { id:"AID-020", category:"shadow_activated",   jobId:"CG36254", what:"Shadow activated — original trade missed window",       reasoning:"3-strike rule: trade missed last 3 confirmation pings. Shadow plan engaged automatically. Customer notified.",                  confidence:0.74, time:"40m ago", step:"shadow_plan_trigger", region:"National",          jobType:"Starlink Install" },
+  { id:"AID-021", category:"rate_card_applied",  jobId:"CG36167", what:"Insurance rate card (Suncorp Tier 2) applied",          reasoning:"Suncorp claim, ≤$2,500 scope. Tier 2 rate applied per insurer agreement schedule.",                                              confidence:0.96, time:"3h ago",  step:"rate_card_application",region:"National",         jobType:"Insurance Repair" },
+];
+
+export type ModelFeedback = {
+  id: string;
+  decisionId: string;
+  flaggedById: string;
+  flaggedByName: string;
+  flaggedAt: string;
+  // true = "Flag for review" (negative label); false = "Looks right" (positive)
+  isFlag: boolean;
+  flagCategory?: AIAuditFlagCategory;
+  reason?: string;
+};
+
+export type AIAuditFlagCategory =
+  | "wrong_action"
+  | "should_have_escalated"
+  | "confidence_overstated"
+  | "pattern_misapplied"
+  | "wrong_trade_match"
+  | "other";
+
+export const AI_AUDIT_FLAG_CHIPS: { id: AIAuditFlagCategory; label: string }[] = [
+  { id: "wrong_action",            label: "Wrong action" },
+  { id: "should_have_escalated",   label: "Should have escalated" },
+  { id: "confidence_overstated",   label: "Confidence overstated" },
+  { id: "pattern_misapplied",      label: "Pattern misapplied" },
+  { id: "wrong_trade_match",       label: "Wrong trade match" },
+  { id: "other",                   label: "Other" },
+];
+
+// ─── Per-step CNN model stats (illustrative — drives Training Feedback panel) ─
+// In production these come from the per-step CNN training pipeline. For the
+// prototype, hardcoded numbers show the loop structure: flags → labels → retrain
+// → accuracy delta. Architecture per Discovery OS decision 22 Apr 2026.
+export type ModelStats = {
+  step: string;          // matches SilentDecision.step
+  label: string;         // human-readable
+  accuracy: number;      // 0–1, current
+  trend: "up" | "down" | "stable";
+  delta?: number;        // pt change since last retrain (e.g. +0.7)
+  lastRetrainDays: number | null; // null = "queued for retrain"
+  flagsLast7d: number;
+  retrainsLast30d: number;
+};
+
+export const MODEL_STATS: ModelStats[] = [
+  { step:"trade_matching",        label:"Trade matching CNN",         accuracy:0.978, trend:"up",     delta:0.7,  lastRetrainDays:2,    flagsLast7d:3,  retrainsLast30d:4 },
+  { step:"scope_classification",  label:"Scope classification CNN",   accuracy:0.994, trend:"stable",             lastRetrainDays:11,   flagsLast7d:1,  retrainsLast30d:1 },
+  { step:"shadow_plan_trigger",   label:"Shadow plan trigger CNN",    accuracy:0.912, trend:"down",   delta:-0.4, lastRetrainDays:null, flagsLast7d:8,  retrainsLast30d:3 },
+  { step:"pattern_suppression",   label:"Pattern suppression LLM",    accuracy:0.886, trend:"stable",             lastRetrainDays:null, flagsLast7d:12, retrainsLast30d:0 },
+  { step:"evidence_validation",   label:"Evidence validation CNN",    accuracy:0.965, trend:"up",     delta:0.3,  lastRetrainDays:5,    flagsLast7d:2,  retrainsLast30d:2 },
+  { step:"rate_card_application", label:"Rate card application CNN",  accuracy:0.991, trend:"stable",             lastRetrainDays:18,   flagsLast7d:0,  retrainsLast30d:1 },
+  { step:"reschedule_trigger",    label:"Reschedule trigger CNN",     accuracy:0.943, trend:"up",     delta:0.5,  lastRetrainDays:7,    flagsLast7d:1,  retrainsLast30d:1 },
+  { step:"insurance_scope",       label:"Insurance scope CNN",        accuracy:0.928, trend:"stable",             lastRetrainDays:9,    flagsLast7d:2,  retrainsLast30d:2 },
+  { step:"multi_trade_match",     label:"Multi-trade matching CNN",   accuracy:0.852, trend:"up",     delta:1.1,  lastRetrainDays:14,   flagsLast7d:1,  retrainsLast30d:1 },
+  { step:"complexity_tiering",    label:"Complexity tier CNN",        accuracy:0.971, trend:"stable",             lastRetrainDays:21,   flagsLast7d:0,  retrainsLast30d:1 },
+];
+
 // ─── Supervisor data ──────────────────────────────────────────────────────────
 // Suburbs from real Prime data (Logan's NSW/QLD region)
 export const SUPERVISORS = [

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
-import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, type FieldDeferral, riskState, riskBadgeClass } from "../data/scenarios";
+import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -594,7 +594,7 @@ function BriefingDetailPanel({ msg, icon, onClose }: { msg: string; icon: string
 }
 
 // ─── Platform Health (Column 3) ───────────────────────────────────────────────
-function PlatformHealth({ isAaron, onWorkflowConfig, deferrals }: { isAaron: boolean; onWorkflowConfig?: () => void; deferrals: FieldDeferral[] }) {
+function PlatformHealth({ isAaron, onWorkflowConfig, deferrals, modelFeedback }: { isAaron: boolean; onWorkflowConfig?: () => void; deferrals: FieldDeferral[]; modelFeedback: ModelFeedback[] }) {
   // Team deferrals visible at portfolio level — Discovery OS roll-up requirement
   // (17 Apr 2026): every deferral remains visible at tier N+1 and N+2 with
   // the full reason chain. Sort: items currently with the senior tier first
@@ -689,6 +689,63 @@ function PlatformHealth({ isAaron, onWorkflowConfig, deferrals }: { isAaron: boo
         </div>
       )}
 
+      {/* Training Feedback — closes the loop on AI Audit. Operator flags from
+          across all queues become labelled training examples for the per-step
+          CNN models (Discovery OS req 22 Apr 2026 architecture). Aaron sees
+          the loop is alive: flags → labels → retrain → accuracy delta. */}
+      <div>
+        <div className="flex items-baseline justify-between mb-2">
+          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Training Feedback</p>
+          <p className="text-slate-400 text-[10px]">last 7 days</p>
+        </div>
+        {(() => {
+          const newFlags = modelFeedback.filter(f => f.isFlag).length;
+          const newConfirms = modelFeedback.filter(f => !f.isFlag).length;
+          return (
+            <div className="bg-white border border-slate-200 rounded-xl p-2.5 mb-2 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className="text-base font-bold text-slate-800">{newFlags}</p>
+                <p className="text-[10px] text-slate-400">Flags this session</p>
+              </div>
+              <div>
+                <p className="text-base font-bold text-slate-800">{newConfirms}</p>
+                <p className="text-[10px] text-slate-400">Confirmations</p>
+              </div>
+              <div>
+                <p className="text-base font-bold text-slate-800">{MODEL_STATS.reduce((a, m) => a + m.flagsLast7d, 0) + newFlags}</p>
+                <p className="text-[10px] text-slate-400">Total labels (7d)</p>
+              </div>
+            </div>
+          );
+        })()}
+        <div className="space-y-1">
+          {MODEL_STATS.map(m => {
+            const sessionFlags = modelFeedback.filter(f => f.isFlag).length; // not per-step yet — illustrative
+            void sessionFlags;
+            const queued = m.lastRetrainDays === null;
+            return (
+              <div key={m.step} className="bg-white border border-slate-200 rounded-lg p-2 text-xs">
+                <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                  <span className="text-slate-700 font-medium truncate">{m.label}</span>
+                  <span className={`text-[10px] font-mono ${m.trend === "down" ? "text-orange-600" : m.trend === "up" ? "text-green-600" : "text-slate-500"}`}>
+                    {(m.accuracy * 100).toFixed(1)}% {m.trend === "up" ? "↑" : m.trend === "down" ? "↓" : "→"}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between text-[10px] text-slate-400">
+                  <span>{m.flagsLast7d} flag{m.flagsLast7d === 1 ? "" : "s"} · {m.retrainsLast30d} retrain{m.retrainsLast30d === 1 ? "" : "s"}/30d</span>
+                  <span className={queued ? "text-amber-600 font-medium" : ""}>
+                    {queued ? "queued for retrain" : `last retrain ${m.lastRetrainDays}d ago`}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-slate-400 text-[10px] mt-2 leading-relaxed italic">
+          Operator flags from AI Audit feed each model's training queue. Auto-retrain triggers when patterns shift (~$10–20 per cycle).
+        </p>
+      </div>
+
       <div>
         <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Field Supervisors</p>
         <div className="space-y-2">
@@ -778,13 +835,14 @@ function PlatformHealth({ isAaron, onWorkflowConfig, deferrals }: { isAaron: boo
 }
 
 // ─── PortfolioView ────────────────────────────────────────────────────────────
-export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, onAddTag, onRemoveTag, deferrals }: {
+export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, onAddTag, onRemoveTag, deferrals, modelFeedback }: {
   persona: string;
   onWorkflowConfig?: () => void;
   tagsByJob: Record<string, string[]>;
   onAddTag: (jobId: string, tag: string) => void;
   onRemoveTag: (jobId: string, tag: string) => void;
   deferrals: FieldDeferral[];
+  modelFeedback: ModelFeedback[];
 }) {
   const isAaron = persona === "aaron";
   const exceptions = buildExceptions(isAaron);
@@ -1004,7 +1062,7 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
             <h2 className="text-sm font-bold text-slate-800">Platform Health</h2>
           </div>
           <div className="flex-1 overflow-hidden">
-            <PlatformHealth isAaron={isAaron} onWorkflowConfig={onWorkflowConfig} deferrals={deferrals} />
+            <PlatformHealth isAaron={isAaron} onWorkflowConfig={onWorkflowConfig} deferrals={deferrals} modelFeedback={modelFeedback} />
           </div>
         </div>
 
