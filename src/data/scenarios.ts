@@ -85,30 +85,6 @@ export const JOB_TYPES = [
   { id:"fm",          label:"Facilities Management",     primeLabel:"Total Installs FM",                      total:360,  onTrack:332,  atRisk:19, critical:7,  needsDecision:6, avgConf:0.78, trend:"improving", color:"text-teal-400",   bar:"bg-teal-500"   },
 ];
 
-// ─── Today's Schedule — Logan's region (real NSW suburbs and CG job numbers) ──
-// Trade names: business names used directly; individual names replaced (see header).
-export const TODAY_JOBS = [
-  // CG36080 — Starlink, Macmasters Beach NSW 2251 — Central Coast, Logan's patch
-  { id:"CG36080", trade:"Metro Handyman Services Pty Ltd",       type:"Starlink Install", suburb:"Macmasters Beach NSW", window:"8–10am",  conf:0.91, geo:"confirmed",   geoTime:"7:41am", minsToWindow:-78 },
-  // CG35976 — Starlink, West Pymble NSW 2073 — "Reschedule Required" in Prime
-  { id:"CG35976", trade:"Circl Customer Service",                 type:"Starlink Install", suburb:"West Pymble NSW",       window:"9–11am",  conf:0.34, geo:"no_activity", geoTime:null,     minsToWindow:-18 },
-  // CG36057 — Starlink, Medowie NSW 2318 — Hunter Valley, Logan's patch
-  { id:"CG36057", trade:"Newcastle Tv And Satellite Pty Ltd",     type:"Starlink Install", suburb:"Medowie NSW",           window:"9–11am",  conf:0.71, geo:"no_activity", geoTime:null,     minsToWindow:-18 },
-  // CG36115 — Starlink, Kariong NSW 2250 — Central Coast, Logan's patch
-  { id:"CG36115", trade:"National Representative Solutions Pty Ltd", type:"Starlink Install", suburb:"Kariong NSW",        window:"10–12pm", conf:0.94, geo:"confirmed",   geoTime:"8:09am", minsToWindow:42 },
-  // CG36071 — Starlink, Bilpin NSW 2758 — Blue Mountains, Logan's patch
-  { id:"CG36071", trade:"Compulance Computer Services",           type:"Starlink Install", suburb:"Bilpin NSW",            window:"10–12pm", conf:0.88, geo:"en_route",    geoTime:"9:22am", minsToWindow:42 },
-  // CG36003 — Starlink, Fern Bay NSW 2295 — Newcastle area, no trade assigned
-  { id:"CG36003", trade:"Circl Customer Service",                 type:"Starlink Install", suburb:"Fern Bay NSW",          window:"11am–1pm",conf:0.42, geo:"unassigned",  geoTime:null,     minsToWindow:102 },
-  // CG35954 — Starlink, Broke NSW 2330 — Hunter Valley
-  { id:"CG35954", trade:"York Digital Solutions",                 type:"Starlink Install", suburb:"Broke NSW",             window:"12–2pm",  conf:0.87, geo:"confirmed",   geoTime:"8:03am", minsToWindow:162 },
-  // CG36110 — Starlink, Coomba Bay NSW 2428 — Mid North Coast
-  { id:"CG36110", trade:"Sandbar Electrical Services",            type:"Starlink Install", suburb:"Coomba Bay NSW",        window:"1–3pm",   conf:0.79, geo:"no_activity", geoTime:null,     minsToWindow:222 },
-  // CG35925 — Starlink, Pitt Town NSW 2756 — Northwest Sydney
-  { id:"CG35925", trade:"Smart Techie Pty Ltd",                   type:"Starlink Install", suburb:"Pitt Town NSW",         window:"2–4pm",   conf:0.91, geo:"confirmed",   geoTime:"7:51am", minsToWindow:282 },
-  // CG35958 — Harvey Norman, Point Clare NSW 2250 — Central Coast
-  { id:"CG35958", trade:"UNITED INFOCOM TECH PTY LTD",           type:"HN Install",       suburb:"Point Clare NSW",       window:"2–4pm",   conf:0.93, geo:"en_route",    geoTime:"1:08pm", minsToWindow:282 },
-];
 
 // ─── Morning Briefing ─────────────────────────────────────────────────────────
 // Uses real CG job numbers where applicable

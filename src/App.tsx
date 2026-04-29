@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { cc, cb, fmt, LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, TODAY_JOBS, geoLabel, JOB_TYPES, ALL_DECISIONS, SUPERVISORS, ALL_PATTERNS, MORNING, riskState, riskBadgeClass } from "./data/scenarios";
+import { LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, ALL_DECISIONS, riskState, riskBadgeClass } from "./data/scenarios";
 import AskAI from "./components/AskAI";
-import StaffPerformance from "./components/StaffPerformance";
 import ChekkuView from "./components/ChekkuView";
 import CockpitView from "./components/CockpitView";
 import PortfolioView from "./components/PortfolioView";
@@ -218,18 +217,13 @@ const ALL_PERSONAS = [
 export default function App() {
   const [view, setView]     = useState("dashboard");
   const [persona, setPersona] = useState("logan");
-  const [expandedPattern, setExpandedPattern] = useState<string|null>(null);
-  const [briefingDismissed, setBriefingDismissed] = useState(false);
   const [decisionsDone, setDecisionsDone] = useState<Record<string,string>>({});
-  const [expandedSup, setExpandedSup] = useState<string|null>(null);
-  const [loggedInspections, setLogged] = useState<Record<string,boolean>>({});
 
-  const isChekku  = persona === "chekku";
+  const isChekku    = persona === "chekku";
   const isPortfolio = persona === "aaron" || persona === "national";
-  const isField    = persona === "conner" || persona === "blake";
+  const isField     = persona === "conner" || persona === "blake";
 
   const P = ALL_PERSONAS.find(p=>p.id===persona)!;
-  const jobTypes = JOB_TYPES.filter(jt=>P.types.includes(jt.id));
   const decisions = ALL_DECISIONS.filter(d=>{
     if(persona==="aaron"||persona==="national")return true;
     if(persona==="logan")return d.type==="Appliance Install"||d.type==="Starlink Install";
@@ -238,18 +232,9 @@ export default function App() {
     if(persona==="kerrie")return d.type==="Insurance Repair";
     return true;
   });
-  const TOTAL     = jobTypes.reduce((a,t)=>a+t.total,0);
-  const TOTAL_DEC = jobTypes.reduce((a,t)=>a+t.needsDecision,0);
-  const TOTAL_ON  = jobTypes.reduce((a,t)=>a+t.onTrack,0);
-  const noActivity = TODAY_JOBS.filter(j=>j.geo==="no_activity"||j.geo==="unassigned");
-  const isLogan   = persona==="logan";
-  const isAaron   = persona==="aaron";
-  const isKerrie  = persona==="kerrie";
-
-  const PATTERNS = ALL_PATTERNS.filter(()=>isLogan||isAaron||persona==="national");
 
   const bg  = "min-h-screen bg-[#f5f6f8] p-4 md:p-6";
-  const maxW = (isLogan||isKerrie||isPortfolio||isField||isChekku) ? "max-w-[1920px] mx-auto" : "max-w-4xl mx-auto";
+  const maxW = "max-w-[1920px] mx-auto";
 
   // ── Shared header + persona switcher ─────────────────────────────────────
   const sharedHeader = (
@@ -359,234 +344,11 @@ export default function App() {
     </div></div>
   );
 
-  // ── Cockpit view — Logan and Kerrie ───────────────────────────────────────
-  if (isLogan || isKerrie) return (
-    <div className={bg}><div className={maxW + " space-y-5"}>
-      {sharedHeader}
-      <CockpitView persona={persona}/>
-      <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
-    </div></div>
-  );
-
-  // ── Decisions / Workflow views ────────────────────────────────────────────
-  // (Aaron/National/Conner/Blake already handled above; this handles
-  //  the workflow and decisions sub-views for any remaining persona)
-
-  // ── Legacy dashboard — fallback (should not be reached) ──────────────────
+  // ── Cockpit view — Logan and Kerrie (default; chekku/aaron/national/conner/blake handled above) ─
   return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-
-      {isAaron&&(
-        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 flex items-center gap-2">
-          <span className="text-green-500 text-sm">✓</span>
-          <p className="text-green-700 text-xs font-medium">Workflow configuration access enabled for this session</p>
-        </div>
-      )}
-
-      {/* Cockpit view — Logan and Kerrie get three-column layout */}
-      {(isLogan||isKerrie)&&<CockpitView persona={persona}/>}
-
-      {/* Stats — non-cockpit personas only */}
-      {!isKerrie&&!isLogan&&<div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="bg-white rounded-xl p-4 col-span-2 md:col-span-1 border border-slate-200">
-          <p className="text-slate-400 text-xs mb-1">Active Commitments</p>
-          <p className="text-3xl font-bold text-slate-800">{fmt(TOTAL)}</p>
-          <p className="text-slate-400 text-xs mt-1">{P.region}</p>
-        </div>
-        {isLogan&&(
-          <div className={`rounded-xl p-4 border ${noActivity.length>0?"bg-amber-50 border-amber-200":"bg-white border-slate-200"}`}>
-            <p className={`text-xs mb-1 ${noActivity.length>0?"text-amber-600":"text-slate-400"}`}>No geo activity today</p>
-            <p className={`text-3xl font-bold ${noActivity.length>0?"text-amber-600":"text-slate-800"}`}>{noActivity.length}</p>
-            <button onClick={()=>setView("decisions")} className="text-xs mt-1 underline text-amber-500">View →</button>
-          </div>
-        )}
-        <div className={`rounded-xl p-4 border ${TOTAL_DEC>0?"bg-red-50 border-red-200":"bg-white border-slate-200"}`}>
-          <p className={`text-xs mb-1 ${TOTAL_DEC>0?"text-red-500":"text-slate-400"}`}>Needs Decision</p>
-          <p className={`text-3xl font-bold ${TOTAL_DEC>0?"text-red-500":"text-slate-800"}`}>{TOTAL_DEC}</p>
-          <button onClick={()=>setView("decisions")} className={`text-xs mt-1 underline ${TOTAL_DEC>0?"text-red-400":"text-slate-400"}`}>View queue →</button>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <p className="text-slate-400 text-xs mb-1">Fully Automated</p>
-          <p className="text-3xl font-bold text-green-500">{fmt(TOTAL_ON)}</p>
-          <p className="text-slate-400 text-xs mt-1">{TOTAL>0?Math.round(TOTAL_ON/TOTAL*100):0}%</p>
-        </div>
-      </div>}
-
-      {/* Morning briefing — non-cockpit personas only */}
-      {!isLogan&&!isKerrie&&!briefingDismissed&&(
-        <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <div className="flex items-start justify-between mb-3">
-            <div><h2 className="text-slate-800 font-semibold text-sm">Morning Briefing</h2><p className="text-slate-400 text-xs mt-0.5">Overnight activity surfaced automatically</p></div>
-            <button onClick={()=>setBriefingDismissed(true)} className="text-slate-400 hover:text-slate-600 text-xs">Dismiss</button>
-          </div>
-          <div className="space-y-2">
-            {MORNING.map((item,i)=>(
-              <div key={i} className={`rounded-lg p-3 flex items-start gap-3 ${item.severity==="high"?"bg-red-50 border border-red-200":"bg-amber-50 border border-amber-200"}`}>
-                <span className="text-base flex-shrink-0">{item.icon}</span>
-                <p className={`text-xs flex-1 ${item.severity==="high"?"text-red-700":"text-amber-700"}`}>{item.msg}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Staff performance — non-cockpit personas only */}
-      {!isLogan&&!isKerrie&&<StaffPerformance persona={persona}/>}
-
-      {/* Coordinator view — legacy, hidden now that Kerrie uses CockpitView */}
-
-      {/* Today's schedule — superseded by CockpitView for Logan */}
-      {false&&isLogan&&(
-        <div className="bg-white rounded-xl p-4 border border-amber-200">
-          <div className="flex items-start justify-between mb-3">
-            <div><h2 className="text-slate-800 font-semibold text-sm">Today's Schedule</h2><p className="text-slate-400 text-xs">North East · {TODAY_JOBS.length} jobs · 9:18am</p></div>
-            <div className="text-right"><span className="text-amber-600 font-bold">{noActivity.length} at risk</span><p className="text-slate-400 text-xs">{TODAY_JOBS.filter(j=>j.geo==="confirmed"||j.geo==="en_route").length} confirmed</p></div>
-          </div>
-          <div className="flex gap-0.5 rounded-full overflow-hidden h-2 mb-3">
-            {TODAY_JOBS.map(j=><div key={j.id} className={`flex-1 ${j.geo==="confirmed"||j.geo==="en_route"?"bg-green-400":j.geo==="no_activity"&&j.minsToWindow<0?"bg-red-400 animate-pulse":j.geo==="no_activity"?"bg-amber-400":j.geo==="unassigned"?"bg-slate-300":"bg-[#00BDFE]"}`} title={j.trade}/>)}
-          </div>
-          <div className="space-y-1">
-            {TODAY_JOBS.map(j=>{
-              const g=geoLabel(j.geo,j.minsToWindow);
-              return(
-                <div key={j.id} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs ${j.geo==="no_activity"&&j.minsToWindow<0?"bg-red-50 border border-red-200":"bg-slate-50"}`}>
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${g.dot}`}/>
-                  <span className="text-slate-500 font-mono w-20 flex-shrink-0">{j.id}</span>
-                  <span className="text-slate-600 w-28 flex-shrink-0 truncate">{j.trade}</span>
-                  <span className="text-slate-400 flex-1 truncate">{j.suburb}</span>
-                  <span className="text-slate-400 w-18 flex-shrink-0">{j.window}</span>
-                  <span className={`flex-shrink-0 w-52 text-right ${g.text}`}>{g.label}{j.geoTime?` · ${j.geoTime}`:""}</span>
-                  <span className={`font-mono font-bold flex-shrink-0 ${cc(j.conf)}`}>{j.conf.toFixed(2)}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Job type health — non-cockpit personas only */}
-      {!isKerrie&&!isLogan&&<div>
-        <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Job Type Health</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {jobTypes.map(jt=>(
-            <div key={jt.id} className={`bg-white rounded-xl p-4 border ${jt.trend==="declining"?"border-orange-300":jt.trend==="improving"?"border-green-300":"border-slate-200"}`}>
-              <div className="flex items-start justify-between mb-2">
-                <div><p className={`text-sm font-semibold ${jt.color}`}>{jt.label}</p><p className="text-slate-400 text-xs">{fmt(jt.total)} active</p></div>
-                <div className="text-right"><span className={`text-xl font-bold font-mono ${cc(jt.avgConf)}`}>{jt.avgConf.toFixed(2)}</span><p className={`text-xs ${jt.trend==="declining"?"text-orange-500":jt.trend==="improving"?"text-green-500":"text-slate-400"}`}>{jt.trend==="declining"?"↓":jt.trend==="improving"?"↑":"→"} {jt.trend}</p></div>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-1.5 mb-2"><div className={`h-1.5 rounded-full ${cb(jt.avgConf)}`} style={{width:`${jt.avgConf*100}%`}}/></div>
-              <div className="flex justify-between text-xs">
-                <span className="text-green-600">{fmt(jt.onTrack)} automated</span>
-                <span className="text-amber-500">{jt.atRisk} at risk</span>
-                <span className={`font-semibold ${jt.needsDecision>0?"text-red-500":"text-slate-400"}`}>{jt.needsDecision} decisions</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>}
-
-      {/* Field supervisors — moved to CockpitView for Logan */}
-      {false&&isLogan&&(
-        <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <h2 className="text-slate-800 font-semibold text-sm mb-3">Field Supervisors — North East</h2>
-          <div className="space-y-3">
-            {SUPERVISORS.map(s=>{
-              const sPct=Math.round(s.safety.done/s.safety.target*100);
-              const qPct=Math.round(s.quality.done/s.quality.target*100);
-              const behind=sPct<50||qPct<50;
-              const open=expandedSup===s.id;
-              return(
-                <div key={s.id} className={`rounded-xl border ${behind?"bg-orange-50 border-orange-200":"bg-slate-50 border-slate-200"}`}>
-                  <button className="w-full p-3 text-left" onClick={()=>setExpandedSup(open?null:s.id)}>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div><div className="flex items-center gap-2"><span className="text-slate-800 font-semibold text-sm">{s.name}</span>{s.avoidanceFlag&&<span className="text-xs text-orange-500">⚠</span>}</div><p className="text-slate-400 text-xs">{s.region}</p></div>
-                      <span className="text-[#00BDFE] text-xs">{open?"▲ Close":"▼ Inspect queue"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[{label:"Safety",v:s.safety,pct:sPct},{label:"Quality",v:s.quality,pct:qPct}].map(k=>(
-                        <div key={k.label}>
-                          <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">{k.label}</span><span className={k.pct>=80?"text-green-600":k.pct>=50?"text-amber-500":"text-orange-500"}>{k.v.done}/{k.v.target}</span></div>
-                          <div className="w-full bg-slate-200 rounded-full h-1.5"><div className={`h-1.5 rounded-full ${k.pct>=80?"bg-green-400":k.pct>=50?"bg-amber-400":"bg-orange-400"}`} style={{width:`${k.pct}%`}}/></div>
-                        </div>
-                      ))}
-                    </div>
-                  </button>
-                  {open&&(
-                    <div className="px-3 pb-3 border-t border-slate-200 pt-3 space-y-2">
-                      {s.avoidanceFlag&&<div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2"><p className="text-orange-600 text-xs">⚠ {s.avoidanceFlag}</p></div>}
-                      <p className="text-slate-400 text-xs">AI-generated inspection queue — ranked by trade risk profile</p>
-                      {s.inspectionQueue.map((t,i)=>{
-                        const logged=loggedInspections[`${s.id}-${t.trade}`];
-                        const pc=t.priority==="critical"?"bg-red-100 text-red-700":t.priority==="high"?"bg-orange-100 text-orange-700":t.priority==="medium"?"bg-amber-100 text-amber-700":"bg-slate-100 text-slate-500";
-                        return(
-                          <div key={i} className={`rounded-lg p-3 border ${logged?"bg-green-50 border-green-200":"bg-white border-slate-200"}`}>
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap mb-0.5"><span className="text-slate-800 text-sm font-semibold">{t.trade}</span><span className={`text-xs px-1.5 py-0.5 rounded-full ${pc}`}>{t.priority}</span><span className="text-amber-500 text-xs">{t.rating}★</span></div>
-                                <p className="text-slate-500 text-xs">{t.reason}</p>
-                                <p className="text-slate-400 text-xs mt-0.5">Last: {t.lastInspected} · {t.jobsSince} jobs since · {t.complaints} complaint{t.complaints!==1?"s":""}</p>
-                              </div>
-                              {logged?<span className="text-green-600 text-xs">✓ Logged</span>:<button onClick={()=>setLogged(l=>({...l,[`${s.id}-${t.trade}`]:true}))} className="text-xs bg-[#00BDFE] hover:bg-[#0099d4] text-white px-3 py-1.5 rounded-lg font-medium transition-colors">Log</button>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Patterns */}
-      {PATTERNS.length>0&&(
-        <div>
-          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Systemic Patterns</h2>
-          <div className="space-y-3">
-            {PATTERNS.map(p=>(
-              <div key={p.id} className={`rounded-xl border ${p.severity==="high"?"bg-red-50 border-red-200":"bg-amber-50 border-amber-200"}`}>
-                <button className="w-full p-4 text-left" onClick={()=>setExpandedPattern(expandedPattern===p.id?null:p.id)}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3"><span className="text-base">{p.icon}</span><div><p className={`text-sm font-semibold ${p.severity==="high"?"text-red-700":"text-amber-700"}`}>{p.title}</p><div className="flex gap-2 mt-1"><span className="text-xs bg-white border border-slate-200 text-slate-500 px-2 py-0.5 rounded">{p.type}</span><span className="text-xs text-slate-400">{p.affected}</span></div></div></div>
-                    <span className="text-slate-400 text-xs">{expandedPattern===p.id?"▲":"▼"}</span>
-                  </div>
-                </button>
-                {expandedPattern===p.id&&<div className="px-4 pb-4 border-t border-slate-200 pt-3 space-y-3"><p className="text-slate-600 text-sm">{p.detail}</p><button className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${p.severity==="high"?"bg-red-600 hover:bg-red-700 text-white":"bg-amber-500 hover:bg-amber-600 text-white"}`}>{p.action}</button></div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Workflow config entry point */}
-      <div className={`rounded-xl border p-4 ${isAaron?"bg-[#e0f7ff] border-[#00BDFE]/40":"bg-white border-slate-200"}`}>
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h2 className="text-slate-800 font-semibold text-sm">Workflow Configuration</h2>
-            <p className="text-slate-400 text-xs mt-0.5">Autonomy levels per step, per job type. Accuracy-tracked. Audit-logged.</p>
-          </div>
-          <button onClick={()=>setView("workflow")} className={`text-xs underline flex-shrink-0 ${isAaron?"text-[#0099d4] hover:text-[#00BDFE]":"text-slate-400 hover:text-slate-600"}`}>
-            {isAaron?"Configure →":"View (read-only) →"}
-          </button>
-        </div>
-        <div className="flex gap-1 rounded-lg overflow-hidden h-2 mb-2">
-          {[4,3,2,1].map(l=>{const c=WORKFLOW_TEMPLATES[0].steps.filter(s=>s.level===l).length;return c>0?<div key={l} className={`${LM[l as keyof typeof LM].bar} opacity-70`} style={{flex:c}}/>:null;})}
-          <div className="bg-red-300 opacity-70" style={{flex:2}}/>
-        </div>
-        {!isAaron&&<p className="text-slate-400 text-xs mt-1">Adjusting autonomy levels requires Aaron sign-off.</p>}
-        {isAaron&&<p className="text-green-600 text-xs mt-1">You have configuration access. All changes are immutably logged.</p>}
-      </div>
-
-      {/* AI */}
-      <div className="bg-white rounded-xl p-4 border border-slate-200">
-        <h2 className="text-slate-800 font-semibold text-sm mb-1">Ask AI</h2>
-        <p className="text-slate-400 text-xs mb-3">{P.label} · {P.region}</p>
-        <AskAI context={`${P.label} (${P.region}): ${fmt(TOTAL)} Commitments, ${TOTAL_DEC} decisions, ${fmt(TOTAL_ON)} automated. ${isAaron?"Has workflow configuration access.":""}`} placeholder="e.g. Which workflow step has the most room for autonomy promotion?"/>
-      </div>
-
+      <CockpitView persona={persona}/>
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
