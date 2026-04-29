@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, ALL_DECISIONS, riskState, riskBadgeClass } from "./data/scenarios";
 import AskAI from "./components/AskAI";
-import ChekkuView from "./components/ChekkuView";
 import CockpitView from "./components/CockpitView";
 import PortfolioView from "./components/PortfolioView";
 import FieldView from "./components/FieldView";
@@ -209,21 +208,15 @@ function WorkflowConfig({ canConfig, onBack }: { canConfig: boolean; onBack: () 
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-const ALL_PERSONAS = [
-  ...PERSONAS,
-  { id:"chekku", label:"Marcus", title:"Trade — MJ Electrical Services", region:"Sydney Metro", types:[], canConfig:false },
-];
-
 export default function App() {
   const [view, setView]     = useState("dashboard");
   const [persona, setPersona] = useState("logan");
   const [decisionsDone, setDecisionsDone] = useState<Record<string,string>>({});
 
-  const isChekku    = persona === "chekku";
   const isPortfolio = persona === "aaron" || persona === "national";
   const isField     = persona === "conner" || persona === "blake";
 
-  const P = ALL_PERSONAS.find(p=>p.id===persona)!;
+  const P = PERSONAS.find(p=>p.id===persona)!;
   const decisions = ALL_DECISIONS.filter(d=>{
     if(persona==="aaron"||persona==="national")return true;
     if(persona==="logan")return d.type==="Appliance Install"||d.type==="Starlink Install";
@@ -243,9 +236,7 @@ export default function App() {
         <div className="flex items-center gap-3">
           <img src="/circl-logo.svg" alt="Circl" className="h-8" />
           <div>
-            <p className="text-slate-500 text-xs">
-              {isChekku ? "Chekku — Trade Portal" : "Mission Control — System Health"}
-            </p>
+            <p className="text-slate-500 text-xs">Mission Control — System Health</p>
           </div>
         </div>
         <span className="text-xs bg-white border border-slate-200 text-slate-500 px-3 py-1 rounded-full">10x Labs · v7</span>
@@ -253,7 +244,7 @@ export default function App() {
       <div className="bg-white rounded-xl p-3 border border-slate-200">
         <p className="text-slate-400 text-xs mb-2">Viewing as:</p>
         <div className="flex flex-wrap gap-2">
-          {ALL_PERSONAS.map(p=>(
+          {PERSONAS.map(p=>(
             <button key={p.id} onClick={()=>setPersona(p.id)} className={`text-sm px-3 py-2 rounded-lg font-medium border transition-colors ${persona===p.id?"bg-[#00BDFE] border-[#00BDFE] text-white":"bg-white border-slate-200 text-slate-600 hover:border-[#00BDFE]"}`}>
               <span className="font-semibold">{p.label}</span>
               <span className={`block text-xs mt-0.5 ${persona===p.id?"text-white/80":"text-slate-400"}`}>{p.region}</span>
@@ -262,15 +253,6 @@ export default function App() {
         </div>
       </div>
     </>
-  );
-
-  // ── Chekku trade view ──────────────────────────────────────────────────────
-  if (isChekku) return (
-    <div className={bg}><div className={maxW + " space-y-5"}>
-      {sharedHeader}
-      <ChekkuView />
-      <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
-    </div></div>
   );
 
   // ── Workflow view — checked before portfolio so Aaron can reach it ─────────
@@ -344,7 +326,7 @@ export default function App() {
     </div></div>
   );
 
-  // ── Cockpit view — Logan and Kerrie (default; chekku/aaron/national/conner/blake handled above) ─
+  // ── Cockpit view — Logan and Kerrie (default; aaron/national/conner/blake handled above) ─
   return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
