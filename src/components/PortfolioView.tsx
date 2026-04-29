@@ -144,9 +144,12 @@ function buildExceptions(isAaron: boolean): ExceptionItem[] {
 
 // ─── Exception Queue Card ─────────────────────────────────────────────────────
 function ExceptionCard({ item, selected, onClick }: { item: ExceptionItem; selected: boolean; onClick: () => void }) {
-  const border = item.severity === "high"
-    ? selected ? "border-red-400 bg-red-50" : "border-red-200 bg-red-50 hover:border-red-400"
-    : selected ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-white hover:border-slate-300";
+  // Card body always white. Severity shown via thin coloured left border so the
+  // queue scans cleanly — high severity catches the eye without the rest receding.
+  const accentBorder = item.severity === "high" ? "border-l-4 border-l-red-400"
+    : item.severity === "medium" ? "border-l-4 border-l-amber-400"
+    : "";
+  const baseBorder = selected ? "border-[#00BDFE]" : "border-slate-200 hover:border-slate-300";
 
   const kindLabel: Record<ExceptionItem["kind"], string> = {
     briefing: "Briefing",
@@ -158,7 +161,7 @@ function ExceptionCard({ item, selected, onClick }: { item: ExceptionItem; selec
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-xl border p-3 transition-all cursor-pointer ${border} ${selected ? "ring-2 ring-[#00BDFE]/30" : ""}`}
+      className={`w-full text-left rounded-xl border bg-white p-3 transition-all cursor-pointer ${baseBorder} ${accentBorder} ${selected ? "shadow-sm" : ""}`}
     >
       <div className="flex items-start gap-2">
         <span className="text-base flex-shrink-0 mt-0.5">{item.icon}</span>
@@ -812,14 +815,14 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
   // workflow-config angle since he's the only one who can adjust autonomy.
   const aiSuggestions = isAaron
     ? [
-        { label: "🎯 Where should I focus?", question: "I have limited time today. Looking across the platform — which 1 or 2 things would most benefit from my attention right now? Be direct about the trade-offs." },
-        { label: "📉 What's slipping?", question: "Which job type or AI workflow step is showing the most concerning trend, and what's driving the decline? Use the data you can see." },
-        { label: "🔓 Anything I should sign off?", question: "Are there workflow autonomy changes you'd recommend I review — promotions where the data justifies it, or demotions I should make permanent? Walk me through the case." },
+        { label: "Where should I focus?", question: "I have limited time today. Looking across the platform — which 1 or 2 things would most benefit from my attention right now? Be direct about the trade-offs." },
+        { label: "What's slipping?", question: "Which job type or AI workflow step is showing the most concerning trend, and what's driving the decline? Use the data you can see." },
+        { label: "Anything I should sign off?", question: "Are there workflow autonomy changes you'd recommend I review — promotions where the data justifies it, or demotions I should make permanent? Walk me through the case." },
       ]
     : [
-        { label: "🎯 What's exposed today?", question: "Across all regions, where is the platform most exposed today — which decisions, patterns, or jobs need senior eyes? Prioritise by risk." },
-        { label: "📉 What's slipping?", question: "Which job type or region is showing the most concerning trend, and what's driving the decline?" },
-        { label: "📊 How are we tracking this week?", question: "Give me a frank read on platform health this week. What's healthy, what's slipping, where's the biggest exposure?" },
+        { label: "What's exposed today?", question: "Across all regions, where is the platform most exposed today — which decisions, patterns, or jobs need senior eyes? Prioritise by risk." },
+        { label: "What's slipping?", question: "Which job type or region is showing the most concerning trend, and what's driving the decline?" },
+        { label: "How are we tracking this week?", question: "Give me a frank read on platform health this week. What's healthy, what's slipping, where's the biggest exposure?" },
       ];
   const aiContextLabel = focus?.type === "job"
     ? `Focused on ${focus.job.id}`
@@ -911,17 +914,17 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
 
           {/* ── AI Bar: pinned to bottom of column 2 ─────────────────────── */}
           <div className="flex-shrink-0 border-t border-slate-200">
-            <div className="bg-[#00BDFE] px-4 py-2 flex items-center gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
-              <span className="text-white text-xs font-semibold">CoreTechX AI</span>
-              <span className="text-white/60 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
+            <div className="bg-slate-800 px-4 py-2 flex items-center gap-2.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00BDFE] animate-pulse flex-shrink-0" />
+              <span className="text-[#00BDFE] text-xs font-semibold">CoreTechX AI</span>
+              <span className="text-slate-400 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
               <button
                 onClick={() => setAiResetCounter(c => c + 1)}
                 title="Clear conversation"
                 className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
                   aiHasConversation
-                    ? "bg-white/20 hover:bg-white/30 text-white"
-                    : "text-white/50 hover:text-white/80"
+                    ? "bg-white/10 hover:bg-white/20 text-white"
+                    : "text-slate-400 hover:text-slate-200"
                 }`}
               >
                 ↻ Clear

@@ -298,14 +298,14 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag }:
                 </div>
               ) : filteredJobs.map(job => {
                 const isSelected = selectedId === job.id;
+                const accentBorder = job.priority === "jeopardy" ? "border-l-4 border-l-red-400"
+                  : job.priority === "urgent" ? "border-l-4 border-l-amber-400"
+                  : "";
                 return (
                   <button key={job.id} onClick={() => setSelectedId(isSelected ? null : job.id)}
-                    className={`w-full text-left rounded-xl p-3 border transition-all ${
-                      isSelected ? "bg-[#e0f7ff] border-[#00BDFE]" :
-                      job.priority === "jeopardy" ? "bg-red-50 border-red-200 hover:border-red-300" :
-                      job.priority === "urgent"   ? "bg-amber-50 border-amber-200 hover:border-amber-300" :
-                      "bg-white border-slate-200 hover:border-slate-300"
-                    }`}>
+                    className={`w-full text-left rounded-xl p-3 border bg-white transition-all ${
+                      isSelected ? "border-[#00BDFE]" : "border-slate-200 hover:border-slate-300"
+                    } ${accentBorder}`}>
                     <div className="flex items-start justify-between gap-1 mb-1">
                       <p className="text-slate-800 text-xs font-semibold leading-tight truncate">{job.trade}</p>
                       <RiskBadge conf={job.conf} size="sm" />
@@ -374,17 +374,17 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag }:
 
           {/* ── AI Bar: pinned to bottom of column 2 ─────────────────────── */}
           <div className="flex-shrink-0 border-t border-slate-200">
-            <div className="bg-[#00BDFE] px-4 py-2 flex items-center gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
-              <span className="text-white text-xs font-semibold">CoreTechX AI</span>
-              <span className="text-white/60 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
+            <div className="bg-slate-800 px-4 py-2 flex items-center gap-2.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00BDFE] animate-pulse flex-shrink-0" />
+              <span className="text-[#00BDFE] text-xs font-semibold">CoreTechX AI</span>
+              <span className="text-slate-400 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
               <button
                 onClick={() => setAiResetCounter(c => c + 1)}
                 title="Clear conversation"
                 className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
                   aiHasConversation
-                    ? "bg-white/20 hover:bg-white/30 text-white"
-                    : "text-white/50 hover:text-white/80"
+                    ? "bg-white/10 hover:bg-white/20 text-white"
+                    : "text-slate-400 hover:text-slate-200"
                 }`}
               >
                 ↻ Clear

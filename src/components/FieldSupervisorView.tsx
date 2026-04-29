@@ -191,17 +191,17 @@ export default function FieldSupervisorView({ onPersonaSwitch }: { onPersonaSwit
 
         {/* AI bar */}
         <div className="mt-auto border-t border-slate-200">
-          <div className="bg-[#00BDFE] px-4 py-2 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
-            <span className="text-white text-xs font-semibold">CoreTechX AI</span>
-            <span className="text-white/60 text-[10px] ml-auto truncate">{selected ? `Focused on ${selected.trade.split(" ")[0]}` : "On round"}</span>
+          <div className="bg-slate-800 px-4 py-2 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00BDFE] animate-pulse flex-shrink-0" />
+            <span className="text-[#00BDFE] text-xs font-semibold">CoreTechX AI</span>
+            <span className="text-slate-400 text-[10px] ml-auto truncate">{selected ? `Focused on ${selected.trade.split(" ")[0]}` : "On round"}</span>
             <button
               onClick={() => setAiResetCounter(c => c + 1)}
               title="Clear conversation"
               className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
                 aiHasConversation
-                  ? "bg-white/20 hover:bg-white/30 text-white"
-                  : "text-white/50 hover:text-white/80"
+                  ? "bg-white/10 hover:bg-white/20 text-white"
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
               ↻ Clear

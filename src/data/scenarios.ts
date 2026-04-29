@@ -189,14 +189,17 @@ export const COMMITMENT_STATE_META: Record<string, { label: string; color: strin
   voided:      { label: "Voided",      color: "bg-slate-50 text-slate-400 border-slate-200",    dot: "bg-slate-300" },
 };
 
+// Class is a taxonomy, not a state — most classes render in neutral slate so
+// the eye reads state and promise first. Only the three classes that signal
+// genuine attention (compliance / commercial / exception) keep an accent.
 export const COMMITMENT_CLASS_META: Record<string, { label: string; color: string }> = {
-  operational:     { label: "Operational",     color: "bg-blue-50 text-blue-600 border-blue-200" },
-  commercial:      { label: "Commercial",      color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  customer:        { label: "Customer",        color: "bg-pink-50 text-pink-700 border-pink-200" },
-  client_provider: { label: "Client/Provider", color: "bg-violet-50 text-violet-700 border-violet-200" },
+  operational:     { label: "Operational",     color: "bg-slate-50 text-slate-600 border-slate-200" },
+  commercial:      { label: "Commercial",      color: "bg-amber-50 text-amber-700 border-amber-200" },
+  customer:        { label: "Customer",        color: "bg-slate-50 text-slate-600 border-slate-200" },
+  client_provider: { label: "Client/Provider", color: "bg-slate-50 text-slate-600 border-slate-200" },
   compliance:      { label: "Compliance",      color: "bg-orange-50 text-orange-700 border-orange-200" },
-  proof:           { label: "Proof",           color: "bg-cyan-50 text-cyan-700 border-cyan-200" },
-  payment:         { label: "Payment",         color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  proof:           { label: "Proof",           color: "bg-slate-50 text-slate-600 border-slate-200" },
+  payment:         { label: "Payment",         color: "bg-slate-50 text-slate-600 border-slate-200" },
   exception:       { label: "Exception",       color: "bg-red-50 text-red-700 border-red-200" },
 };
 
@@ -221,11 +224,16 @@ export const COMMITMENT_REL_META: Record<string, { label: string }> = {
 // not separate workflow states. Predefined vocabulary — no free text — keeps
 // the demo clean and avoids typo drift. Connected to workflow logic, so adding
 // new tags is a deliberate platform-level change, not a per-coordinator action.
+//
+// Two visual styles, not four — colour encodes meaning (caution vs waiting),
+// icons differentiate within each meaning.
+const TAG_CAUTION = "bg-amber-50 text-amber-700 border-amber-200";
+const TAG_WAITING = "bg-slate-100 text-slate-600 border-slate-200";
 export const TAG_VOCABULARY = [
-  { label: "On Hold",           icon: "⏸",  color: "bg-amber-100 text-amber-700 border-amber-200" },
-  { label: "Needs Variation",   icon: "🔧", color: "bg-orange-100 text-orange-700 border-orange-200" },
-  { label: "Awaiting Customer", icon: "📞", color: "bg-blue-100 text-blue-700 border-blue-200" },
-  { label: "Awaiting Parts",    icon: "📦", color: "bg-purple-100 text-purple-700 border-purple-200" },
+  { label: "On Hold",           icon: "⏸",  color: TAG_CAUTION },
+  { label: "Needs Variation",   icon: "🔧", color: TAG_CAUTION },
+  { label: "Awaiting Customer", icon: "📞", color: TAG_WAITING },
+  { label: "Awaiting Parts",    icon: "📦", color: TAG_WAITING },
 ];
 
 // ─── Field-team deferrals ────────────────────────────────────────────────────

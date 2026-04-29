@@ -580,13 +580,13 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
         <p className="text-slate-500 text-xs font-semibold mb-2">Insurer SLA Reference</p>
         <div className="space-y-2">
           {[
-            { name: "Allianz", acceptance: "1h", makesafe: "4h", repair: "10d", color: "text-blue-700" },
-            { name: "IAG / NRMA", acceptance: "2h", makesafe: "4h", repair: "14d", color: "text-purple-700" },
-            { name: "Suncorp", acceptance: "1h", makesafe: "2h", repair: "21d", color: "text-orange-700" },
-            { name: "QBE", acceptance: "4h", makesafe: "8h", repair: "21d", color: "text-teal-700" },
+            { name: "Allianz",    acceptance: "1h", makesafe: "4h", repair: "10d" },
+            { name: "IAG / NRMA", acceptance: "2h", makesafe: "4h", repair: "14d" },
+            { name: "Suncorp",    acceptance: "1h", makesafe: "2h", repair: "21d" },
+            { name: "QBE",        acceptance: "4h", makesafe: "8h", repair: "21d" },
           ].map(ins => (
             <div key={ins.name} className="text-xs">
-              <p className={`font-semibold ${ins.color} mb-0.5`}>{ins.name}</p>
+              <p className="font-semibold text-slate-700 mb-0.5">{ins.name}</p>
               <div className="grid grid-cols-3 gap-1 text-[10px] text-slate-500">
                 <span>Accept: {ins.acceptance}</span>
                 <span>Safe: {ins.makesafe}</span>
@@ -609,17 +609,19 @@ function LoganQueueItem({ job, selected, onClick, tags }: { job: Job; selected: 
   const unassigned = job.geoStatus === "unassigned";
   const hardLimit = isHardLimit(job);
 
+  // Card body always white. Priority/state shown via a thin left border accent
+  // so the queue scans cleanly — the at-risk job stands out, the rest recede.
+  const accentBorder = jeopardy ? "border-l-4 border-l-red-400"
+    : urgent ? "border-l-4 border-l-amber-400"
+    : unassigned ? "border-l-4 border-l-amber-400"
+    : hardLimit ? "border-l-4 border-l-red-400"
+    : "";
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-xl border p-3 transition-all duration-150 ${
-        selected ? "bg-[#e0f7ff] border-[#00BDFE] shadow-sm"
-        : hardLimit ? "bg-white border-red-300 hover:border-red-400 shadow-sm"
-        : jeopardy ? "bg-red-50 border-red-200 hover:border-red-300"
-        : urgent ? "bg-amber-50 border-amber-200 hover:border-amber-300"
-        : unassigned ? "bg-amber-50 border-amber-200 hover:border-amber-300"
-        : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
-      }`}
+      className={`w-full text-left rounded-xl border bg-white p-3 transition-all duration-150 ${
+        selected ? "border-[#00BDFE] shadow-sm" : "border-slate-200 hover:border-slate-300 hover:shadow-sm"
+      } ${accentBorder}`}
     >
       {/* Hard limit banner */}
       {hardLimit && (
@@ -656,16 +658,16 @@ function KerrieQueueItem({ job, selected, onClick, tags }: { job: Job; selected:
   const hardLimit = isHardLimit(job);
   const insurerShort = job.insurer?.replace(" Australia Insurance Ltd", "").replace(" Insurance", "") ?? "";
 
+  const accentBorder = isJeopardy ? "border-l-4 border-l-red-400"
+    : hasFlags ? "border-l-4 border-l-amber-400"
+    : hardLimit ? "border-l-4 border-l-red-400"
+    : "";
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-xl border p-3 transition-all duration-150 ${
-        selected ? "bg-[#e0f7ff] border-[#00BDFE] shadow-sm"
-        : hardLimit ? "bg-white border-red-300 hover:border-red-400 shadow-sm"
-        : isJeopardy ? "bg-red-50 border-red-200 hover:border-red-300"
-        : hasFlags ? "bg-amber-50 border-amber-200 hover:border-amber-300"
-        : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
-      }`}
+      className={`w-full text-left rounded-xl border bg-white p-3 transition-all duration-150 ${
+        selected ? "border-[#00BDFE] shadow-sm" : "border-slate-200 hover:border-slate-300 hover:shadow-sm"
+      } ${accentBorder}`}
     >
       {/* Hard limit banner */}
       {hardLimit && (
@@ -899,14 +901,14 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   // conversational (prompts AI to ask back); chips 2 and 3 fire direct queries.
   const aiSuggestions = isKerrie
     ? [
-        { label: "📞 Insurer's calling about a claim", question: "An insurer is on the phone about a claim. Please ask me for the job number, claim reference, customer name, or insurer, and I'll bring up the full picture so I can help them." },
-        { label: "🏢 All open work for this insurer", question: "An insurer's name has come up — please ask me which insurer, then walk me through all their open jobs, where they sit against SLA, and any concerns." },
-        { label: "⏱ Insurance jobs near SLA breach today", question: "Which insurance jobs are at risk of breaching SLA today, and what's driving the risk for each?" },
+        { label: "Insurer's calling about a claim", question: "An insurer is on the phone about a claim. Please ask me for the job number, claim reference, customer name, or insurer, and I'll bring up the full picture so I can help them." },
+        { label: "All open work for this insurer", question: "An insurer's name has come up — please ask me which insurer, then walk me through all their open jobs, where they sit against SLA, and any concerns." },
+        { label: "Insurance jobs near SLA breach today", question: "Which insurance jobs are at risk of breaching SLA today, and what's driving the risk for each?" },
       ]
     : [
-        { label: "📞 Customer/trade on the phone", question: "A customer or trade is calling about a job. Please ask me for the job number, customer name, or address, then bring up the full picture — trade, status, AI activity, geo, flags, and what I need to know to help them." },
-        { label: "🔧 What else does this trade have?", question: "A trade's name has come up — please ask me which trade, then walk me through all their open jobs, how they're tracking, and any concerns." },
-        { label: "⚠ What's at risk today?", question: "Which jobs are at risk of missing their window today, and what's driving the risk for each?" },
+        { label: "Customer/trade on the phone", question: "A customer or trade is calling about a job. Please ask me for the job number, customer name, or address, then bring up the full picture — trade, status, AI activity, geo, flags, and what I need to know to help them." },
+        { label: "What else does this trade have?", question: "A trade's name has come up — please ask me which trade, then walk me through all their open jobs, how they're tracking, and any concerns." },
+        { label: "What's at risk today?", question: "Which jobs are at risk of missing their window today, and what's driving the risk for each?" },
       ];
 
   // Tab labels
@@ -1092,17 +1094,17 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
 
         {/* ── AI Bar: pinned to bottom of column 2 ─────────────────────────── */}
         <div className="flex-shrink-0 border-t border-slate-200">
-          <div className="bg-[#00BDFE] px-4 py-2 flex items-center gap-2.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
-            <span className="text-white text-xs font-semibold">CoreTechX AI</span>
-            <span className="text-white/60 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
+          <div className="bg-slate-800 px-4 py-2 flex items-center gap-2.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00BDFE] animate-pulse flex-shrink-0" />
+            <span className="text-[#00BDFE] text-xs font-semibold">CoreTechX AI</span>
+            <span className="text-slate-400 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
             <button
               onClick={() => setAiResetCounter(c => c + 1)}
               title="Clear conversation"
               className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
                 aiHasConversation
-                  ? "bg-white/20 hover:bg-white/30 text-white"
-                  : "text-white/50 hover:text-white/80"
+                  ? "bg-white/10 hover:bg-white/20 text-white"
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
               ↻ Clear
