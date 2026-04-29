@@ -237,13 +237,56 @@ export const TAG_VOCABULARY = [
 ];
 
 // ─── Field-team deferrals ────────────────────────────────────────────────────
-// Shared between Logan's "Deferred by team" exception strip (CockpitView, col 3)
-// and Troy's "My deferrals to Logan" list (FieldSupervisorView). Single source
-// of truth makes the cross-persona connection visible by design.
-export const FIELD_DEFERRALS = [
-  { task:"Site audit — Penrith Install",        who:"Troy Macpherson", whoId:"troy",  role:"Field Supervisor", time:"07:42", jobId:"CG-2417931", urgent:true,  reason:"WHS observation flagged — needs Logan sign-off before re-attendance." },
-  { task:"Photo evidence upload — Minto",       who:"MJ Electrical",   whoId:null,    role:"Trade",            time:"08:15", jobId:"CG-2418042", urgent:false, reason:"Trade portal sync error. Coordinator manual upload required." },
-  { task:"Customer call-back — Coffs Harbour",  who:"Kylie Tran",      whoId:"kylie", role:"Field Supervisor", time:"09:03", jobId:"CG-2418109", urgent:false, reason:"Customer requested manager-level discussion on rescheduling." },
+// Shared between Logan's "Deferred by team" exception strip (CockpitView, col 3),
+// Troy's "Deferred to Logan" list (FieldSupervisorView), and Aaron/National's
+// "Team deferrals" panel (PortfolioView). Single source of truth — same record
+// visible at every tier upward (Discovery OS req: roll-up to N+1 and N+2).
+//
+// tierPath records the chain of personas who can see / are above the original
+// deferrer. currentHolder = whose action it is right now. escalations = chain
+// of further deferrals applied after the original (each with its own reason).
+export type DeferralEscalation = {
+  by: string;        // e.g. "Logan Reilly"
+  byId: string;      // persona id
+  byRole: string;    // e.g. "Ops Manager — Installation Services"
+  to: string;        // human-readable next-tier descriptor
+  toId: string;      // persona id (currentHolder after this escalation)
+  time: string;
+  reason: string;
+};
+
+export type FieldDeferral = {
+  task: string;
+  who: string;          // original deferrer (human-readable)
+  whoId: string | null; // original deferrer persona id (null for non-persona actors like trades)
+  role: string;
+  time: string;
+  jobId: string;
+  urgent: boolean;
+  reason: string;
+  tierPath: string[];   // ordered persona ids from origin upward; e.g. ["troy","logan","aaron"]
+  currentHolder: string;// persona id whose action it is now
+  escalations?: DeferralEscalation[];
+};
+
+export const INITIAL_FIELD_DEFERRALS: FieldDeferral[] = [
+  { task:"Site audit — Penrith Install",        who:"Troy Macpherson", whoId:"troy",  role:"Field Supervisor",            time:"07:42", jobId:"CG-2417931", urgent:true,  reason:"WHS observation flagged — needs Logan sign-off before re-attendance.",                  tierPath:["troy","logan","national","aaron"],  currentHolder:"logan" },
+  { task:"Photo evidence upload — Minto",       who:"MJ Electrical",   whoId:null,    role:"Trade",                       time:"08:15", jobId:"CG-2418042", urgent:false, reason:"Trade portal sync error. Coordinator manual upload required.",                          tierPath:["logan","national","aaron"],         currentHolder:"logan" },
+  { task:"Customer call-back — Coffs Harbour",  who:"Kylie Tran",      whoId:"kylie", role:"Field Supervisor",            time:"09:03", jobId:"CG-2418109", urgent:false, reason:"Customer requested manager-level discussion on rescheduling.",                          tierPath:["kylie","logan","national","aaron"], currentHolder:"logan" },
+  { task:"Coverage gap — Mid North Coast (NSW)",who:"Logan Reilly",    whoId:"logan", role:"Ops Manager — Installations", time:"09:18", jobId:"P-041",      urgent:true,  reason:"Beyond my procurement authority — pattern P-039 persisting 5+ days, 3 jobs unmatched in 2295 postcode. Need approval to onboard 1–2 trades for this corridor.", tierPath:["logan","national","aaron"], currentHolder:"aaron" },
+];
+
+// Suggested-reason chips for the Defer/Escalate modal. Pick one to set the
+// text quickly; staff can also type a custom reason. Required free-text field
+// captures the specifics that feed the AI learning loop (Alex, 17 Apr 2026).
+export const DEFERRAL_REASON_CHIPS = [
+  "Trade unresponsive",
+  "Customer not available",
+  "Awaiting parts",
+  "Compliance issue",
+  "Scope unclear",
+  "Beyond my authority",
+  "Other",
 ];
 
 // ─── Supervisor data ──────────────────────────────────────────────────────────

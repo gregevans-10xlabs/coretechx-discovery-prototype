@@ -2,7 +2,7 @@ import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
-import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, riskState, riskBadgeClass } from "../data/scenarios";
+import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, type FieldDeferral, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -594,7 +594,17 @@ function BriefingDetailPanel({ msg, icon, onClose }: { msg: string; icon: string
 }
 
 // ─── Platform Health (Column 3) ───────────────────────────────────────────────
-function PlatformHealth({ isAaron, onWorkflowConfig }: { isAaron: boolean; onWorkflowConfig?: () => void }) {
+function PlatformHealth({ isAaron, onWorkflowConfig, deferrals }: { isAaron: boolean; onWorkflowConfig?: () => void; deferrals: FieldDeferral[] }) {
+  // Team deferrals visible at portfolio level — Discovery OS roll-up requirement
+  // (17 Apr 2026): every deferral remains visible at tier N+1 and N+2 with
+  // the full reason chain. Sort: items currently with the senior tier first
+  // (escalated up), then everything still with the Ops Manager.
+  const teamDeferrals = [...deferrals].sort((a, b) => {
+    const aWithSenior = a.currentHolder === "aaron" || a.currentHolder === "national" ? 0 : 1;
+    const bWithSenior = b.currentHolder === "aaron" || b.currentHolder === "national" ? 0 : 1;
+    return aWithSenior - bWithSenior;
+  });
+
   return (
     <div className="h-full overflow-y-auto scrollbar-thin px-4 py-4 space-y-5">
       <div className="bg-gradient-to-br from-[#00BDFE]/10 to-[#00BDFE]/5 border border-[#00BDFE]/30 rounded-xl p-4">
@@ -634,6 +644,50 @@ function PlatformHealth({ isAaron, onWorkflowConfig }: { isAaron: boolean; onWor
           ))}
         </div>
       </div>
+
+      {/* Team deferrals — full roll-up: every record where the senior tier is
+          part of the path, i.e. visible to portfolio personas. Items currently
+          escalated up sort first; the rest stay visible per the roll-up rule. */}
+      {teamDeferrals.length > 0 && (
+        <div>
+          <div className="flex items-baseline justify-between mb-2">
+            <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Team Deferrals</p>
+            <p className="text-slate-400 text-[10px]">{teamDeferrals.filter(d => d.currentHolder === "aaron" || d.currentHolder === "national").length} need senior call</p>
+          </div>
+          <div className="space-y-2">
+            {teamDeferrals.map((d, i) => {
+              const escalated = (d.escalations?.length ?? 0) > 0;
+              const senior = d.currentHolder === "aaron" || d.currentHolder === "national";
+              return (
+                <div key={i} className={`rounded-xl border bg-white p-2.5 text-xs ${
+                  senior ? "border-orange-300 border-l-4 border-l-orange-400" : "border-slate-200 border-l-4 border-l-amber-300"
+                }`}>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="font-semibold text-slate-700 leading-snug">{d.task}</p>
+                    {d.urgent && <span className="text-[9px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded font-medium uppercase flex-shrink-0">urgent</span>}
+                  </div>
+                  {/* Chain row */}
+                  <p className="text-slate-500 text-[10px] mb-1.5">
+                    {d.who} <span className="text-slate-400">({d.role.split(" — ")[0]})</span>
+                    {escalated && d.escalations!.map((e, idx) => (
+                      <span key={idx} className="text-slate-400"> → {e.by}</span>
+                    ))}
+                    {senior ? <span className="text-orange-600 font-semibold"> → with you</span> : <span className="text-slate-400"> → Ops Mgr</span>}
+                  </p>
+                  {/* Reason chain */}
+                  <div className="space-y-0.5">
+                    <p className="text-slate-600 text-[10px] italic leading-snug">"{d.who.split(" ")[0]}: {d.reason}"</p>
+                    {escalated && d.escalations!.map((e, idx) => (
+                      <p key={idx} className="text-slate-600 text-[10px] italic leading-snug">"{e.by.split(" ")[0]}: {e.reason}"</p>
+                    ))}
+                  </div>
+                  <p className="text-slate-400 text-[10px] mt-1.5">{d.jobId} · since {d.time}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div>
         <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Field Supervisors</p>
@@ -724,12 +778,13 @@ function PlatformHealth({ isAaron, onWorkflowConfig }: { isAaron: boolean; onWor
 }
 
 // ─── PortfolioView ────────────────────────────────────────────────────────────
-export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, onAddTag, onRemoveTag }: {
+export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, onAddTag, onRemoveTag, deferrals }: {
   persona: string;
   onWorkflowConfig?: () => void;
   tagsByJob: Record<string, string[]>;
   onAddTag: (jobId: string, tag: string) => void;
   onRemoveTag: (jobId: string, tag: string) => void;
+  deferrals: FieldDeferral[];
 }) {
   const isAaron = persona === "aaron";
   const exceptions = buildExceptions(isAaron);
@@ -949,7 +1004,7 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
             <h2 className="text-sm font-bold text-slate-800">Platform Health</h2>
           </div>
           <div className="flex-1 overflow-hidden">
-            <PlatformHealth isAaron={isAaron} onWorkflowConfig={onWorkflowConfig} />
+            <PlatformHealth isAaron={isAaron} onWorkflowConfig={onWorkflowConfig} deferrals={deferrals} />
           </div>
         </div>
 

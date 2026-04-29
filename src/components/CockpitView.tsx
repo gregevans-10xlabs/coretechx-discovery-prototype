@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { loganQueueJobs, kerrieQueueJobs } from "../data/jobs";
 import type { Job } from "../data/jobs";
-import { ALL_PATTERNS, FIELD_DEFERRALS, SUPERVISORS, TAG_VOCABULARY, riskState, riskBadgeClass } from "../data/scenarios";
+import { ALL_PATTERNS, SUPERVISORS, TAG_VOCABULARY, type FieldDeferral, type DeferralEscalation, riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
+import DeferralReasonModal from "./DeferralReasonModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned";
@@ -327,13 +328,34 @@ function isHardLimit(job: Job): boolean {
 }
 
 // ─── KPI Panel — Logan ────────────────────────────────────────────────────────
-function LoganKPIs({ jobs, onInspect, onPersonaSwitch }: { jobs: Job[]; onInspect: (supervisor: string) => void; onPersonaSwitch?: (id: string) => void }) {
+function LoganKPIs({ jobs, onInspect, onPersonaSwitch, deferrals: allDeferrals, onAddEscalation }: {
+  jobs: Job[];
+  onInspect: (supervisor: string) => void;
+  onPersonaSwitch?: (id: string) => void;
+  deferrals: FieldDeferral[];
+  onAddEscalation: (jobId: string, esc: DeferralEscalation) => void;
+}) {
   const urgentCount = jobs.filter(j => j.geoStatus === "no_checkin" || j.priority === "urgent").length;
   const jeopardyCount = jobs.filter(j => j.priority === "jeopardy").length;
   const onTrackCount = jobs.filter(j => j.geoStatus === "confirmed_en_route" || j.geoStatus === "gps_active").length;
   const [deferralsOpen, setDeferralsOpen] = useState(true);
+  const [escalateTarget, setEscalateTarget] = useState<FieldDeferral | null>(null);
 
-  const deferrals = FIELD_DEFERRALS;
+  // Logan sees deferrals where he is the current holder OR any further upstream
+  // visibility (he can still see ones he himself escalated, with the chain).
+  const deferrals = allDeferrals.filter(d => d.tierPath.includes("logan"));
+
+  const submitEscalation = (reason: string) => {
+    if (!escalateTarget) return;
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    onAddEscalation(escalateTarget.jobId, {
+      by: "Logan Reilly", byId: "logan", byRole: "Ops Manager — Installations",
+      to: "Aaron / National", toId: "aaron",
+      time, reason,
+    });
+    setEscalateTarget(null);
+  };
   const fieldSupervisors = SUPERVISORS.map(s => ({
     id: s.id,
     name: s.name,
@@ -418,25 +440,59 @@ function LoganKPIs({ jobs, onInspect, onPersonaSwitch }: { jobs: Job[]; onInspec
           </button>
           {deferralsOpen && (
             <div className="border-t border-amber-100 divide-y divide-slate-100">
-              {deferrals.map((d, i) => (
-                <div key={i} className="px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-1 mb-0.5">
-                    <p className="text-slate-700 text-xs font-semibold leading-tight">{d.task}</p>
-                    {d.urgent && (
-                      <span className="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold flex-shrink-0">urgent</span>
-                    )}
+              {deferrals.map((d, i) => {
+                const escalated = (d.escalations?.length ?? 0) > 0;
+                const withLogan = d.currentHolder === "logan";
+                return (
+                  <div key={i} className="px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-1 mb-0.5">
+                      <p className="text-slate-700 text-xs font-semibold leading-tight">{d.task}</p>
+                      {d.urgent && (
+                        <span className="text-[9px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 uppercase">urgent</span>
+                      )}
+                    </div>
+                    <p className="text-slate-500 text-[10px]">From: {d.who} · {d.role}</p>
+                    <p className="text-slate-500 text-[10px] italic mt-1 leading-snug">"{d.reason}"</p>
+                    {escalated && d.escalations!.map((e, idx) => (
+                      <p key={idx} className="text-slate-500 text-[10px] italic mt-0.5 leading-snug">
+                        <span className="text-slate-400 not-italic">↑ {e.by} → {e.to}:</span> "{e.reason}"
+                      </p>
+                    ))}
+                    <div className="flex items-center justify-between mt-1.5 gap-2">
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <span className="text-slate-400">{d.jobId}</span>
+                        <span className="text-slate-300">·</span>
+                        <span className={escalated ? "text-orange-600 font-medium" : "text-slate-400"}>
+                          {escalated ? `with ${d.escalations![d.escalations!.length-1].to}` : `here since ${d.time}`}
+                        </span>
+                      </div>
+                      {withLogan && (
+                        <button
+                          onClick={() => setEscalateTarget(d)}
+                          className="text-[10px] text-[#0077a8] hover:text-[#00BDFE] hover:underline font-medium"
+                        >
+                          Escalate to senior →
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-slate-500 text-[10px]">{d.who} · {d.role}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-slate-400 text-[10px]">Deferred {d.time}</span>
-                    <span className="text-[#0077a8] text-[10px] font-mono cursor-pointer hover:underline">{d.jobId}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       )}
+
+      {/* Escalate-to-senior reason modal */}
+      <DeferralReasonModal
+        open={escalateTarget !== null}
+        title="Escalate to senior"
+        itemDescription={escalateTarget ? `${escalateTarget.task} · ${escalateTarget.jobId}` : ""}
+        destinationLabel="Aaron / National"
+        submitLabel="Escalate"
+        onSubmit={submitEscalation}
+        onCancel={() => setEscalateTarget(null)}
+      />
 
       {/* Field Supervisors */}
       <div className="bg-white rounded-xl border border-slate-200 p-3">
@@ -825,12 +881,14 @@ function CockpitPatternDetail({ pattern: p, onClose }: { pattern: LoganPattern; 
 }
 
 // ─── Main CockpitView ─────────────────────────────────────────────────────────
-export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag }: {
+export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag, deferrals, onAddEscalation }: {
   persona: string;
   onPersonaSwitch?: (id: string) => void;
   tagsByJob: Record<string, string[]>;
   onAddTag: (jobId: string, tag: string) => void;
   onRemoveTag: (jobId: string, tag: string) => void;
+  deferrals: FieldDeferral[];
+  onAddEscalation: (jobId: string, esc: DeferralEscalation) => void;
 }) {
   const isKerrie = persona === "kerrie";
 
@@ -1132,7 +1190,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
         <div className="flex-1 overflow-y-auto p-3">
           {isKerrie
             ? <KerrieKPIs jobs={kerrieQueue} />
-            : <LoganKPIs jobs={loganQueue} onInspect={(id) => setSelectedId(`INSPECT:${id}`)} onPersonaSwitch={onPersonaSwitch} />
+            : <LoganKPIs jobs={loganQueue} onInspect={(id) => setSelectedId(`INSPECT:${id}`)} onPersonaSwitch={onPersonaSwitch} deferrals={deferrals} onAddEscalation={onAddEscalation} />
           }
         </div>
       </div>

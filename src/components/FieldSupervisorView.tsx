@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { SUPERVISORS, FIELD_DEFERRALS } from "../data/scenarios";
+import { SUPERVISORS, type FieldDeferral } from "../data/scenarios";
 import AskAI from "./AskAI";
+import DeferralReasonModal from "./DeferralReasonModal";
 
 // Troy is the only field-supervisor persona currently exposed in the picker.
 // SUPERVISORS data is shared between this view and Logan's column 3.
@@ -15,19 +16,25 @@ function priorityChip(p: string): string {
   return "bg-slate-100 text-slate-500 border border-slate-200";
 }
 
-export default function FieldSupervisorView({ onPersonaSwitch }: { onPersonaSwitch?: (id: string) => void }) {
+export default function FieldSupervisorView({ onPersonaSwitch, deferrals, onAddDeferral }: {
+  onPersonaSwitch?: (id: string) => void;
+  deferrals: FieldDeferral[];
+  onAddDeferral: (entry: FieldDeferral) => void;
+}) {
   const [selectedTrade, setSelectedTrade] = useState<string | null>(TROY.inspectionQueue[0]?.trade ?? null);
   const [outcomes, setOutcomes] = useState<Record<string, AuditOutcome>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [deferModalOpen, setDeferModalOpen] = useState(false);
   // Reset key forces AskAI to remount with fresh state on Clear.
   const [aiResetCounter, setAiResetCounter] = useState(0);
   const [aiHasConversation, setAiHasConversation] = useState(false);
 
   const selected = TROY.inspectionQueue.find(t => t.trade === selectedTrade) ?? null;
 
-  // Troy's deferrals are the field-supervisor entries from the shared list.
-  // Same records appear in Logan's "Deferred by team" strip — the cross-persona link.
-  const myDeferrals = FIELD_DEFERRALS.filter(d => d.whoId === "troy");
+  // Troy's deferrals are anything originated by Troy. Per Discovery OS roll-up
+  // requirement, items remain visible at every tier upward — Troy still sees
+  // his deferrals even after Logan further escalates them, with the chain shown.
+  const myDeferrals = deferrals.filter(d => d.whoId === "troy");
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -36,12 +43,31 @@ export default function FieldSupervisorView({ onPersonaSwitch }: { onPersonaSwit
 
   const recordOutcome = (outcome: AuditOutcome) => {
     if (!selected) return;
-    setOutcomes(o => ({ ...o, [selected.trade]: outcome }));
     if (outcome === "deferred") {
-      flash(`Deferred to Logan — ${selected.trade}. Now in his queue.`);
-    } else {
-      flash(`${outcome.toUpperCase()} logged for ${selected.trade}.`);
+      // Open the reason modal — actual write happens on submit
+      setDeferModalOpen(true);
+      return;
     }
+    setOutcomes(o => ({ ...o, [selected.trade]: outcome }));
+    flash(`${outcome.toUpperCase()} logged for ${selected.trade}.`);
+  };
+
+  const submitDeferral = (reason: string) => {
+    if (!selected) return;
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    onAddDeferral({
+      task: `Site audit — ${selected.trade}`,
+      who: "Troy Macpherson", whoId: "troy", role: "Field Supervisor",
+      time, jobId: `INS-${Date.now().toString().slice(-5)}`,
+      urgent: selected.priority === "critical" || selected.priority === "high",
+      reason,
+      tierPath: ["troy", "logan", "national", "aaron"],
+      currentHolder: "logan",
+    });
+    setOutcomes(o => ({ ...o, [selected.trade]: "deferred" }));
+    setDeferModalOpen(false);
+    flash(`Deferred to Logan — ${selected.trade}. Now in his queue.`);
   };
 
   const safetyPct  = Math.round(TROY.safety.done  / TROY.safety.target  * 100);
@@ -140,26 +166,39 @@ export default function FieldSupervisorView({ onPersonaSwitch }: { onPersonaSwit
           </div>
         )}
 
-        {/* My deferrals — items already escalated to Logan */}
+        {/* My deferrals — items I escalated up. Stay visible per Discovery OS
+            roll-up rule, with the full chain shown if Logan escalated further. */}
         {myDeferrals.length > 0 && (
           <div className="px-4 py-3 border-b border-slate-200">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wide">Deferred to Logan ({myDeferrals.length})</p>
-              <span className="text-[10px] text-amber-600 font-semibold">Awaiting his call</span>
+              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wide">My deferrals ({myDeferrals.length})</p>
+              <span className="text-[10px] text-amber-600 font-semibold">Awaiting action</span>
             </div>
-            {myDeferrals.map(d => (
-              <div key={d.jobId} className="rounded-lg border border-amber-200 bg-amber-50 p-2.5">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="text-slate-800 text-xs font-semibold leading-tight">{d.task}</p>
-                  {d.urgent && <span className="text-[9px] bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded font-medium uppercase">Urgent</span>}
+            <div className="space-y-2">
+            {myDeferrals.map(d => {
+              const escalated = (d.escalations?.length ?? 0) > 0;
+              return (
+                <div key={d.jobId} className="rounded-lg border border-amber-200 bg-white p-2.5 border-l-4 border-l-amber-400">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="text-slate-800 text-xs font-semibold leading-tight">{d.task}</p>
+                    {d.urgent && <span className="text-[9px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded font-medium uppercase flex-shrink-0">Urgent</span>}
+                  </div>
+                  <p className="text-slate-600 text-[10px] mt-1 leading-snug italic">"You: {d.reason}"</p>
+                  {escalated && d.escalations!.map((e, i) => (
+                    <p key={i} className="text-slate-600 text-[10px] mt-1 leading-snug italic">"{e.by}: {e.reason}"</p>
+                  ))}
+                  <div className="flex items-center justify-between mt-1.5 text-[10px]">
+                    <span className="text-slate-400">{d.jobId}</span>
+                    <span className={escalated ? "text-orange-600 font-semibold" : "text-slate-400"}>
+                      {escalated
+                        ? `Now with ${d.escalations![d.escalations!.length-1].to}`
+                        : `With Logan since ${d.time}`}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-slate-600 text-[10px] mt-1 leading-snug italic">"{d.reason}"</p>
-                <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-400">
-                  <span>{d.jobId}</span>
-                  <span>Deferred {d.time}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
+            </div>
           </div>
         )}
 
@@ -226,6 +265,17 @@ export default function FieldSupervisorView({ onPersonaSwitch }: { onPersonaSwit
           </div>
         )}
       </div>
+
+      {/* Deferral reason modal — required for every defer per Discovery OS req */}
+      <DeferralReasonModal
+        open={deferModalOpen}
+        title="Defer to Logan"
+        itemDescription={selected ? `Site audit — ${selected.trade}` : ""}
+        destinationLabel="Logan (Ops Manager — Installations)"
+        submitLabel="Defer to Logan"
+        onSubmit={submitDeferral}
+        onCancel={() => setDeferModalOpen(false)}
+      />
     </div>
   );
 }

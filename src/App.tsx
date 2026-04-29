@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, ALL_DECISIONS, riskState, riskBadgeClass } from "./data/scenarios";
+import { LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, ALL_DECISIONS, INITIAL_FIELD_DEFERRALS, type FieldDeferral, type DeferralEscalation, riskState, riskBadgeClass } from "./data/scenarios";
 import { JOBS } from "./data/jobs";
 import AskAI from "./components/AskAI";
 import CockpitView from "./components/CockpitView";
@@ -233,6 +233,19 @@ export default function App() {
     return { ...curr, [jobId]: existing.filter(t => t !== tag) };
   });
 
+  // Field-team deferrals — lifted to App so the same record is visible at every
+  // tier upward (Discovery OS roll-up requirement, 17 Apr 2026). addDeferral
+  // creates new entries from operator action; addEscalation pushes an item one
+  // tier higher with a new reason in the chain.
+  const [deferrals, setDeferrals] = useState<FieldDeferral[]>(INITIAL_FIELD_DEFERRALS);
+  const addDeferral = (entry: FieldDeferral) => setDeferrals(curr => [entry, ...curr]);
+  const addEscalation = (jobId: string, esc: DeferralEscalation) => setDeferrals(curr =>
+    curr.map(d => d.jobId === jobId
+      ? { ...d, escalations: [...(d.escalations ?? []), esc], currentHolder: esc.toId }
+      : d
+    )
+  );
+
   const isPortfolio = persona === "aaron" || persona === "national";
   const isField     = persona === "conner" || persona === "blake";
   const isTroy      = persona === "troy";
@@ -291,7 +304,7 @@ export default function App() {
   if (isPortfolio) return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <PortfolioView persona={persona} onWorkflowConfig={() => setView("workflow")} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} />
+      <PortfolioView persona={persona} onWorkflowConfig={() => setView("workflow")} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
@@ -309,7 +322,7 @@ export default function App() {
   if (isTroy) return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <FieldSupervisorView onPersonaSwitch={setPersona} />
+      <FieldSupervisorView onPersonaSwitch={setPersona} deferrals={deferrals} onAddDeferral={addDeferral} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
@@ -360,7 +373,7 @@ export default function App() {
   return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag}/>
+      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} onAddEscalation={addEscalation}/>
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
