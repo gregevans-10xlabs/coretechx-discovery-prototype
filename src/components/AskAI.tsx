@@ -68,11 +68,25 @@ export default function AskAI({ context, placeholder, trigger }: {
     if(!override) setQ("");
     setMsgs(m=>[...m,{role:"user",content:u}]); setLoading(true);
     const sys=`You are the CoreTechX AI operations assistant for Circl (Australia). ~5,000 active Commitments, ~20,000/month. The platform uses Commitment confidence scores (0-1), pre-computed shadow plans, and a 4-level autonomy ladder. Agents earn autonomy through measured accuracy. Hard limits (financial >$1k, WHS, legal, enterprise client comms, police/fire) are permanently Level 1. Workflow configuration allows authorised users to adjust autonomy levels per step per job type, with audit logging. All changes require a reason and are immutable once logged.\nContext: ${context}\nAnswer directly, under 150 words.`;
+    let reply: string;
     try {
       const res = await fetch("/api/anthropic", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,system:sys,messages:[...msgs.map(m=>({role:m.role,content:m.content})),{role:"user",content:u}]})});
-      const d=await res.json();
-      setMsgs(m=>[...m,{role:"assistant",content:d.content?.find((b:{type:string;text:string})=>b.type==="text")?.text||"No response."}]);
-    } catch { setMsgs(m=>[...m,{role:"assistant",content:"Unable to reach AI."}]); }
+      const d = await res.json();
+      const text = d?.content?.find((b:{type:string;text:string})=>b.type==="text")?.text;
+      if (text) {
+        reply = text;
+      } else {
+        // Surface API errors verbatim so config issues (bad key, wrong model, etc.) are diagnosable.
+        const apiErr = d?.error?.message ?? d?.error ?? `HTTP ${res.status}`;
+        const apiType = d?.error?.type ? ` (${d.error.type})` : "";
+        reply = `⚠ AI error${apiType}: ${apiErr}`;
+        console.error("AskAI: API returned non-content response", d);
+      }
+    } catch (e) {
+      reply = `⚠ Could not reach /api/anthropic — ${e instanceof Error ? e.message : "network error"}`;
+      console.error("AskAI: fetch threw", e);
+    }
+    setMsgs(m=>[...m,{role:"assistant",content:reply}]);
     setLoading(false);
   };
 
