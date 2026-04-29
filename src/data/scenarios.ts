@@ -173,6 +173,49 @@ export const ALL_PATTERNS = [
   },
 ];
 
+// ─── Commitment metadata (for display) ───────────────────────────────────────
+// State / class / control-mode / relationship vocabularies and visual styling
+// for the Commitment Anatomy block. Schema lives in jobs.ts; this is the
+// presentation layer only. Reflects Discovery OS spec (updated 29 Apr 2026).
+export const COMMITMENT_STATE_META: Record<string, { label: string; color: string; dot: string }> = {
+  specific:    { label: "Specific",    color: "bg-slate-50 text-slate-500 border-slate-200",   dot: "bg-slate-300" },
+  potential:   { label: "Potential",   color: "bg-slate-100 text-slate-600 border-slate-300",  dot: "bg-slate-400" },
+  active:      { label: "Active",      color: "bg-blue-50 text-blue-700 border-blue-200",       dot: "bg-blue-500"  },
+  in_progress: { label: "In Progress", color: "bg-indigo-50 text-indigo-700 border-indigo-200", dot: "bg-indigo-500" },
+  proven:      { label: "Proven",      color: "bg-teal-50 text-teal-700 border-teal-200",       dot: "bg-teal-500"  },
+  closed:      { label: "Closed",      color: "bg-slate-100 text-slate-500 border-slate-200",   dot: "bg-slate-400" },
+  breach:      { label: "Breach",      color: "bg-red-50 text-red-700 border-red-200",          dot: "bg-red-500"   },
+  recovered:   { label: "Recovered",   color: "bg-amber-50 text-amber-700 border-amber-200",    dot: "bg-amber-500" },
+  voided:      { label: "Voided",      color: "bg-slate-50 text-slate-400 border-slate-200",    dot: "bg-slate-300" },
+};
+
+export const COMMITMENT_CLASS_META: Record<string, { label: string; color: string }> = {
+  operational:     { label: "Operational",     color: "bg-blue-50 text-blue-600 border-blue-200" },
+  commercial:      { label: "Commercial",      color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  customer:        { label: "Customer",        color: "bg-pink-50 text-pink-700 border-pink-200" },
+  client_provider: { label: "Client/Provider", color: "bg-violet-50 text-violet-700 border-violet-200" },
+  compliance:      { label: "Compliance",      color: "bg-orange-50 text-orange-700 border-orange-200" },
+  proof:           { label: "Proof",           color: "bg-cyan-50 text-cyan-700 border-cyan-200" },
+  payment:         { label: "Payment",         color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  exception:       { label: "Exception",       color: "bg-red-50 text-red-700 border-red-200" },
+};
+
+export const COMMITMENT_CONTROL_META: Record<string, { label: string; color: string }> = {
+  human_only:     { label: "🔒 Human Only",      color: "text-red-700"    },
+  human_decision: { label: "Human Decision",    color: "text-slate-600"  },
+  ai_assisted:    { label: "AI Assisted",       color: "text-blue-700"   },
+  ai_autonomous:  { label: "AI Autonomous",     color: "text-green-700"  },
+};
+
+export const COMMITMENT_REL_META: Record<string, { label: string }> = {
+  depends_on:      { label: "Depends on" },
+  blocks:          { label: "Blocks" },
+  releases:        { label: "Releases" },
+  triggers:        { label: "Triggers" },
+  alternative_to:  { label: "Alternative to" },
+  conflicts_with:  { label: "Conflicts with" },
+};
+
 // ─── Tag vocabulary ──────────────────────────────────────────────────────────
 // Per CLAUDE.md: "On Hold" and "Needs Variation" are tags overlaid on stages,
 // not separate workflow states. Predefined vocabulary — no free text — keeps

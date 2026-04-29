@@ -106,6 +106,54 @@ export type Job = {
   // Tags overlaid on stages — labels from TAG_VOCABULARY in scenarios.ts.
   // Pre-seeded values are session-initial state; users can add/remove at runtime.
   tags?: string[];
+
+  // Commitments — the underlying probabilistic-contract structure (Discovery OS
+  // canonical model). User-facing concept stays "Job"; commitments are exposed
+  // for those who want the deeper structure. Optional — only modelled jobs have
+  // these; others show a placeholder in the Commitment Anatomy block.
+  commitments?: Commitment[];
+};
+
+// ─── Commitment model ────────────────────────────────────────────────────────
+// Reflects the canonical 5-field anatomy + 9-state lifecycle from the Discovery
+// OS Commitment Model Specification (updated 29 Apr 2026).
+export type CommitmentState =
+  | "specific"      // template-level only (not used at instance layer)
+  | "potential"     // applicable but not yet activated
+  | "active"        // open and being tracked
+  | "in_progress"   // work toward fulfilling has begun
+  | "proven"        // fulfilled, proof submitted, pending closure
+  | "closed"        // formally closed
+  | "breach"        // failed within breach threshold
+  | "recovered"     // breached then back on track
+  | "voided";       // deliberately removed (process change made redundant)
+
+export type CommitmentClass =
+  | "operational" | "commercial" | "customer" | "client_provider"
+  | "compliance" | "proof" | "payment" | "exception";
+
+export type CommitmentControl =
+  | "human_only" | "human_decision" | "ai_assisted" | "ai_autonomous";
+
+export type CommitmentRel =
+  | "depends_on" | "blocks" | "releases" | "triggers"
+  | "alternative_to" | "conflicts_with";
+
+export type Commitment = {
+  id: string;
+  state: CommitmentState;
+  klass: CommitmentClass;          // "class" is reserved in some contexts; use klass
+  type: "staged" | "floating";
+  promise: string;                  // what must become true
+  owner: string;                    // who owns it (human-readable)
+  ownerTier?: string;               // T1 / T2 / T3 / Ops / AI Agent name
+  controlMode: CommitmentControl;
+  proofRequired: string;
+  breachEarly?: string;             // early warning trigger
+  breachHard?: string;              // hard breach trigger
+  autonomyProgression?: string;     // e.g. "monitor → recommend (current) → assess → act → approve"
+  relationships?: { type: CommitmentRel; target: string }[];
+  voidedReason?: string;            // for voided state
 };
 
 // ─── Journey step definitions ─────────────────────────────────────────────────
@@ -402,6 +450,58 @@ export const JOBS: Job[] = [
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
     tags: ["On Hold"],
+    commitments: [
+      { id: "C-CG36110-01", state: "closed", klass: "operational", type: "staged",
+        promise: "Job intake auto-classified as Starlink Install",
+        owner: "AI Triage Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "Prime status event captured",
+        autonomyProgression: "Autonomous since Jul 2025 · 99.4% accuracy",
+      },
+      { id: "C-CG36110-02", state: "closed", klass: "operational", type: "staged",
+        promise: "Trade matched and allocated within 50km of site",
+        owner: "AI Trade Matching Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "Sandbar Electrical accepted via Chekku",
+        autonomyProgression: "Autonomous since Sep 2025 · 97.1% accuracy",
+        relationships: [{ type: "triggers", target: "SWMS document filed" }],
+      },
+      { id: "C-CG36110-03", state: "active", klass: "compliance", type: "staged",
+        promise: "SWMS document filed before site attendance",
+        owner: "Sandbar Electrical Services", ownerTier: "Trade · T1",
+        controlMode: "ai_assisted",
+        proofRequired: "SWMS PDF uploaded via Chekku portal",
+        breachEarly: "T-60 min: confidence drops below 0.6, coordinator notified",
+        breachHard: "T+15 min: shadow plan activates, customer notified",
+        autonomyProgression: "monitor → recommend (current) → assess → act → approve",
+        relationships: [{ type: "blocks", target: "Trade geo check-in at site" }],
+      },
+      { id: "C-CG36110-04", state: "potential", klass: "operational", type: "staged",
+        promise: "Trade geo check-in at job address before window start",
+        owner: "Sandbar Electrical Services", ownerTier: "Trade · T1",
+        controlMode: "ai_autonomous",
+        proofRequired: "Active 'I'm on my way' event + geofence entry at T-30",
+        breachHard: "T+15 min: missed-arrival escalation",
+        autonomyProgression: "Autonomous · 96% sustained accuracy",
+        relationships: [{ type: "depends_on", target: "SWMS document filed" }],
+      },
+      { id: "C-CG36110-05", state: "potential", klass: "proof", type: "staged",
+        promise: "Install evidence pack submitted with photos and signed customer form",
+        owner: "Sandbar Electrical Services", ownerTier: "Trade · T1",
+        controlMode: "ai_assisted",
+        proofRequired: "≥6 photos + customer signature + serial number scan",
+        breachEarly: "T+24h: evidence-clean reminder sent",
+        relationships: [{ type: "depends_on", target: "Trade geo check-in at site" },
+                        { type: "triggers", target: "Invoice generated" }],
+      },
+      { id: "C-CG36110-06", state: "potential", klass: "payment", type: "staged",
+        promise: "Trade payment processed (RCTI generated and remitted)",
+        owner: "AI Settlement Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "RCTI sent + payment confirmed",
+        relationships: [{ type: "depends_on", target: "Install evidence pack submitted" }],
+      },
+    ],
   },
 
   {
@@ -458,6 +558,54 @@ export const JOBS: Job[] = [
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
+    commitments: [
+      { id: "C-CG35958-01", state: "closed", klass: "operational", type: "staged",
+        promise: "Harvey Norman order ingested + auto-classified",
+        owner: "AI Intake Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "HN portal event captured + rate card applied",
+      },
+      { id: "C-CG35958-02", state: "closed", klass: "operational", type: "staged",
+        promise: "Trade matched within delivery window",
+        owner: "AI Trade Matching Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "UNITED INFOCOM TECH accepted via Chekku",
+      },
+      { id: "C-CG35958-03", state: "closed", klass: "customer", type: "staged",
+        promise: "Customer notified of confirmed install window",
+        owner: "AI Customer Comms Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "SMS delivered + read receipt OR portal event",
+      },
+      { id: "C-CG35958-04", state: "in_progress", klass: "operational", type: "staged",
+        promise: "Trade attends and completes install in window",
+        owner: "UNITED INFOCOM TECH PTY LTD", ownerTier: "Trade · T1",
+        controlMode: "ai_autonomous",
+        proofRequired: "Geo check-in + completion event",
+        breachHard: "T+30 min: missed-arrival escalation",
+        autonomyProgression: "Autonomous · 99% on-time rate sustained",
+      },
+      { id: "C-CG35958-05", state: "potential", klass: "proof", type: "staged",
+        promise: "Install QA evidence pack submitted",
+        owner: "UNITED INFOCOM TECH PTY LTD", ownerTier: "Trade · T1",
+        controlMode: "ai_assisted",
+        proofRequired: "≥4 photos + signed customer form + serial scan",
+        relationships: [{ type: "depends_on", target: "Trade attends and completes install" },
+                        { type: "triggers", target: "HN portal updated" }],
+      },
+      { id: "C-CG35958-06", state: "potential", klass: "client_provider", type: "staged",
+        promise: "HN portal updated with completion event",
+        owner: "AI Portal Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "HN portal acknowledgement event received",
+      },
+      { id: "C-CG35958-07", state: "potential", klass: "payment", type: "staged",
+        promise: "Trade paid (RCTI generated and remitted)",
+        owner: "AI Settlement Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "RCTI sent + payment confirmed",
+      },
+    ],
   },
 
   {
@@ -630,6 +778,61 @@ export const JOBS: Job[] = [
     nextAction: "Scope change approval",
     nextTradeDate: "Today",
     tags: ["Needs Variation"],
+    commitments: [
+      { id: "C-CG36069-01", state: "closed", klass: "client_provider", type: "staged",
+        promise: "Claim received from Allianz portal and ingested",
+        owner: "AI Intake Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "Allianz portal event captured + claim ID assigned",
+        autonomyProgression: "Autonomous since Mar 2025 · 97% accuracy",
+      },
+      { id: "C-CG36069-02", state: "closed", klass: "compliance", type: "staged",
+        promise: "Trade compliance verified (license, insurance, SWMS on file)",
+        owner: "AI Compliance Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_assisted",
+        proofRequired: "Trade compliance docs current within 30 days",
+      },
+      { id: "C-CG36069-03", state: "closed", klass: "operational", type: "staged",
+        promise: "Makesafe completed within Allianz 4h SLA",
+        owner: "TAYLOR MADE ROOFING AND CARPENTRY", ownerTier: "Trade · T2",
+        controlMode: "ai_assisted",
+        proofRequired: "Trade reports makesafe complete + 4 photos uploaded",
+      },
+      { id: "C-CG36069-04", state: "voided", klass: "operational", type: "staged",
+        promise: "Standard repair scope executed ($6,600)",
+        owner: "TAYLOR MADE ROOFING AND CARPENTRY", ownerTier: "Trade · T2",
+        controlMode: "ai_assisted",
+        proofRequired: "Repair complete + insurer sign-off",
+        voidedReason: "Trade discovered additional water damage during makesafe. Scope replaced by variation commitment (+$1,800). Original commitment voided 09:06 today.",
+      },
+      { id: "C-CG36069-05", state: "active", klass: "commercial", type: "floating",
+        promise: "Variation +$1,800 approved by human (financial >$1k hard limit)",
+        owner: "Kerrie Tran", ownerTier: "Insurance Coord · T2",
+        controlMode: "human_only",
+        proofRequired: "Coordinator approval logged + insurer notified",
+        breachEarly: "T+4h: variation pending notification to Allianz",
+        breachHard: "T+24h: claim escalation, customer satisfaction risk",
+        autonomyProgression: "🔒 Permanent — financial decisions >$1k cannot be delegated to AI",
+        relationships: [
+          { type: "blocks", target: "Repair work completed" },
+          { type: "alternative_to", target: "Standard repair scope (voided)" },
+        ],
+      },
+      { id: "C-CG36069-06", state: "potential", klass: "operational", type: "staged",
+        promise: "Repair work completed to approved scope",
+        owner: "TAYLOR MADE ROOFING AND CARPENTRY", ownerTier: "Trade · T2",
+        controlMode: "ai_assisted",
+        proofRequired: "Trade reports complete + final photos + customer sign-off",
+        relationships: [{ type: "depends_on", target: "Variation +$1,800 approved" }],
+      },
+      { id: "C-CG36069-07", state: "potential", klass: "client_provider", type: "staged",
+        promise: "Allianz portal updated with completion + invoice",
+        owner: "AI Portal Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_assisted",
+        proofRequired: "Allianz acknowledgement event received",
+        relationships: [{ type: "depends_on", target: "Repair work completed" }],
+      },
+    ],
   },
 
   {
@@ -729,6 +932,73 @@ export const JOBS: Job[] = [
     visibleTo: ["conner", "national", "aaron"],
     actionableBy: ["conner", "national", "aaron"],
     readOnlyFor: [],
+    commitments: [
+      { id: "C-CG36385-01", state: "closed", klass: "client_provider", type: "staged",
+        promise: "AHO work order received and intake completed",
+        owner: "AI Intake Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "AHO portal event captured",
+      },
+      { id: "C-CG36385-02", state: "closed", klass: "operational", type: "staged",
+        promise: "Site survey conducted and scope captured",
+        owner: "Conner Reilly", ownerTier: "Ops Mgr · T3",
+        controlMode: "human_decision",
+        proofRequired: "Survey report uploaded + scope document signed",
+        autonomyProgression: "🔒 Construction surveys remain human — complex sites require judgment",
+      },
+      { id: "C-CG36385-03", state: "closed", klass: "client_provider", type: "staged",
+        promise: "Scope approved by AHO before works commenced",
+        owner: "AHO (client)", ownerTier: "Client · enterprise",
+        controlMode: "human_only",
+        proofRequired: "AHO sign-off received via portal",
+        autonomyProgression: "🔒 Permanent — enterprise client comms cannot be delegated",
+      },
+      { id: "C-CG36385-04", state: "closed", klass: "operational", type: "staged",
+        promise: "Lead trade allocated (builder)",
+        owner: "AI Trade Matching Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_assisted",
+        proofRequired: "AusCorp Energy accepted via Chekku",
+        relationships: [{ type: "triggers", target: "Sub-trade allocated (HVAC)" }],
+      },
+      { id: "C-CG36385-05", state: "closed", klass: "operational", type: "staged",
+        promise: "Sub-trade allocated (HVAC)",
+        owner: "AI Trade Matching Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_assisted",
+        proofRequired: "J1 Air Conditioning accepted via Chekku",
+      },
+      { id: "C-CG36385-06", state: "in_progress", klass: "operational", type: "staged",
+        promise: "Build stages completed on schedule (4-week build)",
+        owner: "AusCorp Energy Pty Ltd", ownerTier: "Trade · T2 (lead)",
+        controlMode: "ai_assisted",
+        proofRequired: "Stage sign-offs at frame, lock-up, fix, completion",
+        breachEarly: "Day 5 without stage progress: AI flags variance to coordinator",
+        breachHard: "Day 7 without stage progress: Conner notified directly",
+        autonomyProgression: "AI Assisted — construction is Tier C (Complex), human stays in loop",
+        relationships: [{ type: "blocks", target: "QA inspection" }],
+      },
+      { id: "C-CG36385-07", state: "active", klass: "compliance", type: "staged",
+        promise: "WHS observations logged twice weekly during works",
+        owner: "Troy Macpherson", ownerTier: "Field Supervisor · T2",
+        controlMode: "ai_assisted",
+        proofRequired: "WHS observation form completed + photos",
+        breachEarly: "T+24h after due: AI reminder sent",
+      },
+      { id: "C-CG36385-08", state: "potential", klass: "operational", type: "staged",
+        promise: "QA inspection passed",
+        owner: "Conner Reilly", ownerTier: "Ops Mgr · T3",
+        controlMode: "human_decision",
+        proofRequired: "Inspection report + customer (AHO) walk-through sign-off",
+        relationships: [{ type: "depends_on", target: "Build stages completed on schedule" },
+                        { type: "blocks", target: "Final invoice released" }],
+      },
+      { id: "C-CG36385-09", state: "potential", klass: "payment", type: "staged",
+        promise: "Trades paid (RCTI generated for both AusCorp and J1)",
+        owner: "AI Settlement Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_assisted",
+        proofRequired: "RCTIs sent + payments confirmed for both trades",
+        relationships: [{ type: "depends_on", target: "QA inspection passed" }],
+      },
+    ],
   },
 
   {

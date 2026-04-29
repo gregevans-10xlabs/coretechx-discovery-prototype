@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
 import JourneyBar from "./JourneyBar";
+import CommitmentAnatomy from "./CommitmentAnatomy";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
@@ -438,6 +439,10 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }:
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey</p>
           <JourneyBar job={job} size="compact" tags={tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
+        </div>
+
+        <div>
+          <CommitmentAnatomy job={job} />
         </div>
 
         {/* Flags */}

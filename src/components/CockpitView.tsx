@@ -5,6 +5,7 @@ import { ALL_PATTERNS, FIELD_DEFERRALS, SUPERVISORS, TAG_VOCABULARY, riskState, 
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
+import CommitmentAnatomy from "./CommitmentAnatomy";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned";
@@ -257,6 +258,8 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
       <div>
         <p className="text-slate-500 text-xs font-medium mb-2">Journey Progress</p>
         <JourneyBar job={job} accentColor={accentColor} tags={tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
+
+        <CommitmentAnatomy job={job} />
       </div>
 
       {/* Activity log */}

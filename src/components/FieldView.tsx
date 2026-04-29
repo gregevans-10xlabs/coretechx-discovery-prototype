@@ -4,6 +4,7 @@ import { riskState, riskBadgeClass, TAG_VOCABULARY } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
+import CommitmentAnatomy from "./CommitmentAnatomy";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -122,6 +123,8 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }:
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey Progress</p>
           <JourneyBar job={job} tags={tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
         </div>
+
+        <CommitmentAnatomy job={job} />
 
         {/* AI Log */}
         <div>
