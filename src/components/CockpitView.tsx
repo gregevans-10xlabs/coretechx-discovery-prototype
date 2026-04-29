@@ -810,6 +810,9 @@ export default function CockpitView({ persona, onPersonaSwitch }: { persona: str
   const [, setActionsDone]        = useState<Record<string, string>>({});
   // Prefill question fired into the AI bar by the "Why is this here?" button.
   const [aiTrigger, setAiTrigger] = useState<{ text: string; nonce: number } | undefined>(undefined);
+  // Reset key forces AskAI to remount with fresh state on Clear or persona change.
+  const [aiResetCounter, setAiResetCounter] = useState(0);
+  const [aiHasConversation, setAiHasConversation] = useState(false);
 
   const filteredQueue = fullQueue.filter(j => {
     if (filter === "action")  return j.actionRequired !== null;
@@ -1056,13 +1059,26 @@ export default function CockpitView({ persona, onPersonaSwitch }: { persona: str
             <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
             <span className="text-white text-xs font-semibold">CoreTechX AI</span>
             <span className="text-white/60 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
+            <button
+              onClick={() => setAiResetCounter(c => c + 1)}
+              title="Clear conversation"
+              className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
+                aiHasConversation
+                  ? "bg-white/20 hover:bg-white/30 text-white"
+                  : "text-white/50 hover:text-white/80"
+              }`}
+            >
+              ↻ Clear
+            </button>
           </div>
           <div className="bg-white px-4 pt-2 pb-3">
             <AskAI
+              key={`${persona}-${aiResetCounter}`}
               context={aiContext}
               placeholder={selectedJob ? `Ask about ${selectedJob.id}...` : "Ask about your queue..."}
               trigger={aiTrigger}
               suggestions={aiSuggestions}
+              onConversationChange={setAiHasConversation}
             />
           </div>
         </div>

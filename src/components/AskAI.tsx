@@ -51,7 +51,7 @@ function FormatAI({ text }: { text: string }) {
 // ─── AskAI chat widget ────────────────────────────────────────────────────────
 export type AskAISuggestion = { label: string; question: string };
 
-export default function AskAI({ context, placeholder, trigger, suggestions }: {
+export default function AskAI({ context, placeholder, trigger, suggestions, onConversationChange }: {
   context: string;
   placeholder?: string;
   // Parent can fire a one-shot question by setting trigger.text and bumping nonce.
@@ -59,6 +59,9 @@ export default function AskAI({ context, placeholder, trigger, suggestions }: {
   // Optional chip row above the input — each chip fires its question on click.
   // Disappears once the conversation has started so it doesn't compete for space.
   suggestions?: AskAISuggestion[];
+  // Notifies the parent when the conversation is non-empty. Lets the surrounding
+  // chrome (e.g. Clear button) reflect "you have something to lose" state.
+  onConversationChange?: (hasConversation: boolean) => void;
 }) {
   const [q,setQ]=useState("");
   const [msgs,setMsgs]=useState<{role:string;content:string}[]>([]);
@@ -66,6 +69,7 @@ export default function AskAI({ context, placeholder, trigger, suggestions }: {
   const bot=useRef<HTMLDivElement>(null);
 
   useEffect(()=>{ bot.current?.scrollIntoView({behavior:"smooth"}); },[msgs]);
+  useEffect(()=>{ onConversationChange?.(msgs.length > 0); }, [msgs.length, onConversationChange]);
 
   const ask=async(override?:string)=>{
     const u=(override ?? q).trim();

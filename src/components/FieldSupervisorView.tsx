@@ -19,6 +19,9 @@ export default function FieldSupervisorView({ onPersonaSwitch }: { onPersonaSwit
   const [selectedTrade, setSelectedTrade] = useState<string | null>(TROY.inspectionQueue[0]?.trade ?? null);
   const [outcomes, setOutcomes] = useState<Record<string, AuditOutcome>>({});
   const [toast, setToast] = useState<string | null>(null);
+  // Reset key forces AskAI to remount with fresh state on Clear.
+  const [aiResetCounter, setAiResetCounter] = useState(0);
+  const [aiHasConversation, setAiHasConversation] = useState(false);
 
   const selected = TROY.inspectionQueue.find(t => t.trade === selectedTrade) ?? null;
 
@@ -192,11 +195,24 @@ export default function FieldSupervisorView({ onPersonaSwitch }: { onPersonaSwit
             <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse flex-shrink-0" />
             <span className="text-white text-xs font-semibold">CoreTechX AI</span>
             <span className="text-white/60 text-[10px] ml-auto truncate">{selected ? `Focused on ${selected.trade.split(" ")[0]}` : "On round"}</span>
+            <button
+              onClick={() => setAiResetCounter(c => c + 1)}
+              title="Clear conversation"
+              className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
+                aiHasConversation
+                  ? "bg-white/20 hover:bg-white/30 text-white"
+                  : "text-white/50 hover:text-white/80"
+              }`}
+            >
+              ↻ Clear
+            </button>
           </div>
           <div className="bg-white px-3 py-2">
             <AskAI
+              key={`troy-${aiResetCounter}`}
               context={`Troy Macpherson — Field Supervisor, North East NSW. ${TROY.inspectionQueue.length} inspections in today's queue. Currently ${selected ? `viewing ${selected.trade} (priority ${selected.priority}, last inspected ${selected.lastInspected}, ${selected.complaints} complaint${selected.complaints !== 1 ? "s" : ""}). Reason on queue: ${selected.reason}` : "between sites"}. Standing: safety ${TROY.safety.done}/${TROY.safety.target}, quality ${TROY.quality.done}/${TROY.quality.target} — both below threshold. ${myDeferrals.length} items currently deferred to Logan.`}
               placeholder={selected ? `Ask about ${selected.trade.split(" ")[0]}...` : "Ask about today's round..."}
+              onConversationChange={setAiHasConversation}
             />
           </div>
         </div>
