@@ -212,23 +212,24 @@ export const SUPERVISORS = [
 ];
 
 // ─── Staff Performance (Aaron hard requirement: gamified KPI visibility) ──────
-export type KPI = { label: string; current: number; target: number; unit: string; trend: string; lowerIsBetter?: boolean };
+// weight: fraction of overall score this KPI contributes (all weights sum to 1.0 per persona)
+// baseline: for lowerIsBetter KPIs where target=0 — the value at which attainment reaches 0
+export type KPI = { label: string; current: number; target: number; unit: string; trend: string; weight: number; lowerIsBetter?: boolean; baseline?: number };
 export type Badge = { icon: string; label: string; desc: string; earned: boolean };
 export type LeaderboardEntry = { label: string; score: number; isYou?: boolean };
 export type TeamMember = { name: string; role: string; tier: "Platinum"|"Gold"|"Silver"|"Bronze"; score: number; trend: "up"|"down"|"stable"; concern: string };
 export type ImprovementAction = {
-  task: string;        // Imperative action: "Upload 3 evidence packs"
-  detail: string;      // Progress context: "47 of 50 — 3 remaining"
-  kpi: string;         // KPI label this action moves
-  badge: string | null;// Badge it closes or progresses (null if none)
-  pts: number;         // Estimated point impact
-  urgent: boolean;     // Time-sensitive (show "Today" flag)
+  task: string;                 // Imperative action verb: "Log 4 safety inspections"
+  detail: string;               // Progress context with specific numbers
+  kpi: string;                  // Must match a KPI label exactly — used to compute score impact
+  projectedAttainment: number;  // Attainment (0–1) after completing this action
+  badge: string | null;
+  urgent: boolean;
 };
 
 export const STAFF_PERFORMANCE: {
   persona: string; name: string; role: string;
   tier: "Platinum" | "Gold" | "Silver" | "Bronze";
-  score: number;
   rank: number | null; rankTotal: number | null; rankNoun: string | null;
   streak: number;
   weeklyTrend: "up" | "down" | "stable";
@@ -245,11 +246,11 @@ export const STAFF_PERFORMANCE: {
 }[] = [
   {
     persona:"logan", name:"Logan", role:"Ops Manager — Installation Services",
-    tier:"Gold", score:88,
+    tier:"Gold",
     rank:2, rankTotal:6, rankNoun:"installation coordinators",
     streak:3,
     weeklyTrend:"up", trendDetail:"Up from 4th last week",
-    highlight:"Decision resolution is strong. Inspection targets need a push — 14 days left, 26 to go.",
+    highlight:"Decision resolution and evidence review are strong. Inspection targets are the only thing holding this score back — 14 days left to close the gap.",
     weeklyChallenge:"🏗️ Inspection Sprint — log 8 safety inspections before Friday to unlock the Inspector badge.",
     badges:[
       { icon:"⚡", label:"First Responder",   desc:"Cleared every jeopardy job within 30 min of it escalating this week. No jeopardy went unactioned on Logan's watch.",                                           earned:true  },
@@ -264,67 +265,67 @@ export const STAFF_PERFORMANCE: {
       { label:"—", score:85 },
     ],
     kpis:[
-      { label:"Decisions resolved",         current:18, target:20, unit:"this week",  trend:"up" },
-      { label:"Jobs closed on time",         current:94, target:95, unit:"%",          trend:"stable" },
-      { label:"Evidence reviewed",           current:47, target:50, unit:"this week",  trend:"up" },
-      { label:"Trade inspections (Safety)",  current:8,  target:20, unit:"this month", trend:"behind" },
-      { label:"Trade inspections (Quality)", current:6,  target:20, unit:"this month", trend:"behind" },
+      { label:"Jobs closed on time",         current:94, target:95, unit:"%",          trend:"stable", weight:0.35 },
+      { label:"Decisions resolved",          current:18, target:20, unit:"this week",  trend:"up",     weight:0.30 },
+      { label:"Evidence reviewed",           current:47, target:50, unit:"this week",  trend:"up",     weight:0.20 },
+      { label:"Trade inspections (Safety)",  current:8,  target:20, unit:"this month", trend:"behind", weight:0.08 },
+      { label:"Trade inspections (Quality)", current:6,  target:20, unit:"this month", trend:"behind", weight:0.07 },
     ],
-    nextRankGap: "8 pts to reach #1 — inspections and a clean close-out week",
+    nextRankGap: "10% to reach #1 — complete inspection targets and decision queue",
     improvementActions:[
-      { task:"Log 4 safety inspections with field supervisors", detail:"8 of 20 this month — 12 remaining. Friday is the best window before month-end pressure compounds.", kpi:"Trade inspections (Safety)",  badge:"Safety Inspector", pts:4, urgent:true  },
-      { task:"Log 4 quality inspections with field supervisors", detail:"6 of 20 this month — 14 remaining. Both inspection KPIs are below 50% of target with 14 days left.", kpi:"Trade inspections (Quality)", badge:"Safety Inspector", pts:3, urgent:true  },
-      { task:"Resolve the 2 remaining decisions in queue",      detail:"18 of 20 decisions actioned this week — 2 left to lock in the KPI target.",                           kpi:"Decisions resolved",          badge:null,              pts:1, urgent:false },
+      { task:"Resolve the 2 remaining decisions in queue",       detail:"18 of 20 decisions actioned this week — 2 left to lock in the KPI. Highest-weight item you can close today.", kpi:"Decisions resolved",          projectedAttainment:1.0, badge:null,             urgent:true  },
+      { task:"Log 4 safety inspections with field supervisors",  detail:"8 of 20 this month — 12 remaining. Friday is the best window before month-end pressure compounds.",            kpi:"Trade inspections (Safety)",  projectedAttainment:0.60,badge:"Safety Inspector", urgent:true  },
+      { task:"Log 4 quality inspections with field supervisors", detail:"6 of 20 this month — 14 remaining. Both inspection KPIs are below 50% of target with 14 days left.",           kpi:"Trade inspections (Quality)", projectedAttainment:0.50,badge:"Safety Inspector", urgent:true  },
     ],
   },
   {
     persona:"kerrie", name:"Kerrie", role:"Insurance Coordinator",
-    tier:"Silver", score:74,
+    tier:"Silver",
     rank:4, rankTotal:5, rankNoun:"insurance coordinators",
     streak:2,
     weeklyTrend:"stable", trendDetail:"Holding 4th — portal rate dragging the score",
-    highlight:"Portal update rate is slipping. 3 Allianz jobs had updates logged >1h after status change.",
-    weeklyChallenge:"⚡ Portal Blitz — log 5 portal updates within 15 min of status change this week to unlock Portal Pro.",
+    highlight:"Portal on-time rate at 72% — well below the 95% target. Six late updates this week are driving SLA breach risk across Allianz jobs. This is the primary drag on performance.",
+    weeklyChallenge:"⚡ Portal Blitz — log 5 portal updates within 15 min of status change this week to unlock Portal Hawk.",
     badges:[
-      { icon:"📅", label:"SLA Guardian",  desc:"Zero missed SLA deadlines across Allianz, IAG, Suncorp and QBE this week. Every acceptance, makesafe and repair window met.",                               earned:true  },
-      { icon:"🤝", label:"Trade Ready",   desc:"Every active insurance job has a confirmed, compliant trade allocated. No unassigned jobs sitting on the books.",                                            earned:true  },
-      { icon:"⚡", label:"Portal Hawk",   desc:"Log 95%+ of insurer portal updates within 15 min of a status change. Currently at 88% — 3 Allianz jobs this week were updated more than 1 hour late.",     earned:false },
-      { icon:"📜", label:"Cert Machine",  desc:"File 12+ completion certificates in a single week. Currently at 9 — 3 more before Friday would unlock this.",                                               earned:false },
-      { icon:"🏆", label:"Top 3",         desc:"Break into the top 3 of the 5 insurance coordinators. Currently #4 — 8 points off the podium. Closing the portal rate gap would get you there.",          earned:false },
+      { icon:"📅", label:"SLA Guardian",  desc:"Zero missed SLA deadlines across Allianz, IAG, Suncorp and QBE this week. Every acceptance, makesafe and repair window met.",                                        earned:true  },
+      { icon:"🤝", label:"Trade Ready",   desc:"Every active insurance job has a confirmed, compliant trade allocated. No unassigned jobs sitting on the books.",                                                     earned:true  },
+      { icon:"⚡", label:"Portal Hawk",   desc:"Log 95%+ of insurer portal updates within 15 min of a status change. Currently at 72% — 6 updates this week were more than 1 hour late, triggering breach risk.", earned:false },
+      { icon:"📜", label:"Cert Machine",  desc:"File 12+ completion certificates in a single week. Currently at 7 — 5 more before Friday would unlock this.",                                                        earned:false },
+      { icon:"🏆", label:"Top 3",         desc:"Break into the top 3 of the 5 insurance coordinators. Currently #4 — closing the portal rate gap alone would close most of the distance.",                           earned:false },
     ],
     leaderboard:[
-      { label:"—", score:94 },
+      { label:"—", score:89 },
       { label:"—", score:82 },
       { label:"You", score:74, isYou:true },
-      { label:"—", score:68 },
+      { label:"—", score:65 },
     ],
     kpis:[
-      { label:"Work orders scheduled",  current:12, target:15, unit:"this week", trend:"stable" },
-      { label:"Portal updates on time", current:88, target:95, unit:"%",         trend:"down"   },
-      { label:"Completion certs filed", current:9,  target:12, unit:"this week", trend:"stable" },
-      { label:"Scope changes reviewed", current:4,  target:5,  unit:"this week", trend:"stable" },
+      { label:"Portal updates on time", current:72, target:95, unit:"%",         trend:"down",   weight:0.40 },
+      { label:"Work orders scheduled",  current:12, target:15, unit:"this week", trend:"stable", weight:0.25 },
+      { label:"Completion certs filed", current:7,  target:12, unit:"this week", trend:"stable", weight:0.20 },
+      { label:"Scope changes reviewed", current:4,  target:5,  unit:"this week", trend:"stable", weight:0.15 },
     ],
-    nextRankGap: "8 pts to break into top 3 — close the portal rate gap first",
+    nextRankGap: "8% to break into top 3 — close the portal rate gap first",
     improvementActions:[
-      { task:"Log 5 portal updates within 15 min of status change", detail:"On-time rate is 88% — target is 95%. 3 Allianz jobs were updated >1h late this week. Every timely update shifts this number.", kpi:"Portal updates on time", badge:"Portal Hawk",  pts:6, urgent:true  },
-      { task:"File 3 more completion certificates before Friday",   detail:"9 of 12 filed this week — 3 more hits the KPI target and unlocks the Cert Machine badge.",                                     kpi:"Completion certs filed", badge:"Cert Machine", pts:3, urgent:false },
-      { task:"Schedule the 3 remaining work orders",                detail:"12 of 15 scheduled — the last 3 are straightforward Allianz jobs already scoped.",                                              kpi:"Work orders scheduled",  badge:null,          pts:1, urgent:false },
+      { task:"Log 5 portal updates within 15 min of status change", detail:"On-time rate is 72% — target 95%. Getting 5 more timely updates this week moves the rate to ~82%, the single biggest score lever you have.", kpi:"Portal updates on time", projectedAttainment:82/95, badge:"Portal Hawk",  urgent:true  },
+      { task:"File 3 more completion certificates before Friday",   detail:"7 of 12 filed this week — 3 more hits the KPI target and unlocks the Cert Machine badge.",                                                   kpi:"Completion certs filed", projectedAttainment:10/12, badge:"Cert Machine", urgent:false },
+      { task:"Schedule the 3 remaining work orders",                detail:"12 of 15 scheduled — the last 3 are straightforward Allianz jobs already scoped and ready to assign.",                                        kpi:"Work orders scheduled",  projectedAttainment:1.0,   badge:null,          urgent:false },
     ],
   },
   {
     persona:"conner", name:"Conner", role:"Ops Manager — Construction",
-    tier:"Gold", score:88,
+    tier:"Gold",
     rank:2, rankTotal:4, rankNoun:"construction managers",
     streak:4,
     weeklyTrend:"stable", trendDetail:"Solid — holding 2nd for 4 weeks running",
-    highlight:"Safety audits are clean. One more trade confirmation would push you to first this week.",
-    weeklyChallenge:"🎯 Full House — hit all 4 KPI targets this week for your first Perfect Week badge.",
+    highlight:"Safety audits are spotless and the highest-weight KPI (build stages) has room to close. Confirming the last trade and progressing 2 build stages this week would push you into Platinum.",
+    weeklyChallenge:"🎯 Perfect Build — hit all 4 KPI targets this week and clear the build stage gap for your first tier promotion.",
     badges:[
-      { icon:"🏗️", label:"Stage Keeper",  desc:"13 of 15 active AHO build stages on schedule this month. Sites are progressing and milestone payments are being triggered on time.",                         earned:true  },
-      { icon:"🛡️", label:"Audit Clean",   desc:"8 of 8 scheduled safety audits completed this week — zero misses. WHS compliance is spotless across all active construction sites.",                         earned:true  },
-      { icon:"⚡", label:"Site Ready",     desc:"11 of 12 trades confirmed and on-site on time this week. Sub-contractors showing up when they're supposed to, before the window opens.",                     earned:true  },
-      { icon:"🎯", label:"Perfect Build",  desc:"Hit all 4 KPI targets in the same week. Currently at 3 of 4 — one more trade confirmation this week would unlock this for the first time.",                 earned:false },
-      { icon:"🏆", label:"#1 Builder",     desc:"Reach #1 among the 4 construction managers. Currently 5 points behind the leader — a consistent delivery week with all trades confirmed would close the gap.", earned:false },
+      { icon:"🏗️", label:"Stage Keeper",  desc:"12 of 15 active AHO build stages on schedule this month. Sites are progressing and milestone payments are being triggered on time.",                               earned:true  },
+      { icon:"🛡️", label:"Audit Clean",   desc:"8 of 8 scheduled safety audits completed this week — zero misses. WHS compliance is spotless across all active construction sites.",                               earned:true  },
+      { icon:"⚡", label:"Site Ready",     desc:"11 of 12 trades confirmed and on-site on time this week. Sub-contractors showing up when they're supposed to, before the window opens.",                           earned:true  },
+      { icon:"🎯", label:"Perfect Build",  desc:"Hit all 4 KPI targets in the same week. Currently at 2 of 4 — confirm the last trade and close 2 defects this week to unlock this for the first time.",          earned:false },
+      { icon:"🏆", label:"#1 Builder",     desc:"Reach #1 among the 4 construction managers. Currently 5% behind the leader — a Perfect Build week would close the gap and trigger a tier promotion.",             earned:false },
     ],
     leaderboard:[
       { label:"—", score:93 },
@@ -332,32 +333,32 @@ export const STAFF_PERFORMANCE: {
       { label:"—", score:82 },
     ],
     kpis:[
-      { label:"Build stages on schedule", current:13, target:15, unit:"this month", trend:"stable" },
-      { label:"Safety audits completed",  current:8,  target:8,  unit:"this week",  trend:"stable" },
-      { label:"Trades confirmed on-site", current:11, target:12, unit:"this week",  trend:"stable" },
-      { label:"Defects resolved <48h",    current:9,  target:10, unit:"this week",  trend:"up"     },
+      { label:"Build stages on schedule", current:12, target:15, unit:"this month", trend:"stable", weight:0.35 },
+      { label:"Safety audits completed",  current:8,  target:8,  unit:"this week",  trend:"stable", weight:0.30 },
+      { label:"Trades confirmed on-site", current:11, target:12, unit:"this week",  trend:"stable", weight:0.20 },
+      { label:"Defects resolved <48h",    current:8,  target:10, unit:"this week",  trend:"up",     weight:0.15 },
     ],
-    nextRankGap: "5 pts to reach #1 — confirm the last trade and close the open defect",
+    nextRankGap: "5% to reach #1 — confirm the last trade and progress build stages",
     improvementActions:[
-      { task:"Confirm the 1 remaining trade for this week", detail:"11 of 12 confirmed — 1 outstanding. This is the only thing between you and a Perfect Build week.", kpi:"Trades confirmed on-site", badge:"Perfect Build", pts:4, urgent:true  },
-      { task:"Resolve the 1 outstanding defect within 48h", detail:"9 of 10 defects resolved — this one is flagged to a Penrith site. Closing it hits the KPI and completes a Perfect Build week.", kpi:"Defects resolved <48h",    badge:"Perfect Build", pts:3, urgent:false },
-      { task:"Progress 2 AHO build stages to next milestone", detail:"13 of 15 stages on schedule this month — 2 more milestone completions closes the monthly KPI.", kpi:"Build stages on schedule",  badge:null,           pts:2, urgent:false },
+      { task:"Confirm the 1 remaining trade for this week",    detail:"11 of 12 trades confirmed on-site. Closing this is the second-highest weight KPI and the fastest win available today.",                         kpi:"Trades confirmed on-site", projectedAttainment:1.0,   badge:"Perfect Build", urgent:true  },
+      { task:"Resolve 2 outstanding defects within 48h",       detail:"8 of 10 defects resolved — 2 flagged to Penrith sites. Closing both hits the weekly target and contributes to a Perfect Build week.",           kpi:"Defects resolved <48h",    projectedAttainment:1.0,   badge:"Perfect Build", urgent:false },
+      { task:"Progress 2 AHO build stages to next milestone",  detail:"12 of 15 stages on schedule this month — 2 more milestone completions pushes the highest-weight KPI from 80% to 93% of target.",               kpi:"Build stages on schedule",  projectedAttainment:0.933, badge:null,          urgent:false },
     ],
   },
   {
     persona:"blake", name:"Blake", role:"Ops Manager — Facilities Management",
-    tier:"Platinum", score:94,
+    tier:"Platinum",
     rank:1, rankTotal:4, rankNoun:"FM managers",
     streak:5,
     weeklyTrend:"up", trendDetail:"Holding #1 for 5 consecutive weeks",
-    highlight:"Outstanding week — preventive maintenance is spotless. Two weeks from the Unbeatable badge.",
+    highlight:"Outstanding week — preventive maintenance is spotless. Two quick actions complete this week's KPI set and put the Unbeatable badge in reach.",
     weeklyChallenge:"👑 Fortnight Reign — hold #1 again next week to unlock the Unbeatable badge.",
     badges:[
-      { icon:"🔑", label:"FM Leader",     desc:"Reached and held #1 rank among FM managers. Five consecutive weeks at the top — no one else in the group has come close.",                                   earned:true  },
-      { icon:"⚡", label:"First In",      desc:"2.1h average response time — the fastest in the FM manager group. The benchmark every other manager is measured against.",                                    earned:true  },
-      { icon:"✅", label:"Full House",    desc:"23 of 23 preventive maintenance tasks completed on time this week. Nothing slipped, nothing deferred — a perfect maintenance week.",                          earned:true  },
-      { icon:"👑", label:"Unbeatable",    desc:"Hold #1 rank for 6 consecutive weeks without dropping. Currently at 5 weeks — one more strong week and this badge is yours.",                                earned:false },
-      { icon:"🌟", label:"Legend",        desc:"Sustain 95%+ performance across all KPIs for a full calendar month. Currently averaging 94% — this is within reach if response time holds.",                 earned:false },
+      { icon:"🔑", label:"FM Leader",     desc:"Reached and held #1 rank among FM managers. Five consecutive weeks at the top — no one else in the group has come close.",                                     earned:true  },
+      { icon:"⚡", label:"First In",      desc:"2.1h average response time — the fastest in the FM manager group. The benchmark every other manager is measured against.",                                      earned:true  },
+      { icon:"✅", label:"Full House",    desc:"23 of 23 preventive maintenance tasks completed on time this week. Nothing slipped, nothing deferred — a perfect maintenance week.",                            earned:true  },
+      { icon:"👑", label:"Unbeatable",    desc:"Hold #1 rank for 6 consecutive weeks without dropping. Currently at 5 weeks — one more strong week and this badge is yours.",                                  earned:false },
+      { icon:"🌟", label:"Legend",        desc:"Sustain 96%+ performance across all KPIs for a full calendar month. Currently at 94% — closing the reactive and compliance KPIs this week puts this in range.", earned:false },
     ],
     leaderboard:[
       { label:"You", score:94, isYou:true },
@@ -365,91 +366,91 @@ export const STAFF_PERFORMANCE: {
       { label:"—",   score:79 },
     ],
     kpis:[
-      { label:"Preventive maintenance tasks", current:23, target:23, unit:"this week", trend:"stable" },
-      { label:"Reactive jobs resolved",        current:17, target:18, unit:"this week", trend:"stable" },
-      { label:"Subcontractor compliance",      current:31, target:32, unit:"this week", trend:"stable" },
-      { label:"Avg response time",             current:2.1,target:4,  unit:"h",         trend:"stable", lowerIsBetter:true },
+      { label:"Preventive maintenance tasks", current:23, target:23, unit:"this week", trend:"stable", weight:0.35 },
+      { label:"Reactive jobs resolved",        current:17, target:18, unit:"this week", trend:"stable", weight:0.25 },
+      { label:"Subcontractor compliance",      current:31, target:32, unit:"this week", trend:"stable", weight:0.25 },
+      { label:"Avg response time",             current:2.1,target:4,  unit:"h",         trend:"stable", weight:0.15, lowerIsBetter:true },
     ],
     nextRankGap: null,
     improvementActions:[
-      { task:"Resolve the 1 remaining reactive job this week",          detail:"17 of 18 resolved — this last one is a Karuah commercial callout. Closing it locks the reactive KPI.",             kpi:"Reactive jobs resolved",       badge:null,        pts:3, urgent:false },
-      { task:"Log the 1 remaining subcontractor compliance check",      detail:"31 of 32 checks logged — 1 subcontractor pending compliance verification. Quick task, clears the KPI.",            kpi:"Subcontractor compliance",     badge:"Legend",    pts:2, urgent:false },
-      { task:"Hold response time below 2.5h for the rest of the week", detail:"Currently averaging 2.1h — best in the group. Holding this through Friday adds weight to the Unbeatable badge run.", kpi:"Avg response time",           badge:"Unbeatable",pts:2, urgent:false },
+      { task:"Resolve the 1 remaining reactive job this week",          detail:"17 of 18 resolved — a Karuah commercial callout. Closing it locks the reactive KPI and moves the score.",            kpi:"Reactive jobs resolved",   projectedAttainment:1.0,  badge:null,         urgent:false },
+      { task:"Log the 1 remaining subcontractor compliance check",      detail:"31 of 32 checks logged — 1 subcontractor pending verification. Quick task, clears the KPI and helps the Legend run.",kpi:"Subcontractor compliance", projectedAttainment:1.0,  badge:"Legend",     urgent:false },
+      { task:"Hold response time below 2.5h for the rest of the week", detail:"Currently averaging 2.1h — best in the group by far. Maintaining this through Friday supports the Unbeatable badge.", kpi:"Avg response time",        projectedAttainment:0.74, badge:"Unbeatable", urgent:false },
     ],
   },
   {
     persona:"national", name:"National View", role:"Senior Ops — All Regions",
-    tier:"Gold", score:84,
+    tier:"Gold",
     rank:null, rankTotal:null, rankNoun:null,
     streak:1,
-    weeklyTrend:"down", trendDetail:"SLA performance declining — insurance backlog driving misses",
-    highlight:"3 SLA breaches this week, all in insurance. Portal update latency is the primary driver.",
-    weeklyChallenge:"✅ Zero Breach Week — coordinate with insurance team to clear the backlog and achieve zero SLA breaches.",
+    weeklyTrend:"down", trendDetail:"Portal on-time rate dragging team score — insurance backlog driving it",
+    highlight:"Portal on-time rate sits at 70% — well below the 95% target. Three SLA breaches this week are all traceable to late portal updates in the insurance stream. This is the primary drag on the team score.",
+    weeklyChallenge:"✅ Portal Blitz — coordinate with Kerrie to move team portal on-time rate from 70% to 82% and recover the SLA position.",
     badges:[
-      { icon:"🌐", label:"Network",        desc:"All regions actively reporting",              earned:true  },
-      { icon:"📊", label:"Data Rich",      desc:"100% KPI coverage across all teams",         earned:true  },
-      { icon:"✅", label:"Zero Breaches",  desc:"No SLA breaches for a full week",            earned:false },
-      { icon:"🚀", label:"Peak Form",      desc:"95%+ team KPI average for a week",           earned:false },
-      { icon:"🏆", label:"Top Quartile",   desc:"Outperform industry benchmark on all metrics",earned:false },
+      { icon:"🌐", label:"Network",       desc:"All regions actively reporting — full visibility across Starlink, Harvey Norman, Insurance, Construction, and FM.",           earned:true  },
+      { icon:"📊", label:"Data Rich",     desc:"100% KPI coverage across all active teams. Every coordinator's performance is tracked and visible in real time.",            earned:true  },
+      { icon:"✅", label:"SLA Clean",     desc:"Achieve 100% SLA adherence across all regions for a full week. Currently at 97% — close the portal latency gap to get there.", earned:false },
+      { icon:"🚀", label:"Peak Form",     desc:"Team portal on-time rate hits 95%+ for a full week. Currently at 70% — targeted action on the insurance stream gets there.", earned:false },
+      { icon:"🏆", label:"Top Quartile",  desc:"Outperform the industry benchmark on all four team KPIs for a calendar month. The portal rate is the only gap right now.",   earned:false },
     ],
     leaderboard:[
       { label:"Blake (FM)",   score:94 },
       { label:"Conner",       score:88 },
-      { label:"Logan",        score:88 },
+      { label:"Logan",        score:86 },
       { label:"Tom H.",       score:87 },
       { label:"Kerrie",       score:74 },
     ],
     kpis:[
-      { label:"Decisions resolved",  current:87, target:100, unit:"this week", trend:"stable" },
-      { label:"Jobs closed on time", current:91, target:95,  unit:"%",         trend:"down"   },
-      { label:"SLA breaches",        current:3,  target:0,   unit:"this week", trend:"stable", lowerIsBetter:true },
-      { label:"Portal updates late", current:7,  target:0,   unit:"this week", trend:"up",     lowerIsBetter:true },
+      { label:"Team decisions resolved", current:87, target:100, unit:"%",         trend:"stable", weight:0.25 },
+      { label:"Jobs closed on time",     current:91, target:95,  unit:"%",         trend:"down",   weight:0.20 },
+      { label:"SLA adherence",           current:97, target:100, unit:"%",         trend:"stable", weight:0.15 },
+      { label:"Portal on-time rate",     current:70, target:95,  unit:"%",         trend:"down",   weight:0.40 },
     ],
     nextRankGap: null,
     improvementActions:[
-      { task:"Coordinate with Kerrie to clear 5 overdue portal updates", detail:"7 portal updates are late — Allianz is the primary insurer. Each cleared update reduces breach risk and improves team SLA rate.", kpi:"Portal updates late", badge:"Zero Breaches", pts:5, urgent:true  },
-      { task:"Review Logan's inspection schedule for the next 2 weeks",  detail:"Logan needs 12 more safety inspections in 14 days. Blocking focused inspection days now prevents a month-end scramble.",         kpi:"Jobs closed on time", badge:null,           pts:3, urgent:true  },
-      { task:"Clear the 13 remaining decisions in the queue",            detail:"87 of 100 decisions resolved — 13 remaining to hit the weekly team KPI target.",                                                    kpi:"Decisions resolved",  badge:null,           pts:2, urgent:false },
+      { task:"Coordinate with Kerrie to clear 5 overdue portal updates", detail:"Portal on-time rate is 70% — 40% of team score. Moving it to 82% this week is the highest-leverage single action available.", kpi:"Portal on-time rate",     projectedAttainment:0.863, badge:"SLA Clean",  urgent:true  },
+      { task:"Assign the 13 unresolved team decisions to coordinators",  detail:"87 of 100 decisions resolved this week. Routing the remaining 13 to the right skill sets closes the weekly team KPI.",          kpi:"Team decisions resolved", projectedAttainment:0.92,  badge:null,         urgent:true  },
+      { task:"Block an inspection week for Logan — 26 audits in 14 days",detail:"Logan is at 40% of his monthly safety inspection target. A focused 3-day block prevents month-end scramble and SLA risk.",       kpi:"SLA adherence",           projectedAttainment:1.0,   badge:"Peak Form",  urgent:false },
     ],
   },
   {
     persona:"aaron", name:"Aaron", role:"Founder / CEO",
-    tier:"Gold", score:86,
+    tier:"Gold",
     rank:null, rankTotal:null, rankNoun:null,
     streak:2,
-    weeklyTrend:"stable", trendDetail:"Team average holding — insurance KPIs are the key drag",
-    highlight:"The team is performing well overall. Addressing insurance coordinator capacity is the clearest path to lifting the team average to Platinum.",
-    weeklyChallenge:"🏆 Team Platinum Push — coordinate one strong week across all four coordinators to break the 90-point team average.",
+    weeklyTrend:"stable", trendDetail:"Team average holding — portal on-time rate is the key drag",
+    highlight:"Team portal on-time rate sits at 70% — the single biggest drag on the team's performance score. Addressing Kerrie's capacity is the clearest path to lifting the team to Platinum.",
+    weeklyChallenge:"🏆 Team Platinum Push — drive portal on-time rate to 82% and close the decision queue this week to break the Platinum threshold.",
     badges:[
-      { icon:"🌐", label:"Network",       desc:"All coordinators actively reporting",             earned:true  },
-      { icon:"📊", label:"Full Visibility",desc:"100% KPI coverage across all roles",            earned:true  },
-      { icon:"✅", label:"Zero Breaches",  desc:"Team achieves zero SLA breaches for a week",    earned:false },
-      { icon:"🚀", label:"Peak Form",      desc:"All coordinators above 85 in the same week",    earned:false },
-      { icon:"🏆", label:"Dream Team",     desc:"Team average reaches Platinum tier (90+)",      earned:false },
+      { icon:"🌐", label:"Network",        desc:"All coordinators actively reporting — full KPI visibility across all roles and regions.",                                                  earned:true  },
+      { icon:"📊", label:"Full Visibility", desc:"100% KPI coverage across all active coordinators. Every team member's performance is visible in real time.",                             earned:true  },
+      { icon:"✅", label:"SLA Clean",       desc:"Team achieves 100% SLA adherence for a full week. Currently at 97% — the portal latency gap is the only remaining obstacle.",           earned:false },
+      { icon:"🚀", label:"Peak Form",       desc:"All coordinators above 85% performance score in the same week. Currently Blake, Conner, Logan are there — Kerrie needs portal rate up.", earned:false },
+      { icon:"🏆", label:"Dream Team",      desc:"Team average score reaches Platinum tier (90%+). Currently at Gold — closing Kerrie's portal rate is the primary lever.",               earned:false },
     ],
     leaderboard:[],
     kpis:[
-      { label:"Team decisions resolved",  current:87, target:100, unit:"this week", trend:"stable" },
-      { label:"Jobs closed on time",       current:91, target:95,  unit:"%",         trend:"down"   },
-      { label:"SLA breaches",              current:3,  target:0,   unit:"this week", trend:"stable", lowerIsBetter:true },
-      { label:"Portal updates late",       current:7,  target:0,   unit:"this week", trend:"up",     lowerIsBetter:true },
+      { label:"Team decisions resolved", current:87, target:100, unit:"%",         trend:"stable", weight:0.25 },
+      { label:"Jobs closed on time",     current:91, target:95,  unit:"%",         trend:"down",   weight:0.20 },
+      { label:"SLA adherence",           current:97, target:100, unit:"%",         trend:"stable", weight:0.15 },
+      { label:"Portal on-time rate",     current:70, target:95,  unit:"%",         trend:"down",   weight:0.40 },
     ],
     nextRankGap: null,
     improvementActions:[
-      { task:"Redistribute 15 jobs from Kerrie's queue to cut portal latency", detail:"Kerrie carries 80 concurrent jobs — 15% above comfortable capacity. Redistribution would cut late portal updates from 7 to ~2.",         kpi:"Portal updates late",        badge:"Zero Breaches", pts:5, urgent:true  },
-      { task:"Block an inspection week for Logan — 26 audits in 14 days",      detail:"Logan is at 40% of his monthly inspection target. A focused 3-day inspection block would close it without impacting other KPIs.",         kpi:"Jobs closed on time",        badge:"Peak Form",     pts:4, urgent:true  },
-      { task:"Assign the 13 unresolved decisions to the right coordinators",   detail:"87 of 100 team decisions resolved. Routing the remaining 13 to the right skill sets would close the weekly team KPI.",                    kpi:"Team decisions resolved",    badge:"Dream Team",    pts:2, urgent:false },
+      { task:"Redistribute 15 jobs from Kerrie's queue to cut portal latency", detail:"Kerrie carries 80 concurrent jobs — 15% above capacity. Redistribution moves portal on-time rate from 70% to ~82%. Highest-leverage action on the board.", kpi:"Portal on-time rate",     projectedAttainment:0.863, badge:"SLA Clean",  urgent:true  },
+      { task:"Block an inspection week for Logan — 26 audits in 14 days",      detail:"Logan is at 40% of his monthly safety inspection target. A focused 3-day block prevents month-end scramble and protects SLA adherence.",                   kpi:"SLA adherence",           projectedAttainment:1.0,   badge:"Peak Form",  urgent:true  },
+      { task:"Assign the 13 unresolved team decisions to the right people",    detail:"87 of 100 decisions resolved this week. Routing the remaining 13 to the right skill sets closes the weekly team KPI.",                                     kpi:"Team decisions resolved", projectedAttainment:1.0,   badge:"Dream Team", urgent:false },
     ],
     teamMembers:[
       { name:"Blake",  role:"FM Ops Manager",           tier:"Platinum", score:94, trend:"up",     concern:"Holding #1 — on track for Unbeatable badge. No action needed." },
-      { name:"Logan",  role:"Installation Ops Manager", tier:"Gold",     score:88, trend:"up",     concern:"Inspection targets at 40% of monthly goal — 26 inspections needed in 14 days." },
+      { name:"Logan",  role:"Installation Ops Manager", tier:"Gold",     score:86, trend:"up",     concern:"Inspection targets at 40% of monthly goal — 26 inspections needed in 14 days." },
       { name:"Conner", role:"Construction Ops Manager", tier:"Gold",     score:88, trend:"stable", concern:"One trade confirmation gap this week — minor drag, otherwise consistent." },
       { name:"Kerrie", role:"Insurance Coordinator",    tier:"Silver",   score:74, trend:"stable", concern:"Portal update latency is the primary SLA risk — 3 Allianz jobs flagged this week." },
     ],
     improvements:[
-      "Kerrie's portal update rate is the team's biggest drag and the primary SLA risk — consider redistributing 10–15 of her 80 concurrent jobs to reduce latency.",
+      "Kerrie's portal on-time rate (70%) is the team's primary score drag and the main SLA risk — redistributing 10–15 of her 80 concurrent jobs would move the rate to ~82%.",
       "Logan needs 26 safety inspections in 14 days — block a focused inspection week now before month-end pressure compounds.",
-      "The team is 4 points from Platinum average — a coordinated challenge week targeting Kerrie's portal rate and Logan's inspections would likely get there.",
+      "The team is 5% from Platinum average — a coordinated week targeting Kerrie's portal rate and the decision queue would likely get there.",
     ],
   },
 ];

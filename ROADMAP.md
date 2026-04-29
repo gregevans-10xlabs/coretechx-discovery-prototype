@@ -8,20 +8,40 @@ Items planned for future sessions. Ordered by priority within each section.
 
 ### High priority
 
-**1. Commitment anatomy on job detail**
+**1. Replace raw confidence scores on job cards** _(Discovery OS alignment fix)_
+Job cards currently show `conf: 0.85` etc. A recorded Decision (17 Apr 2026, 75% confidence) specifies that the raw score is NOT shown to ops staff — instead, a plain-English LLM explanation of why the job is in the queue. Replace the decimal with a qualitative risk state: On Track / At Risk / Critical / Jeopardy. The raw score can remain accessible in the detailed job panel for developer discussion. Add a "Why is this here?" AI explanation pattern in the job detail.
+_Source: Decisions DB — "Confidence score not surfaced to ops users — LLM explanation instead" (17 Apr 2026). Flagged via Discovery OS alignment analysis._
+
+**2. Add field supervisor persona (Troy)** _(Discovery OS gap)_
+The April 22 Decision formally classifies the field supervisor experience as a role-based view within Mission Control (not a separate product surface). The prototype has no field supervisor persona. Add Troy with a simplified mobile-oriented view: My Round (today's inspection queue), Site Audit (pass/flag/fail), Jeopardy Queue (AI-suggested actions). Overlaps with existing item #4 below — treat this as the Mission Control entry point for that work.
+_Source: Decisions DB — "Field supervisor experience is a Mission Control view, not a separate product surface" (22 Apr 2026). Flagged via Discovery OS alignment analysis._
+
+**3. Add countdown/auto-execute signal to Decision Queue items** _(Discovery OS gap)_
+Decision Queue items should show when the AI will auto-execute if the human doesn't act. Currently the queue has action buttons but no urgency signal — it reads as a to-do list, not an exception surface. Add a deadline tag or countdown: e.g. "AI will act in 47 min" or "Auto-resolves at 3:15pm" for L3/L4 decisions.
+_Source: Session Starter — "Deadline (if no human acts, AI's top pick auto-executes)" as required Decision Queue field. Flagged via Discovery OS alignment analysis._
+
+**4. Demonstrate chat-as-search in the AI assistant** _(Discovery OS gap)_
+A confirmed design decision (April 17) says operators never browse a job list — they ask the AI: "Find me the job at 7 Smith Street, customer's on the phone." The prototype AI assistant is context-injected but doesn't demonstrate this pattern. Add at least one pre-canned interaction showing a job lookup by address or customer name.
+_Source: Session Starter — "Chat as search — confirmed (Aaron, 17 April 2026)". Flagged via Discovery OS alignment analysis._
+
+> ⚠️ **Shadow plans — needs discussion before any prototype changes**
+> The Discovery OS alignment analysis noted shadow plans as a gap. Greg's view: shadow plans are not a "pillar" concept alongside Commitments and the Trade Network — they are an important commitment that a job may carry, not a separate structural layer. The framing in Discovery OS and the Session Starter may overstate their architectural prominence. Before adding any shadow plan UX to the prototype, this should be discussed and the Discovery OS framing reviewed. Do not implement shadow plan prototype changes until there is alignment on what they are in the product model.
+> _Source: Greg Evans, 24 Apr 2026. Flagged via Discovery OS alignment analysis._
+
+**5. Commitment anatomy on job detail**
 Show the formal Commitment spec on each job detail panel: trigger, due date, proof required, breach trigger, escalation path, downstream release, control mode. Currently partially visible via the activity log and flags — needs a dedicated structured block.
 _Source: Aaron's Vision Direction Pack v2, April 2026_
 
-**2. Complexity tier visual distinction**
+**6. Complexity tier visual distinction**
 Jobs should be visually tagged by tier (S / ST / MT / C) throughout the work queue and job detail. Qualification and planning patterns differ per tier. A heat map view across the portfolio would be powerful.
 _Source: Aaron's Vision Direction Pack v2, April 2026_
 
-**3. Chekku trade experience**
+**7. Chekku trade experience**
 Rebuild ChekkuView to match the "one screen, one action, one tap" vision. Daily workflow: My Day → Next Job → On Job → Day Complete. Five-tab nav: Home, Work, Money, Perks/Store, Career.
 _Source: Aaron's Vision Direction Pack v2, April 2026_
 
-**4. Field Supervisor screens**
-Dedicated screens not yet built:
+**8. Field Supervisor screens**
+Dedicated screens not yet built (see also item #2 above for the Mission Control persona entry point):
 - My Round — today's sites, colour-coded by status
 - Site Audit — pass / flag / fail + photo capture
 - Trade Check-in — WHS, variation request, conversation log

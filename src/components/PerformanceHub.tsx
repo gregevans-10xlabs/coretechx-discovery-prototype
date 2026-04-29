@@ -1,15 +1,33 @@
 import { useState } from "react";
-import { STAFF_PERFORMANCE } from "../data/scenarios";
+import { STAFF_PERFORMANCE, type KPI } from "../data/scenarios";
 
-// ─── Performance Hub (gamified KPI panel — all operational personas) ──────────
+// ─── Performance Hub (weighted KPI attainment — all operational personas) ────
+// Score = sum(weight × attainment) × 100. Weights ARE the documented performance
+// criteria for the role — each quarterly review uses exactly these numbers.
 const TIER_META = {
-  Platinum: { icon: "👑", color: "text-purple-700 bg-purple-50 border-purple-300", bar: "bg-purple-500", next: null      },
-  Gold:     { icon: "⭐", color: "text-amber-700 bg-amber-50 border-amber-300",   bar: "bg-amber-400",  next: "Platinum" },
-  Silver:   { icon: "🥈", color: "text-slate-600 bg-slate-100 border-slate-300",  bar: "bg-slate-400",  next: "Gold"     },
-  Bronze:   { icon: "🥉", color: "text-orange-700 bg-orange-50 border-orange-300",bar: "bg-orange-400", next: "Silver"   },
+  Platinum: { icon: "👑", color: "text-purple-700 bg-purple-50 border-purple-300", bar: "bg-purple-500", next: null,       label: "Consistently exceeding expectations" },
+  Gold:     { icon: "⭐", color: "text-amber-700 bg-amber-50 border-amber-300",   bar: "bg-amber-400",  next: "Platinum",  label: "Meeting expectations"               },
+  Silver:   { icon: "🥈", color: "text-slate-600 bg-slate-100 border-slate-300",  bar: "bg-slate-400",  next: "Gold",      label: "Working toward expectations"        },
+  Bronze:   { icon: "🥉", color: "text-orange-700 bg-orange-50 border-orange-300",bar: "bg-orange-400", next: "Silver",    label: "Below expectations"                 },
 };
 
 type Badge = typeof STAFF_PERFORMANCE[0]["badges"][0];
+
+function attainment(k: KPI): number {
+  if (k.lowerIsBetter) {
+    if (k.target === 0) return k.current === 0 ? 1 : 0;
+    return Math.max(0, 1 - k.current / (k.target * 2));
+  }
+  return Math.min(k.current / k.target, 1);
+}
+
+function computeScore(kpis: KPI[]): number {
+  return Math.round(kpis.reduce((sum, k) => sum + k.weight * attainment(k), 0) * 100);
+}
+
+function tierFromScore(s: number): keyof typeof TIER_META {
+  return s >= 90 ? "Platinum" : s >= 80 ? "Gold" : s >= 70 ? "Silver" : "Bronze";
+}
 
 export default function PerformanceHub({ persona }: { persona: string }) {
   const [tab, setTab] = useState<"standing" | "kpis" | "improve">("standing");
@@ -17,15 +35,29 @@ export default function PerformanceHub({ persona }: { persona: string }) {
   const perf = STAFF_PERFORMANCE.find(p => p.persona === persona);
   if (!perf) return null;
 
-  const tm = TIER_META[perf.tier];
-  const nextTier = tm.next;
+  const score   = computeScore(perf.kpis);
+  const tier    = tierFromScore(score);
+  const tm      = TIER_META[tier];
+  const nextTier = tm.next as keyof typeof TIER_META | null;
 
   const tierThreshold: Record<string, number> = { Platinum: 100, Gold: 90, Silver: 80, Bronze: 70 };
-  const prevThreshold  = nextTier ? tierThreshold[perf.tier] ?? 70 : (tierThreshold[perf.tier] ?? 80) - 10;
-  const scoreProgress  = Math.min(Math.round(((perf.score - prevThreshold) / ((tierThreshold[nextTier ?? perf.tier] ?? 100) - prevThreshold)) * 100), 100);
+  const prevThreshold  = nextTier ? tierThreshold[tier] ?? 70 : (tierThreshold[tier] ?? 80) - 10;
+  const scoreProgress  = Math.min(Math.round(((score - prevThreshold) / ((nextTier ? tierThreshold[nextTier] : 100) - prevThreshold)) * 100), 100);
 
   const trendArrow = perf.weeklyTrend === "up" ? "↑" : perf.weeklyTrend === "down" ? "↓" : "→";
   const trendColor = perf.weeklyTrend === "up" ? "text-green-600" : perf.weeklyTrend === "down" ? "text-red-500" : "text-slate-400";
+
+  // Projected score: apply each improvement action's projected attainment for its KPI
+  const projectedScore = Math.round(
+    perf.kpis.reduce((sum, k) => {
+      const action = perf.improvementActions.find(a => a.kpi === k.label);
+      const curr   = attainment(k);
+      const proj   = action ? Math.max(curr, action.projectedAttainment) : curr;
+      return sum + k.weight * proj;
+    }, 0) * 100
+  );
+  const projTier = tierFromScore(projectedScore);
+  const tierUp   = projTier !== tier;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -48,12 +80,15 @@ export default function PerformanceHub({ persona }: { persona: string }) {
           <>
             {/* Tier + score */}
             <div className="flex items-center justify-between">
-              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${tm.color}`}>
-                {tm.icon} {perf.tier}
-              </span>
+              <div>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${tm.color}`}>
+                  {tm.icon} {tier}
+                </span>
+                <p className="text-slate-400 text-[9px] mt-1 ml-0.5">{tm.label}</p>
+              </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-slate-800">{perf.score}</span>
-                <span className="text-slate-400 text-xs ml-1">pts</span>
+                <span className="text-2xl font-black text-slate-800">{score}</span>
+                <span className="text-slate-400 text-xs ml-0.5">%</span>
               </div>
             </div>
 
@@ -61,8 +96,8 @@ export default function PerformanceHub({ persona }: { persona: string }) {
             {nextTier && (
               <div>
                 <div className="flex justify-between text-[10px] mb-1">
-                  <span className="text-slate-400">{perf.tier}</span>
-                  <span className="text-slate-500 font-semibold">{(tierThreshold[nextTier] ?? 100) - perf.score} pts to {nextTier}</span>
+                  <span className="text-slate-400">{tier}</span>
+                  <span className="text-slate-500 font-semibold">{tierThreshold[nextTier] - score}% to {nextTier}</span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2">
                   <div className={`h-2 rounded-full transition-all ${tm.bar}`} style={{ width: `${scoreProgress}%` }} />
@@ -119,10 +154,12 @@ export default function PerformanceHub({ persona }: { persona: string }) {
                         </span>
                         {e.isYou
                           ? <span className="text-[#0077a8]">You</span>
-                          : <span className="text-slate-400 text-[10px] italic">anonymous</span>
+                          : <span className="text-slate-400 text-[10px]">{e.label ?? "—"}</span>
                         }
                       </div>
-                      <span className={`font-bold tabular-nums ${e.isYou ? "text-[#0077a8]" : "text-slate-400"}`}>{e.score}</span>
+                      <span className={`font-bold tabular-nums ${e.isYou ? "text-[#0077a8]" : "text-slate-400"}`}>
+                        {e.isYou ? score : e.score}%
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -146,7 +183,6 @@ export default function PerformanceHub({ persona }: { persona: string }) {
                   </div>
                 ))}
               </div>
-              {/* Hover detail panel — replaces plain browser tooltip */}
               {hoveredBadge ? (
                 <div className="mt-2 bg-slate-800 rounded-xl px-3 py-2.5 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
@@ -155,9 +191,7 @@ export default function PerformanceHub({ persona }: { persona: string }) {
                       <span className="text-white text-xs font-semibold">{hoveredBadge.label}</span>
                     </div>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                      hoveredBadge.earned
-                        ? "bg-green-500/20 text-green-400"
-                        : "bg-amber-500/20 text-amber-400"
+                      hoveredBadge.earned ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
                     }`}>
                       {hoveredBadge.earned ? "✓ Earned" : "Not yet"}
                     </span>
@@ -177,16 +211,12 @@ export default function PerformanceHub({ persona }: { persona: string }) {
             <p className="text-slate-500 text-[10px] leading-snug">{perf.highlight}</p>
             <div className="space-y-3">
               {perf.kpis.map(k => {
-                const lower = k.lowerIsBetter ?? false;
-                const pct = lower
-                  ? k.target === 0
-                    ? k.current === 0 ? 100 : 0
-                    : Math.max(0, Math.round((1 - k.current / (k.target * 2 || 1)) * 100))
-                  : Math.min(Math.round((k.current / k.target) * 100), 100);
-                const onTarget  = lower ? k.current <= k.target : k.current >= k.target;
-                const barColor  = onTarget ? "bg-green-400" : k.trend === "behind" || k.trend === "down" ? "bg-red-400" : "bg-amber-400";
-                const textColor = onTarget ? "text-green-600" : k.trend === "behind" || k.trend === "down" ? "text-red-600" : "text-amber-600";
-                const isPercent = k.unit === "%" || k.unit === "h";
+                const att      = attainment(k);
+                const pct      = Math.round(att * 100);
+                const onTarget = k.lowerIsBetter ? k.current <= k.target : k.current >= k.target;
+                const barColor = onTarget ? "bg-green-400" : k.trend === "behind" || k.trend === "down" ? "bg-red-400" : "bg-amber-400";
+                const textColor= onTarget ? "text-green-600" : k.trend === "behind" || k.trend === "down" ? "text-red-600" : "text-amber-600";
+                const isPercent= k.unit === "%" || k.unit === "h";
                 return (
                   <div key={k.label}>
                     <div className="flex items-start justify-between gap-1 mb-1">
@@ -199,81 +229,87 @@ export default function PerformanceHub({ persona }: { persona: string }) {
                     <div className="w-full bg-slate-100 rounded-full h-1.5">
                       <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
                     </div>
-                    <p className="text-slate-400 text-[10px] mt-0.5">
-                      {!isPercent ? k.unit + " " : ""}
-                      {onTarget ? "✓ On target" : `${lower ? "reduce to" : "target"} ${k.target}${isPercent ? k.unit : ""}`}
-                    </p>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className="text-slate-400 text-[10px]">
+                        {!isPercent ? k.unit + " " : ""}
+                        {onTarget ? "✓ On target" : `${k.lowerIsBetter ? "reduce to" : "target"} ${k.target}${isPercent ? k.unit : ""}`}
+                      </p>
+                      <p className="text-slate-300 text-[9px]">{Math.round(k.weight * 100)}% of score</p>
+                    </div>
                   </div>
                 );
               })}
             </div>
+            <p className="text-slate-400 text-[9px] leading-snug pt-1 border-t border-slate-100">
+              Weights reflect your documented performance criteria — the same values your manager uses in quarterly and annual reviews.
+            </p>
           </>
         )}
 
         {/* ── IMPROVE tab ── */}
         {tab === "improve" && (
           <>
-            {/* Weekly challenge — headline goal */}
+            {/* Weekly challenge */}
             <div className="bg-gradient-to-br from-[#e0f7ff] to-white border border-[#00BDFE]/30 rounded-xl px-3 py-2.5">
-              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1">This week's challenge</p>
+              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1">This week's focus</p>
               <p className="text-slate-800 text-sm font-bold leading-snug">{perf.weeklyChallenge}</p>
             </div>
 
             {/* Action plan */}
             <div>
-              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Today's action plan</p>
+              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Actions your manager would direct</p>
               <div className="space-y-2">
-                {perf.improvementActions.map((action, i) => (
-                  <div key={i} className={`rounded-xl border p-2.5 ${action.urgent ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <p className="text-slate-800 text-xs font-semibold leading-snug flex-1">{action.task}</p>
-                      <span className="text-[#0077a8] text-[10px] font-bold flex-shrink-0 bg-[#e0f7ff] px-1.5 py-0.5 rounded-full whitespace-nowrap">+{action.pts} pts</span>
+                {perf.improvementActions.map((action, i) => {
+                  const kpiData  = perf.kpis.find(k => k.label === action.kpi);
+                  const currAtt  = kpiData ? attainment(kpiData) : 0;
+                  const delta    = kpiData ? Math.round((Math.max(currAtt, action.projectedAttainment) - currAtt) * kpiData.weight * 100) : 0;
+                  return (
+                    <div key={i} className={`rounded-xl border p-2.5 ${action.urgent ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <p className="text-slate-800 text-xs font-semibold leading-snug flex-1">{action.task}</p>
+                        {delta > 0 && (
+                          <span className="text-[#0077a8] text-[10px] font-bold flex-shrink-0 bg-[#e0f7ff] px-1.5 py-0.5 rounded-full whitespace-nowrap">+{delta}%</span>
+                        )}
+                      </div>
+                      <p className="text-slate-500 text-[10px] leading-snug mb-1.5">{action.detail}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-slate-400 italic truncate">{action.kpi}</span>
+                        {action.badge && (
+                          <>
+                            <span className="text-slate-200 flex-shrink-0">·</span>
+                            <span className="text-[10px] text-amber-600 font-semibold flex-shrink-0">→ {action.badge}</span>
+                          </>
+                        )}
+                        {action.urgent && (
+                          <span className="text-[10px] text-amber-600 font-bold ml-auto flex-shrink-0">⏰ Today</span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-slate-500 text-[10px] leading-snug mb-1.5">{action.detail}</p>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] text-slate-400 italic truncate">{action.kpi}</span>
-                      {action.badge && (
-                        <>
-                          <span className="text-slate-200 flex-shrink-0">·</span>
-                          <span className="text-[10px] text-amber-600 font-semibold flex-shrink-0">→ {action.badge}</span>
-                        </>
-                      )}
-                      {action.urgent && (
-                        <span className="text-[10px] text-amber-600 font-bold ml-auto flex-shrink-0">⏰ Today</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
             {/* Score projection */}
-            {(() => {
-              const totalPts = perf.improvementActions.reduce((sum, a) => sum + a.pts, 0);
-              const projected = perf.score + totalPts;
-              const projTier  = projected >= 100 ? "Platinum" : projected >= 90 ? "Gold" : projected >= 80 ? "Silver" : "Bronze";
-              const tierUp    = projTier !== perf.tier;
-              return (
-                <div className={`rounded-xl border px-3 py-2.5 ${tierUp ? "bg-amber-50 border-amber-300" : "bg-slate-50 border-slate-200"}`}>
-                  <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-2">If you complete all of the above</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 text-sm tabular-nums">{perf.score}</span>
-                    <span className="text-slate-300 text-xs">→</span>
-                    <span className={`text-2xl font-black tabular-nums ${tierUp ? "text-amber-600" : "text-slate-800"}`}>{projected}</span>
-                    <span className="text-slate-400 text-xs">pts</span>
-                    {tierUp && (
-                      <span className="ml-auto text-xs font-bold text-amber-600 flex-shrink-0">{TIER_META[projTier as keyof typeof TIER_META].icon} {projTier}!</span>
-                    )}
-                  </div>
-                  <p className="text-slate-400 text-[10px] mt-1">
-                    {tierUp
-                      ? `+${totalPts} pts earned — tier promotion unlocked`
-                      : `+${totalPts} pts earned this week`
-                    }
-                  </p>
-                </div>
-              );
-            })()}
+            <div className={`rounded-xl border px-3 py-2.5 ${tierUp ? "bg-amber-50 border-amber-300" : "bg-slate-50 border-slate-200"}`}>
+              <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-2">If you complete all of the above</p>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 text-sm tabular-nums">{score}%</span>
+                <span className="text-slate-300 text-xs">→</span>
+                <span className={`text-2xl font-black tabular-nums ${tierUp ? "text-amber-600" : "text-slate-800"}`}>{projectedScore}%</span>
+                {tierUp && (
+                  <span className="ml-auto text-xs font-bold text-amber-600 flex-shrink-0">
+                    {TIER_META[projTier].icon} {projTier}!
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-400 text-[10px] mt-1">
+                {tierUp
+                  ? `+${projectedScore - score}% — tier promotion unlocked`
+                  : `+${projectedScore - score}% performance improvement`
+                }
+              </p>
+            </div>
           </>
         )}
 
