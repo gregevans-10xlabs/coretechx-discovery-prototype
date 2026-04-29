@@ -22,6 +22,17 @@ function kpiScore(kpi: KPI): number {
   return kpi.current / kpi.target;
 }
 
+// Weighted attainment per Mission Control product definition:
+// score = sum(weight × attainment) × 100. Mirrors PerformanceHub.computeScore.
+function attainment(k: KPI): number {
+  return k.lowerIsBetter
+    ? Math.max(0, 1 - k.current / (k.target * 2))
+    : Math.min(k.current / k.target, 1.0);
+}
+function teamScore(kpis: KPI[]): number {
+  return Math.round(kpis.reduce((sum, k) => sum + k.weight * attainment(k), 0) * 100);
+}
+
 function barColor(s: number)  { return s >= 1.0 ? "bg-green-400" : s >= 0.92 ? "bg-[#00BDFE]" : s >= 0.8 ? "bg-amber-400" : "bg-red-400"; }
 function textColor(s: number) { return s >= 1.0 ? "text-green-600" : s >= 0.92 ? "text-[#0099d4]" : s >= 0.8 ? "text-amber-600" : "text-red-500"; }
 
@@ -179,7 +190,7 @@ export default function StaffPerformance({ persona }: { persona: string }) {
         ) : (
           <div className="flex items-center gap-3">
             <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-center shrink-0">
-              <p className="text-slate-800 font-bold text-2xl leading-none">{data.score}</p>
+              <p className="text-slate-800 font-bold text-2xl leading-none">{teamScore(data.kpis)}</p>
               <p className="text-slate-400 text-[10px] mt-0.5">team avg</p>
             </div>
             <div>
