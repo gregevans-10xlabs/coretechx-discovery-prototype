@@ -4,6 +4,7 @@ import AskAI from "./components/AskAI";
 import CockpitView from "./components/CockpitView";
 import PortfolioView from "./components/PortfolioView";
 import FieldView from "./components/FieldView";
+import FieldSupervisorView from "./components/FieldSupervisorView";
 
 // ─── Workflow Config View ─────────────────────────────────────────────────────
 function WorkflowConfig({ canConfig, onBack }: { canConfig: boolean; onBack: () => void }) {
@@ -215,6 +216,7 @@ export default function App() {
 
   const isPortfolio = persona === "aaron" || persona === "national";
   const isField     = persona === "conner" || persona === "blake";
+  const isTroy      = persona === "troy";
 
   const P = PERSONAS.find(p=>p.id===persona)!;
   const decisions = ALL_DECISIONS.filter(d=>{
@@ -284,6 +286,15 @@ export default function App() {
     </div></div>
   );
 
+  // ── Field Supervisor view — Troy ──────────────────────────────────────────
+  if (isTroy) return (
+    <div className={bg}><div className={maxW + " space-y-5"}>
+      {sharedHeader}
+      <FieldSupervisorView onPersonaSwitch={setPersona} />
+      <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
+    </div></div>
+  );
+
   // ── Decisions view ─────────────────────────────────────────────────────────
   if (view==="decisions") return (
     <div className={bg}><div className={maxW + " space-y-5"}>
@@ -326,11 +337,11 @@ export default function App() {
     </div></div>
   );
 
-  // ── Cockpit view — Logan and Kerrie (default; aaron/national/conner/blake handled above) ─
+  // ── Cockpit view — Logan and Kerrie (default; aaron/national/conner/blake/troy handled above) ─
   return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <CockpitView persona={persona}/>
+      <CockpitView persona={persona} onPersonaSwitch={setPersona}/>
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );

@@ -65,6 +65,7 @@ export const PRIME_STATUSES = [
 export const PERSONAS = [
   { id:"logan",    label:"Logan",    title:"Ops Manager — Installation Services", region:"North East (NSW/QLD)", types:["starlink","hn","jbhifi"],                                      canConfig:false },
   { id:"kerrie",   label:"Kerrie",   title:"Insurance Coordinator",                region:"National",             types:["insurance"],                                                   canConfig:false },
+  { id:"troy",     label:"Troy",     title:"Field Supervisor",                     region:"North East NSW",       types:[],                                                              canConfig:false },
   { id:"conner",   label:"Conner",   title:"Ops Manager — Construction",           region:"National",             types:["construction"],                                                canConfig:false },
   { id:"blake",    label:"Blake",    title:"Ops Manager — FM",                     region:"National",             types:["fm"],                                                          canConfig:false },
   { id:"national", label:"National", title:"Senior Operations — All Regions",      region:"All Regions",          types:["starlink","hn","jbhifi","insurance","construction","fm"],      canConfig:false },
@@ -170,6 +171,16 @@ export const ALL_PATTERNS = [
     detail:"Average confidence on Allianz NSW jobs dropped from 0.81 to 0.71 over 10 days. Primary signal: 90% Chekku no-match rate forcing manual procurement on every job. Carpenter and plasterer availability in Newcastle-Hunter corridor is the binding constraint.",
     type:"Capacity", affected:"41 Commitments", action:"Review trade compliance remediation queue",
   },
+];
+
+// ─── Field-team deferrals ────────────────────────────────────────────────────
+// Shared between Logan's "Deferred by team" exception strip (CockpitView, col 3)
+// and Troy's "My deferrals to Logan" list (FieldSupervisorView). Single source
+// of truth makes the cross-persona connection visible by design.
+export const FIELD_DEFERRALS = [
+  { task:"Site audit — Penrith Install",        who:"Troy Macpherson", whoId:"troy",  role:"Field Supervisor", time:"07:42", jobId:"CG-2417931", urgent:true,  reason:"WHS observation flagged — needs Logan sign-off before re-attendance." },
+  { task:"Photo evidence upload — Minto",       who:"MJ Electrical",   whoId:null,    role:"Trade",            time:"08:15", jobId:"CG-2418042", urgent:false, reason:"Trade portal sync error. Coordinator manual upload required." },
+  { task:"Customer call-back — Coffs Harbour",  who:"Kylie Tran",      whoId:"kylie", role:"Field Supervisor", time:"09:03", jobId:"CG-2418109", urgent:false, reason:"Customer requested manager-level discussion on rescheduling." },
 ];
 
 // ─── Supervisor data ──────────────────────────────────────────────────────────

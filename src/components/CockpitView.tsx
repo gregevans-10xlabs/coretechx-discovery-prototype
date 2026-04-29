@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { loganQueueJobs, kerrieQueueJobs, STARLINK_JOURNEY, HN_JOURNEY, INSURANCE_JOURNEY } from "../data/jobs";
 import type { Job } from "../data/jobs";
-import { ALL_PATTERNS, riskState, riskBadgeClass } from "../data/scenarios";
+import { ALL_PATTERNS, FIELD_DEFERRALS, SUPERVISORS, riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 
@@ -356,51 +356,22 @@ function isHardLimit(job: Job): boolean {
 }
 
 // ─── KPI Panel — Logan ────────────────────────────────────────────────────────
-function LoganKPIs({ jobs, onInspect }: { jobs: Job[]; onInspect: (supervisor: string) => void }) {
+function LoganKPIs({ jobs, onInspect, onPersonaSwitch }: { jobs: Job[]; onInspect: (supervisor: string) => void; onPersonaSwitch?: (id: string) => void }) {
   const urgentCount = jobs.filter(j => j.geoStatus === "no_checkin" || j.priority === "urgent").length;
   const jeopardyCount = jobs.filter(j => j.priority === "jeopardy").length;
   const onTrackCount = jobs.filter(j => j.geoStatus === "confirmed_en_route" || j.geoStatus === "gps_active").length;
   const [deferralsOpen, setDeferralsOpen] = useState(true);
 
-  // Illustrative deferrals — tasks reprioritised by field team without manager sign-off
-  const deferrals = [
-    {
-      task: "Site audit — Penrith Install",
-      who: "Troy Macpherson", role: "Field Supervisor",
-      time: "07:42", jobId: "CG-2417931", urgent: true,
-    },
-    {
-      task: "Photo evidence upload — Minto",
-      who: "MJ Electrical", role: "Trade",
-      time: "08:15", jobId: "CG-2418042", urgent: false,
-    },
-    {
-      task: "Customer call-back — Coffs Harbour",
-      who: "Kylie Tran", role: "Field Supervisor",
-      time: "09:03", jobId: "CG-2418109", urgent: false,
-    },
-  ];
-
-  const fieldSupervisors = [
-    {
-      name: "Troy Macpherson",
-      region: "North East NSW",
-      safety: 8, safetyTarget: 20,
-      quality: 6, qualityTarget: 20,
-      alert: true,
-      alertMsg: "Both scores below threshold — 3 jobs flagged",
-      id: "troy",
-    },
-    {
-      name: "Kylie Tran",
-      region: "QLD + Northern Rivers",
-      safety: 14, safetyTarget: 20,
-      quality: 11, qualityTarget: 20,
-      alert: false,
-      alertMsg: "",
-      id: "kylie",
-    },
-  ];
+  const deferrals = FIELD_DEFERRALS;
+  const fieldSupervisors = SUPERVISORS.map(s => ({
+    id: s.id,
+    name: s.name,
+    region: s.region,
+    safety: s.safety.done, safetyTarget: s.safety.target,
+    quality: s.quality.done, qualityTarget: s.quality.target,
+    alert: s.safety.done < s.safety.target * 0.5 && s.quality.done < s.quality.target * 0.5,
+    alertMsg: s.avoidanceFlag ? "Both scores below threshold — 3 jobs flagged" : "",
+  }));
 
   return (
     <div className="space-y-3">
@@ -512,12 +483,23 @@ function LoganKPIs({ jobs, onInspect }: { jobs: Job[]; onInspect: (supervisor: s
                   </p>
                   <p className="text-slate-400 text-[10px]">{fs.region}</p>
                 </div>
-                <button
-                  onClick={() => onInspect(fs.id)}
-                  className="text-[10px] text-[#0077a8] border border-[#00BDFE]/40 bg-[#e0f7ff] px-2 py-0.5 rounded-md hover:bg-[#00BDFE] hover:text-white transition-colors font-medium flex-shrink-0 ml-1"
-                >
-                  Inspect ▾
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0 ml-1">
+                  {onPersonaSwitch && (
+                    <button
+                      onClick={() => onPersonaSwitch(fs.id)}
+                      className="text-[10px] text-[#0077a8] hover:text-[#00BDFE] hover:underline font-medium"
+                      title={`Switch to ${fs.name.split(" ")[0]}'s view`}
+                    >
+                      View as →
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onInspect(fs.id)}
+                    className="text-[10px] text-[#0077a8] border border-[#00BDFE]/40 bg-[#e0f7ff] px-2 py-0.5 rounded-md hover:bg-[#00BDFE] hover:text-white transition-colors font-medium"
+                  >
+                    Inspect ▾
+                  </button>
+                </div>
               </div>
               {fs.alert && (
                 <p className="text-red-600 text-[10px] mb-1.5 leading-snug">{fs.alertMsg}</p>
@@ -868,7 +850,7 @@ function CockpitPatternDetail({ pattern: p, onClose }: { pattern: LoganPattern; 
 }
 
 // ─── Main CockpitView ─────────────────────────────────────────────────────────
-export default function CockpitView({ persona }: { persona: string }) {
+export default function CockpitView({ persona, onPersonaSwitch }: { persona: string; onPersonaSwitch?: (id: string) => void }) {
   const isKerrie = persona === "kerrie";
 
   const loganQueue  = sortDecisionFirst(loganQueueJobs());
@@ -1122,7 +1104,7 @@ export default function CockpitView({ persona }: { persona: string }) {
         <div className="flex-1 overflow-y-auto p-3">
           {isKerrie
             ? <KerrieKPIs jobs={kerrieQueue} />
-            : <LoganKPIs jobs={loganQueue} onInspect={(id) => setSelectedId(`INSPECT:${id}`)} />
+            : <LoganKPIs jobs={loganQueue} onInspect={(id) => setSelectedId(`INSPECT:${id}`)} onPersonaSwitch={onPersonaSwitch} />
           }
         </div>
       </div>
