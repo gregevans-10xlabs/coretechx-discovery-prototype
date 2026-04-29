@@ -1,11 +1,8 @@
 import { useState } from "react";
 import { JOBS, type Job, STARLINK_JOURNEY, HN_JOURNEY, INSURANCE_JOURNEY, AHO_JOURNEY } from "../data/jobs";
+import { riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-// helpers used in sub-components
-function _cc(_v: number) { return ""; } void _cc;
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -23,11 +20,13 @@ function sortDecisionFirst(jobs: Job[]): Job[] {
   };
   return [...jobs].sort((a, b) => score(a) - score(b));
 }
-function confBadge(v: number) {
-  const base = "text-xs font-mono font-bold px-2 py-0.5 rounded-full border";
-  if (v >= 0.75) return `${base} bg-green-50 text-green-700 border-green-200`;
-  if (v >= 0.5)  return `${base} bg-amber-50 text-amber-700 border-amber-200`;
-  return `${base} bg-red-50 text-red-600 border-red-200`;
+function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) {
+  const text = size === "sm" ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5";
+  return (
+    <span className={`inline-flex items-center font-semibold border rounded-full ${text} ${riskBadgeClass(conf)}`}>
+      {riskState(conf)}
+    </span>
+  );
 }
 
 function getJourney(job: Job) {
@@ -38,7 +37,7 @@ function getJourney(job: Job) {
 }
 
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
-function JobDetailPanel({ job, onClose }: { job: Job; onClose: () => void }) {
+function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => void; onAskWhy: () => void }) {
   const journey = getJourney(job);
   const [actionDone, setActionDone] = useState<string | null>(null);
 
@@ -67,7 +66,15 @@ function JobDetailPanel({ job, onClose }: { job: Job; onClose: () => void }) {
 
         <div className="flex items-center justify-between mt-3">
           <h2 className="text-slate-800 font-bold text-base leading-tight">{job.trade}</h2>
-          <span className={confBadge(job.conf)}>{job.conf.toFixed(1)}</span>
+          <div className="text-right flex-shrink-0">
+            <RiskBadge conf={job.conf} />
+            <button
+              onClick={onAskWhy}
+              className="text-[10px] mt-1 text-[#00BDFE] hover:text-[#0099d4] hover:underline font-medium block ml-auto"
+            >
+              Why is this here?
+            </button>
+          </div>
         </div>
         <p className="text-slate-500 text-xs mt-0.5">{job.suburb} · {job.window}</p>
       </div>
@@ -227,6 +234,8 @@ export default function FieldView({ persona }: { persona: string }) {
 
   const [filterTab, setFilterTab] = useState<"action" | "browse" | "complete">("action");
   const [selectedId, setSelectedId] = useState<string | null>(decisionJobs[0]?.id ?? null);
+  // Prefill question fired into the AI bar by the "Why is this here?" button.
+  const [aiTrigger, setAiTrigger] = useState<{ text: string; nonce: number } | undefined>(undefined);
 
   const selectedJob = selectedId ? allJobs.find(j => j.id === selectedId) ?? null : null;
 
@@ -300,7 +309,7 @@ export default function FieldView({ persona }: { persona: string }) {
                     }`}>
                     <div className="flex items-start justify-between gap-1 mb-1">
                       <p className="text-slate-800 text-xs font-semibold leading-tight truncate">{job.trade}</p>
-                      <span className={confBadge(job.conf)}>{job.conf.toFixed(1)}</span>
+                      <RiskBadge conf={job.conf} size="sm" />
                     </div>
                     <p className="text-slate-500 text-[10px] truncate">{job.suburb} · {job.window}</p>
                     <div className="flex items-center gap-1 mt-1.5">
@@ -349,7 +358,14 @@ export default function FieldView({ persona }: { persona: string }) {
                 )}
               </div>
             ) : (
-              <JobDetailPanel job={selectedJob} onClose={() => setSelectedId(null)} />
+              <JobDetailPanel
+                job={selectedJob}
+                onClose={() => setSelectedId(null)}
+                onAskWhy={() => setAiTrigger({
+                  text: `Why is job ${selectedJob.id} in my queue right now? Explain in plain English what happened, what risk it carries, and what I'd typically need to decide.`,
+                  nonce: Date.now(),
+                })}
+              />
             )}
           </div>
 
@@ -364,6 +380,7 @@ export default function FieldView({ persona }: { persona: string }) {
               <AskAI
                 context={aiContext}
                 placeholder={selectedJob ? `Ask about ${selectedJob.id}...` : "Ask about your queue..."}
+                trigger={aiTrigger}
               />
             </div>
           </div>

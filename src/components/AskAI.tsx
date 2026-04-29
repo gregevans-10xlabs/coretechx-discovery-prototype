@@ -49,7 +49,12 @@ function FormatAI({ text }: { text: string }) {
 }
 
 // ─── AskAI chat widget ────────────────────────────────────────────────────────
-export default function AskAI({ context, placeholder }: { context: string; placeholder?: string }) {
+export default function AskAI({ context, placeholder, trigger }: {
+  context: string;
+  placeholder?: string;
+  // Parent can fire a one-shot question by setting trigger.text and bumping nonce.
+  trigger?: { text: string; nonce: number };
+}) {
   const [q,setQ]=useState("");
   const [msgs,setMsgs]=useState<{role:string;content:string}[]>([]);
   const [loading,setLoading]=useState(false);
@@ -57,9 +62,11 @@ export default function AskAI({ context, placeholder }: { context: string; place
 
   useEffect(()=>{ bot.current?.scrollIntoView({behavior:"smooth"}); },[msgs]);
 
-  const ask=async()=>{
-    if(!q.trim()||loading)return;
-    const u=q.trim(); setQ(""); setMsgs(m=>[...m,{role:"user",content:u}]); setLoading(true);
+  const ask=async(override?:string)=>{
+    const u=(override ?? q).trim();
+    if(!u||loading)return;
+    if(!override) setQ("");
+    setMsgs(m=>[...m,{role:"user",content:u}]); setLoading(true);
     const sys=`You are the CoreTechX AI operations assistant for Circl (Australia). ~5,000 active Commitments, ~20,000/month. The platform uses Commitment confidence scores (0-1), pre-computed shadow plans, and a 4-level autonomy ladder. Agents earn autonomy through measured accuracy. Hard limits (financial >$1k, WHS, legal, enterprise client comms, police/fire) are permanently Level 1. Workflow configuration allows authorised users to adjust autonomy levels per step per job type, with audit logging. All changes require a reason and are immutable once logged.\nContext: ${context}\nAnswer directly, under 150 words.`;
     try {
       const res = await fetch("/api/anthropic", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,system:sys,messages:[...msgs.map(m=>({role:m.role,content:m.content})),{role:"user",content:u}]})});
@@ -68,6 +75,12 @@ export default function AskAI({ context, placeholder }: { context: string; place
     } catch { setMsgs(m=>[...m,{role:"assistant",content:"Unable to reach AI."}]); }
     setLoading(false);
   };
+
+  // Fire a prefilled question whenever the parent bumps trigger.nonce.
+  useEffect(()=>{
+    if(trigger?.text) void ask(trigger.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[trigger?.nonce]);
 
   return (
     <div>
@@ -91,7 +104,7 @@ export default function AskAI({ context, placeholder }: { context: string; place
           onKeyDown={e=>e.key==="Enter"&&ask()}
         />
         <button
-          onClick={ask}
+          onClick={()=>ask()}
           disabled={loading||!q.trim()}
           className="bg-[#00BDFE] hover:bg-[#0099d4] disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >

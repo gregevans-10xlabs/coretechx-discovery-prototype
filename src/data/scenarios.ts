@@ -10,10 +10,25 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Confidence helpers ───────────────────────────────────────────────────────
+// Per Discovery OS decision (17 Apr 2026): raw confidence scores are not shown to
+// ops staff in operator-facing surfaces. Use riskState/riskBadgeClass for cards
+// and detail headers. The cc/cb/cl/cbg helpers below remain for executive
+// aggregates (avg confidence across many jobs) and dev tooling.
 export const cc  = (s: number) => s>=0.95?"text-green-400":s>=0.80?"text-blue-400":s>=0.60?"text-yellow-400":s>=0.40?"text-orange-400":"text-red-400";
 export const cb  = (s: number) => s>=0.80?"bg-green-400":s>=0.60?"bg-yellow-400":s>=0.40?"bg-orange-400":"bg-red-400";
 export const cl  = (s: number) => s>=0.95?"On track":s>=0.80?"Likely":s>=0.60?"At risk":s>=0.40?"High risk":"Critical";
 export const cbg = (s: number) => s>=0.80?"bg-blue-950/60 border-blue-800":s>=0.60?"bg-yellow-950/40 border-yellow-800":s>=0.40?"bg-orange-950/40 border-orange-800":"bg-red-950/60 border-red-800";
+
+// ─── Risk state (operator-facing) ─────────────────────────────────────────────
+// Qualitative replacement for the raw confidence score on every operator surface.
+export const riskState = (s: number) =>
+  s>=0.80 ? "On Track" : s>=0.60 ? "At Risk" : s>=0.40 ? "Critical" : "Jeopardy";
+
+export const riskBadgeClass = (s: number) =>
+  s>=0.80 ? "text-green-700 bg-green-50 border-green-200"
+: s>=0.60 ? "text-amber-700 bg-amber-50 border-amber-200"
+: s>=0.40 ? "text-orange-700 bg-orange-50 border-orange-200"
+:           "text-red-700 bg-red-50 border-red-200";
 export const fmt = (n: number) => n.toLocaleString();
 export const geoLabel = (geo: string, mins: number) => {
   if (geo==="confirmed")  return { label:`Confirmed en route`,                                   dot:"bg-green-400",               text:"text-green-400"  };

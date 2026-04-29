@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
-import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES } from "../data/scenarios";
+import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -53,8 +53,20 @@ type FocusState =
   | null;
 
 // ─── Confidence helpers ───────────────────────────────────────────────────────
+// cc/cb retained for executive AGGREGATE views (avg confidence across many jobs).
+// Per-job displays use riskState/riskBadgeClass via RiskBadge — see Discovery OS
+// decision 17 Apr 2026 (raw scores not shown to operators).
 const cc = (s: number) => s >= 0.80 ? "text-green-600" : s >= 0.60 ? "text-amber-600" : "text-red-600";
 const cb = (s: number) => s >= 0.80 ? "bg-green-100 border-green-300 text-green-700" : s >= 0.60 ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-red-100 border-red-300 text-red-700";
+
+function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) {
+  const text = size === "sm" ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5";
+  return (
+    <span className={`inline-flex items-center font-semibold border rounded ${text} ${riskBadgeClass(conf)}`}>
+      {riskState(conf)}
+    </span>
+  );
+}
 
 // ─── Build exception queue ────────────────────────────────────────────────────
 function buildExceptions(isAaron: boolean): ExceptionItem[] {
@@ -139,7 +151,7 @@ function ExceptionCard({ item, selected, onClick }: { item: ExceptionItem; selec
             }`}>{item.severity}</span>
             <span className="text-[10px] text-slate-400">{kindLabel[item.kind]}</span>
             {item.kind === "decision" && (
-              <span className={`text-[10px] font-mono font-semibold ${cc((item as DecisionEx).conf)}`}>{((item as DecisionEx).conf * 100).toFixed(0)}%</span>
+              <RiskBadge conf={(item as DecisionEx).conf} size="sm" />
             )}
           </div>
         </div>
@@ -267,7 +279,7 @@ function DecisionDetailPanel({ dec, onClose }: { dec: DecisionItem; onClose: () 
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className={`text-xs px-2 py-0.5 rounded font-semibold border ${cb(dec.conf)}`}>{(dec.conf * 100).toFixed(0)}% confidence</span>
+              <RiskBadge conf={dec.conf} />
               <span className="text-xs text-slate-400">{dec.type} · {dec.region}</span>
             </div>
             <h2 className="text-base font-bold text-slate-800">{dec.label}</h2>
@@ -361,7 +373,7 @@ function JobTypeDetailPanel({ jtLabel, onClose }: { jtLabel: string; onClose: ()
           }`}>
             <div className="flex items-center justify-between mb-1">
               <span className="font-semibold text-slate-700">{j.trade}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border ${cb(j.conf)}`}>{(j.conf * 100).toFixed(0)}%</span>
+              <RiskBadge conf={j.conf} size="sm" />
             </div>
             <p className="text-slate-500">{j.suburb} · {j.primeStatus}</p>
             {j.flags[0] && <p className="text-amber-700 mt-1">⚠ {j.flags[0].detail}</p>}
@@ -375,7 +387,7 @@ function JobTypeDetailPanel({ jtLabel, onClose }: { jtLabel: string; onClose: ()
 }
 
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
-function JobDetailPanel({ job, onClose }: { job: Job; onClose: () => void }) {
+function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => void; onAskWhy: () => void }) {
   const [chosen, setChosen] = useState<string | null>(null);
   const stages = ["Intake", "Triage", "Qualify", "Match", "Allocate", "Schedule", "Execute", "Complete"];
   const currentStage = Math.min(job.journeyStep, stages.length - 1);
@@ -386,7 +398,13 @@ function JobDetailPanel({ job, onClose }: { job: Job; onClose: () => void }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className={`text-xs px-2 py-0.5 rounded font-semibold border ${cb(job.conf)}`}>{(job.conf * 100).toFixed(0)}% confidence</span>
+              <RiskBadge conf={job.conf} />
+              <button
+                onClick={onAskWhy}
+                className="text-[11px] text-[#00BDFE] hover:text-[#0099d4] hover:underline font-medium"
+              >
+                Why is this here?
+              </button>
               <span className="text-xs text-slate-400">{job.type}</span>
               {job.priority === "jeopardy" && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-semibold">JEOPARDY</span>}
               {job.priority === "urgent" && <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-semibold">URGENT</span>}
@@ -693,6 +711,8 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
   const exceptions = buildExceptions(isAaron);
   const [focus, setFocus] = useState<FocusState>(null);
   const [filter, setFilter] = useState<"all" | "high" | "decisions" | "patterns">("all");
+  // Prefill question fired into the AI bar by the "Why is this here?" button.
+  const [aiTrigger, setAiTrigger] = useState<{ text: string; nonce: number } | undefined>(undefined);
 
   const filtered = exceptions.filter(e => {
     if (filter === "high") return e.severity === "high";
@@ -811,7 +831,14 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
                 <p className="text-slate-400 text-xs leading-relaxed">Click any item in the queue to see full context, AI activity log, and available actions.</p>
               </div>
             ) : focus.type === "job" ? (
-              <JobDetailPanel job={focus.job} onClose={() => setFocus(null)} />
+              <JobDetailPanel
+                job={focus.job}
+                onClose={() => setFocus(null)}
+                onAskWhy={() => setAiTrigger({
+                  text: `Why is job ${focus.job.id} in my queue right now? Explain in plain English what happened, what risk it carries, and what I'd typically need to decide.`,
+                  nonce: Date.now(),
+                })}
+              />
             ) : focus.type === "pattern" ? (
               <PatternDetailPanel pattern={focus.pattern} onClose={() => setFocus(null)} />
             ) : focus.type === "decision" ? (
@@ -834,6 +861,7 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
               <AskAI
                 context={aiContext}
                 placeholder={focus ? `Ask about this ${focus.type}...` : "Ask about your portfolio..."}
+                trigger={aiTrigger}
               />
             </div>
           </div>

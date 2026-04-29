@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { cc, cb, fmt, LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, TODAY_JOBS, geoLabel, JOB_TYPES, ALL_DECISIONS, SUPERVISORS, ALL_PATTERNS, MORNING } from "./data/scenarios";
+import { cc, cb, fmt, LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, TODAY_JOBS, geoLabel, JOB_TYPES, ALL_DECISIONS, SUPERVISORS, ALL_PATTERNS, MORNING, riskState, riskBadgeClass } from "./data/scenarios";
 import AskAI from "./components/AskAI";
 import StaffPerformance from "./components/StaffPerformance";
 import ChekkuView from "./components/ChekkuView";
@@ -342,7 +342,7 @@ export default function App() {
                       </div>
                       <p className="text-red-600 text-sm font-semibold">{dec.label}</p>
                     </div>
-                    <span className={`text-xl font-bold font-mono ${cc(dec.conf)}`}>{dec.conf.toFixed(2)}</span>
+                    <span className={`text-xs font-semibold border rounded px-2 py-0.5 ${riskBadgeClass(dec.conf)}`}>{riskState(dec.conf)}</span>
                   </div>
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
                     <p className="text-xs text-orange-600 font-medium mb-1">⏱ {dec.urgency}</p>

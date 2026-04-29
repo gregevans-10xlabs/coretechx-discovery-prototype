@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { loganQueueJobs, kerrieQueueJobs, STARLINK_JOURNEY, HN_JOURNEY, INSURANCE_JOURNEY } from "../data/jobs";
 import type { Job } from "../data/jobs";
-import { ALL_PATTERNS } from "../data/scenarios";
+import { ALL_PATTERNS, riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 
@@ -67,14 +67,12 @@ function flagSeverityColor(severity: string): string {
   return "bg-slate-50 border-slate-200 text-slate-600";
 }
 
-// ─── Confidence badge ─────────────────────────────────────────────────────────
-function ConfBadge({ conf }: { conf: number }) {
-  const color = conf >= 0.8 ? "text-green-600 bg-green-50 border-green-200"
-    : conf >= 0.6 ? "text-amber-600 bg-amber-50 border-amber-200"
-    : "text-red-600 bg-red-50 border-red-200";
+// ─── Risk state badge (operator-facing replacement for raw confidence score) ─
+function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) {
+  const text = size === "sm" ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5";
   return (
-    <span className={`inline-flex items-center font-mono font-bold text-sm border rounded-lg px-2 py-0.5 ${color}`}>
-      {conf.toFixed(1)}
+    <span className={`inline-flex items-center font-semibold border rounded-lg ${text} ${riskBadgeClass(conf)}`}>
+      {riskState(conf)}
     </span>
   );
 }
@@ -158,10 +156,11 @@ function ActivityLog({ items, actionRequired }: {
 }
 
 // ─── Job Detail Panel (unified — works for Logan and Kerrie) ──────────────────
-function JobDetail({ job, persona, onAction }: {
+function JobDetail({ job, persona, onAction, onAskWhy }: {
   job: Job;
   persona: string;
   onAction: (id: string, action: string) => void;
+  onAskWhy: () => void;
 }) {
   const [actionDone, setActionDone] = useState<string | null>(null);
   const isInsurance = job.type === "Insurance Repair";
@@ -214,8 +213,13 @@ function JobDetail({ job, persona, onAction }: {
           <p className="text-slate-300 text-[10px] font-mono mt-0.5">{job.id}</p>
         </div>
         <div className="text-right flex-shrink-0">
-          <ConfBadge conf={job.conf} />
-          <p className="text-slate-400 text-[10px] mt-1">confidence</p>
+          <RiskBadge conf={job.conf} />
+          <button
+            onClick={onAskWhy}
+            className="text-[10px] mt-1 text-[#00BDFE] hover:text-[#0099d4] hover:underline font-medium block ml-auto"
+          >
+            Why is this here?
+          </button>
         </div>
       </div>
 
@@ -685,7 +689,7 @@ function LoganQueueItem({ job, selected, onClick }: { job: Job; selected: boolea
           {!jeopardy && urgent && <span className="text-[10px] text-amber-600 font-semibold flex-shrink-0">Urgent</span>}
           {unassigned && !urgent && !jeopardy && <span className="text-[10px] text-amber-600 font-semibold flex-shrink-0">Unassigned</span>}
         </div>
-        <ConfBadge conf={job.conf} />
+        <RiskBadge conf={job.conf} size="sm" />
       </div>
       <p className="text-slate-300 text-[9px] font-mono mt-1">{job.id}</p>
     </button>
@@ -877,6 +881,8 @@ export default function CockpitView({ persona }: { persona: string }) {
   const [filter, setFilter]       = useState<QueueFilter>("action");
   const [selectedId, setSelectedId] = useState<string | null>(decisionQueue[0]?.id ?? null);
   const [, setActionsDone]        = useState<Record<string, string>>({});
+  // Prefill question fired into the AI bar by the "Why is this here?" button.
+  const [aiTrigger, setAiTrigger] = useState<{ text: string; nonce: number } | undefined>(undefined);
 
   const filteredQueue = fullQueue.filter(j => {
     if (filter === "action")  return j.actionRequired !== null;
@@ -1080,6 +1086,10 @@ export default function CockpitView({ persona }: { persona: string }) {
                 job={selectedJob}
                 persona={persona}
                 onAction={(id, action) => setActionsDone(a => ({ ...a, [id]: action }))}
+                onAskWhy={() => setAiTrigger({
+                  text: `Why is job ${selectedJob.id} in my queue right now? Explain in plain English what happened, what risk it carries, and what I'd typically need to decide.`,
+                  nonce: Date.now(),
+                })}
               />
             </div>
           )}
@@ -1097,6 +1107,7 @@ export default function CockpitView({ persona }: { persona: string }) {
             <AskAI
               context={aiContext}
               placeholder={selectedJob ? `Ask about ${selectedJob.id}...` : "Ask about your queue..."}
+              trigger={aiTrigger}
             />
           </div>
         </div>
