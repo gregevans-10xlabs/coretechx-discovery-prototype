@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { type Job, UNIVERSAL_STAGES, journeyMapForJob } from "../data/jobs";
+import { TAG_VOCABULARY } from "../data/scenarios";
 
 // Shared journey bar — renders the 8 Universal Stages backbone with
-// client-specific terminology annotated under each stage.
+// client-specific terminology annotated under each stage. When tags or
+// edit callbacks are provided, also renders a TagsBar above the journey
+// (per CLAUDE.md: "On Hold" / "Needs Variation" are tags overlaid on
+// stages, not separate workflow states).
 //
 // The 8 universal stages are the canonical structure (Discovery OS decision,
-// 7 Apr 2026). Client labels are configurable presentation. Coordinators see
-// familiar Prime/client terminology AND the universal stage it maps to,
-// always in the same position on every job type.
+// 7 Apr 2026). Client labels are configurable presentation.
 //
 // Two visual sizes:
 //   - "default": circles + connecting lines (CockpitView, FieldView job detail)
@@ -16,16 +19,87 @@ type Props = {
   job: Job;
   accentColor?: string;
   size?: "default" | "compact";
+  // Tags applied to this job (from App-level state; pass [] if none).
+  tags?: string[];
+  // Edit callbacks — both required to enable add/remove UI; omit either to
+  // render tags read-only (e.g. National view).
+  onAddTag?: (tag: string) => void;
+  onRemoveTag?: (tag: string) => void;
 };
 
-export default function JourneyBar({ job, accentColor = "#00BDFE", size = "default" }: Props) {
+// ─── Tags bar — overlay above the journey ────────────────────────────────────
+function TagsBar({ tags, onAdd, onRemove }: {
+  tags: string[];
+  onAdd?: (tag: string) => void;
+  onRemove?: (tag: string) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const canEdit = !!onAdd && !!onRemove;
+  const available = TAG_VOCABULARY.filter(v => !tags.includes(v.label));
+
+  if (tags.length === 0 && !canEdit) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mb-3">
+      {tags.map(t => {
+        const meta = TAG_VOCABULARY.find(v => v.label === t);
+        if (!meta) return null;
+        return (
+          <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full font-medium border inline-flex items-center gap-1 ${meta.color}`}>
+            <span>{meta.icon}</span>
+            <span>{t}</span>
+            {canEdit && (
+              <button
+                onClick={() => onRemove!(t)}
+                title={`Remove ${t}`}
+                className="hover:bg-white/40 rounded px-0.5 -mr-0.5 leading-none"
+              >×</button>
+            )}
+          </span>
+        );
+      })}
+      {canEdit && available.length > 0 && (
+        <div className="relative">
+          <button
+            onClick={() => setPickerOpen(p => !p)}
+            className="text-[10px] px-2 py-0.5 rounded-full font-medium border border-dashed border-slate-300 text-slate-500 hover:bg-slate-50 hover:border-slate-400 transition-colors"
+          >
+            + Add tag
+          </button>
+          {pickerOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
+              <div className="absolute top-full mt-1 left-0 bg-white border border-slate-200 rounded-lg shadow-lg p-1 z-20 min-w-[170px]">
+                {available.map(t => (
+                  <button
+                    key={t.label}
+                    onClick={() => { onAdd!(t.label); setPickerOpen(false); }}
+                    className="w-full text-left text-[11px] px-2 py-1.5 hover:bg-slate-50 rounded flex items-center gap-1.5"
+                  >
+                    <span>{t.icon}</span>
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function JourneyBar({ job, accentColor = "#00BDFE", size = "default", tags, onAddTag, onRemoveTag }: Props) {
   const map = journeyMapForJob(job);
   const clientStep = Math.min(job.journeyStep, map.toUniversal.length - 1);
   const universalStage = map.toUniversal[clientStep] ?? 0;
+  const showTags = tags !== undefined || onAddTag !== undefined;
 
   if (size === "compact") {
     return (
-      <div className="flex items-start gap-1">
+      <div>
+        {showTags && <TagsBar tags={tags ?? []} onAdd={onAddTag} onRemove={onRemoveTag} />}
+        <div className="flex items-start gap-1">
         {UNIVERSAL_STAGES.map((stage, i) => {
           const done = i < universalStage;
           const active = i === universalStage;
@@ -42,6 +116,7 @@ export default function JourneyBar({ job, accentColor = "#00BDFE", size = "defau
             </div>
           );
         })}
+        </div>
       </div>
     );
   }
@@ -50,6 +125,7 @@ export default function JourneyBar({ job, accentColor = "#00BDFE", size = "defau
   // as half-segments inside each column so labels can truncate without overlapping.
   return (
     <div className="mb-2">
+      {showTags && <TagsBar tags={tags ?? []} onAdd={onAddTag} onRemove={onRemoveTag} />}
       <div className="flex items-start">
         {UNIVERSAL_STAGES.map((stage, i) => {
           const done = i < universalStage;

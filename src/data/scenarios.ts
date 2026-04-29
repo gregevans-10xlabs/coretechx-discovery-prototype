@@ -173,6 +173,18 @@ export const ALL_PATTERNS = [
   },
 ];
 
+// ─── Tag vocabulary ──────────────────────────────────────────────────────────
+// Per CLAUDE.md: "On Hold" and "Needs Variation" are tags overlaid on stages,
+// not separate workflow states. Predefined vocabulary — no free text — keeps
+// the demo clean and avoids typo drift. Connected to workflow logic, so adding
+// new tags is a deliberate platform-level change, not a per-coordinator action.
+export const TAG_VOCABULARY = [
+  { label: "On Hold",           icon: "⏸",  color: "bg-amber-100 text-amber-700 border-amber-200" },
+  { label: "Needs Variation",   icon: "🔧", color: "bg-orange-100 text-orange-700 border-orange-200" },
+  { label: "Awaiting Customer", icon: "📞", color: "bg-blue-100 text-blue-700 border-blue-200" },
+  { label: "Awaiting Parts",    icon: "📦", color: "bg-purple-100 text-purple-700 border-purple-200" },
+];
+
 // ─── Field-team deferrals ────────────────────────────────────────────────────
 // Shared between Logan's "Deferred by team" exception strip (CockpitView, col 3)
 // and Troy's "My deferrals to Logan" list (FieldSupervisorView). Single source

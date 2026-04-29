@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
 import JourneyBar from "./JourneyBar";
-import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, riskState, riskBadgeClass } from "../data/scenarios";
+import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -59,6 +59,23 @@ type FocusState =
 // decision 17 Apr 2026 (raw scores not shown to operators).
 const cc = (s: number) => s >= 0.80 ? "text-green-600" : s >= 0.60 ? "text-amber-600" : "text-red-600";
 const cb = (s: number) => s >= 0.80 ? "bg-green-100 border-green-300 text-green-700" : s >= 0.60 ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-red-100 border-red-300 text-red-700";
+
+function CardTags({ tags }: { tags: string[] }) {
+  if (!tags || tags.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {tags.map(t => {
+        const meta = TAG_VOCABULARY.find(v => v.label === t);
+        if (!meta) return null;
+        return (
+          <span key={t} className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium border ${meta.color}`}>
+            {meta.icon} {t}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) {
   const text = size === "sm" ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5";
@@ -331,7 +348,7 @@ function DecisionDetailPanel({ dec, onClose }: { dec: DecisionItem; onClose: () 
 }
 
 // ─── Job Type Detail Panel ────────────────────────────────────────────────────
-function JobTypeDetailPanel({ jtLabel, onClose }: { jtLabel: string; onClose: () => void }) {
+function JobTypeDetailPanel({ jtLabel, onClose, tagsByJob }: { jtLabel: string; onClose: () => void; tagsByJob: Record<string, string[]> }) {
   const jobs = JOBS.filter(j => j.type === jtLabel);
   const jt = JOB_TYPES.find(j => j.label === jtLabel);
   return (
@@ -378,6 +395,7 @@ function JobTypeDetailPanel({ jtLabel, onClose }: { jtLabel: string; onClose: ()
             </div>
             <p className="text-slate-500">{j.suburb} · {j.primeStatus}</p>
             {j.flags[0] && <p className="text-amber-700 mt-1">⚠ {j.flags[0].detail}</p>}
+            <CardTags tags={tagsByJob[j.id] ?? []} />
             <p className="font-mono text-slate-300 text-[10px] mt-1">{j.id}</p>
           </div>
         ))}
@@ -388,7 +406,7 @@ function JobTypeDetailPanel({ jtLabel, onClose }: { jtLabel: string; onClose: ()
 }
 
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
-function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => void; onAskWhy: () => void }) {
+function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void }) {
   const [chosen, setChosen] = useState<string | null>(null);
 
   return (
@@ -419,7 +437,7 @@ function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => v
         {/* Journey */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey</p>
-          <JourneyBar job={job} size="compact" />
+          <JourneyBar job={job} size="compact" tags={tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
         </div>
 
         {/* Flags */}
@@ -698,7 +716,13 @@ function PlatformHealth({ isAaron, onWorkflowConfig }: { isAaron: boolean; onWor
 }
 
 // ─── PortfolioView ────────────────────────────────────────────────────────────
-export default function PortfolioView({ persona, onWorkflowConfig }: { persona: string; onWorkflowConfig?: () => void }) {
+export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, onAddTag, onRemoveTag }: {
+  persona: string;
+  onWorkflowConfig?: () => void;
+  tagsByJob: Record<string, string[]>;
+  onAddTag: (jobId: string, tag: string) => void;
+  onRemoveTag: (jobId: string, tag: string) => void;
+}) {
   const isAaron = persona === "aaron";
   const exceptions = buildExceptions(isAaron);
   const [focus, setFocus] = useState<FocusState>(null);
@@ -865,13 +889,16 @@ export default function PortfolioView({ persona, onWorkflowConfig }: { persona: 
                   text: `Why is job ${focus.job.id} in my queue right now? Explain in plain English what happened, what risk it carries, and what I'd typically need to decide.`,
                   nonce: Date.now(),
                 })}
+                tags={tagsByJob[focus.job.id] ?? []}
+                onAddTag={isAaron ? (t) => onAddTag(focus.job.id, t) : undefined}
+                onRemoveTag={isAaron ? (t) => onRemoveTag(focus.job.id, t) : undefined}
               />
             ) : focus.type === "pattern" ? (
               <PatternDetailPanel pattern={focus.pattern} onClose={() => setFocus(null)} />
             ) : focus.type === "decision" ? (
               <DecisionDetailPanel dec={focus.dec} onClose={() => setFocus(null)} />
             ) : focus.type === "jobtype" ? (
-              <JobTypeDetailPanel jtLabel={focus.jtLabel} onClose={() => setFocus(null)} />
+              <JobTypeDetailPanel jtLabel={focus.jtLabel} onClose={() => setFocus(null)} tagsByJob={tagsByJob} />
             ) : focus.type === "briefing" ? (
               <BriefingDetailPanel msg={focus.msg} icon={focus.icon} onClose={() => setFocus(null)} />
             ) : null}

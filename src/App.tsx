@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, ALL_DECISIONS, riskState, riskBadgeClass } from "./data/scenarios";
+import { JOBS } from "./data/jobs";
 import AskAI from "./components/AskAI";
 import CockpitView from "./components/CockpitView";
 import PortfolioView from "./components/PortfolioView";
@@ -214,6 +215,24 @@ export default function App() {
   const [persona, setPersona] = useState("logan");
   const [decisionsDone, setDecisionsDone] = useState<Record<string,string>>({});
 
+  // Tags overlaid on stages — lifted to App so changes persist across persona
+  // switches (Logan adds "On Hold"; Aaron sees the same tag on the same job).
+  // Initial state seeded from any tags hardcoded in jobs.ts.
+  const [tagsByJob, setTagsByJob] = useState<Record<string, string[]>>(() => {
+    const init: Record<string, string[]> = {};
+    JOBS.forEach(j => { if (j.tags?.length) init[j.id] = [...j.tags]; });
+    return init;
+  });
+  const addTag = (jobId: string, tag: string) => setTagsByJob(curr => {
+    const existing = curr[jobId] ?? [];
+    if (existing.includes(tag)) return curr;
+    return { ...curr, [jobId]: [...existing, tag] };
+  });
+  const removeTag = (jobId: string, tag: string) => setTagsByJob(curr => {
+    const existing = curr[jobId] ?? [];
+    return { ...curr, [jobId]: existing.filter(t => t !== tag) };
+  });
+
   const isPortfolio = persona === "aaron" || persona === "national";
   const isField     = persona === "conner" || persona === "blake";
   const isTroy      = persona === "troy";
@@ -272,7 +291,7 @@ export default function App() {
   if (isPortfolio) return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <PortfolioView persona={persona} onWorkflowConfig={() => setView("workflow")} />
+      <PortfolioView persona={persona} onWorkflowConfig={() => setView("workflow")} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
@@ -281,7 +300,7 @@ export default function App() {
   if (isField) return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <FieldView persona={persona} />
+      <FieldView persona={persona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
@@ -341,7 +360,7 @@ export default function App() {
   return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <CockpitView persona={persona} onPersonaSwitch={setPersona}/>
+      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag}/>
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );

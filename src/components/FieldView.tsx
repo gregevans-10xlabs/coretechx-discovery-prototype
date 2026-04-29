@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
-import { riskState, riskBadgeClass } from "../data/scenarios";
+import { riskState, riskBadgeClass, TAG_VOCABULARY } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
@@ -21,6 +21,23 @@ function sortDecisionFirst(jobs: Job[]): Job[] {
   };
   return [...jobs].sort((a, b) => score(a) - score(b));
 }
+function CardTags({ tags }: { tags: string[] }) {
+  if (!tags || tags.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {tags.map(t => {
+        const meta = TAG_VOCABULARY.find(v => v.label === t);
+        if (!meta) return null;
+        return (
+          <span key={t} className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium border ${meta.color}`}>
+            {meta.icon} {t}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) {
   const text = size === "sm" ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5";
   return (
@@ -31,7 +48,7 @@ function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) 
 }
 
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
-function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => void; onAskWhy: () => void }) {
+function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void }) {
   const [actionDone, setActionDone] = useState<string | null>(null);
 
   return (
@@ -103,7 +120,7 @@ function JobDetailPanel({ job, onClose, onAskWhy }: { job: Job; onClose: () => v
         {/* Journey */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey Progress</p>
-          <JourneyBar job={job} />
+          <JourneyBar job={job} tags={tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
         </div>
 
         {/* AI Log */}
@@ -195,7 +212,12 @@ const FIELD_CONFIG: Record<string, {
   },
 };
 
-export default function FieldView({ persona }: { persona: string }) {
+export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag }: {
+  persona: string;
+  tagsByJob: Record<string, string[]>;
+  onAddTag: (jobId: string, tag: string) => void;
+  onRemoveTag: (jobId: string, tag: string) => void;
+}) {
   const config  = FIELD_CONFIG[persona] ?? FIELD_CONFIG.blake;
   const allJobs = sortDecisionFirst(JOBS.filter(j => j.visibleTo.includes(persona)));
 
@@ -295,6 +317,7 @@ export default function FieldView({ persona }: { persona: string }) {
                     {job.actionRequired && (
                       <p className="text-amber-700 text-[10px] mt-1.5 font-medium truncate">⚡ {job.actionRequired}</p>
                     )}
+                    <CardTags tags={tagsByJob[job.id] ?? []} />
                     <p className="text-[9px] font-mono text-slate-300 mt-1">{job.id}</p>
                   </button>
                 );
@@ -339,6 +362,9 @@ export default function FieldView({ persona }: { persona: string }) {
                   text: `Why is job ${selectedJob.id} in my queue right now? Explain in plain English what happened, what risk it carries, and what I'd typically need to decide.`,
                   nonce: Date.now(),
                 })}
+                tags={tagsByJob[selectedJob.id] ?? []}
+                onAddTag={(t) => onAddTag(selectedJob.id, t)}
+                onRemoveTag={(t) => onRemoveTag(selectedJob.id, t)}
               />
             )}
           </div>

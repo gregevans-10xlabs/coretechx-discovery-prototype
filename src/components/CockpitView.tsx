@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { loganQueueJobs, kerrieQueueJobs } from "../data/jobs";
 import type { Job } from "../data/jobs";
-import { ALL_PATTERNS, FIELD_DEFERRALS, SUPERVISORS, riskState, riskBadgeClass } from "../data/scenarios";
+import { ALL_PATTERNS, FIELD_DEFERRALS, SUPERVISORS, TAG_VOCABULARY, riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
@@ -63,6 +63,26 @@ function flagSeverityColor(severity: string): string {
 }
 
 // ─── Risk state badge (operator-facing replacement for raw confidence score) ─
+// Compact tag pills shown on queue cards so coordinators see "On Hold" /
+// "Needs Variation" without opening the job. Read-only; full editor lives
+// inside the JobDetail JourneyBar.
+function CardTags({ tags }: { tags: string[] }) {
+  if (!tags || tags.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {tags.map(t => {
+        const meta = TAG_VOCABULARY.find(v => v.label === t);
+        if (!meta) return null;
+        return (
+          <span key={t} className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium border ${meta.color}`}>
+            {meta.icon} {t}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) {
   const text = size === "sm" ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5";
   return (
@@ -102,11 +122,14 @@ function ActivityLog({ items, actionRequired }: {
 }
 
 // ─── Job Detail Panel (unified — works for Logan and Kerrie) ──────────────────
-function JobDetail({ job, persona, onAction, onAskWhy }: {
+function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveTag }: {
   job: Job;
   persona: string;
   onAction: (id: string, action: string) => void;
   onAskWhy: () => void;
+  tags: string[];
+  onAddTag?: (tag: string) => void;
+  onRemoveTag?: (tag: string) => void;
 }) {
   const [actionDone, setActionDone] = useState<string | null>(null);
   const isInsurance = job.type === "Insurance Repair";
@@ -233,7 +256,7 @@ function JobDetail({ job, persona, onAction, onAskWhy }: {
       {/* Journey */}
       <div>
         <p className="text-slate-500 text-xs font-medium mb-2">Journey Progress</p>
-        <JourneyBar job={job} accentColor={accentColor} />
+        <JourneyBar job={job} accentColor={accentColor} tags={tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
       </div>
 
       {/* Activity log */}
@@ -577,7 +600,7 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
 }
 
 // ─── Queue Items ──────────────────────────────────────────────────────────────
-function LoganQueueItem({ job, selected, onClick }: { job: Job; selected: boolean; onClick: () => void }) {
+function LoganQueueItem({ job, selected, onClick, tags }: { job: Job; selected: boolean; onClick: () => void; tags: string[] }) {
   const urgent = job.geoStatus === "no_checkin" || job.priority === "urgent";
   const jeopardy = job.priority === "jeopardy";
   const unassigned = job.geoStatus === "unassigned";
@@ -618,12 +641,13 @@ function LoganQueueItem({ job, selected, onClick }: { job: Job; selected: boolea
         </div>
         <RiskBadge conf={job.conf} size="sm" />
       </div>
+      <CardTags tags={tags} />
       <p className="text-slate-300 text-[9px] font-mono mt-1">{job.id}</p>
     </button>
   );
 }
 
-function KerrieQueueItem({ job, selected, onClick }: { job: Job; selected: boolean; onClick: () => void }) {
+function KerrieQueueItem({ job, selected, onClick, tags }: { job: Job; selected: boolean; onClick: () => void; tags: string[] }) {
   const hasFlags = job.flags.length > 0;
   const isJeopardy = job.priority === "jeopardy";
   const hardLimit = isHardLimit(job);
@@ -667,6 +691,7 @@ function KerrieQueueItem({ job, selected, onClick }: { job: Job; selected: boole
         <p className="text-slate-400 text-[10px] truncate">{job.insuranceStage ?? job.primeStatus}</p>
         <p className="text-slate-300 text-[9px] font-mono">{job.id}</p>
       </div>
+      <CardTags tags={tags} />
     </button>
   );
 }
@@ -795,7 +820,13 @@ function CockpitPatternDetail({ pattern: p, onClose }: { pattern: LoganPattern; 
 }
 
 // ─── Main CockpitView ─────────────────────────────────────────────────────────
-export default function CockpitView({ persona, onPersonaSwitch }: { persona: string; onPersonaSwitch?: (id: string) => void }) {
+export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag }: {
+  persona: string;
+  onPersonaSwitch?: (id: string) => void;
+  tagsByJob: Record<string, string[]>;
+  onAddTag: (jobId: string, tag: string) => void;
+  onRemoveTag: (jobId: string, tag: string) => void;
+}) {
   const isKerrie = persona === "kerrie";
 
   const loganQueue  = sortDecisionFirst(loganQueueJobs());
@@ -934,12 +965,12 @@ export default function CockpitView({ persona, onPersonaSwitch }: { persona: str
             <p className="text-slate-400 text-xs text-center py-6">No jobs in this view</p>
           ) : isKerrie ? (
             filteredQueue.map(j => (
-              <KerrieQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} />
+              <KerrieQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} />
             ))
           ) : (
             <>
               {filteredQueue.map(j => (
-                <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} />
+                <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} />
               ))}
               {/* Pattern cards — Logan only, shown in Decisions tab */}
               {filter === "action" && loganPatterns.length > 0 && (
@@ -1047,6 +1078,9 @@ export default function CockpitView({ persona, onPersonaSwitch }: { persona: str
                   text: `Why is job ${selectedJob.id} in my queue right now? Explain in plain English what happened, what risk it carries, and what I'd typically need to decide.`,
                   nonce: Date.now(),
                 })}
+                tags={tagsByJob[selectedJob.id] ?? []}
+                onAddTag={selectedJob.readOnlyFor.includes(persona) ? undefined : (t) => onAddTag(selectedJob.id, t)}
+                onRemoveTag={selectedJob.readOnlyFor.includes(persona) ? undefined : (t) => onRemoveTag(selectedJob.id, t)}
               />
             </div>
           )}

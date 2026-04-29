@@ -102,6 +102,10 @@ export type Job = {
   kpiDeadline?: string;          // e.g. "45 min remaining (Allianz 1h acceptance)"
   nextAction?: string;
   nextTradeDate?: string;
+
+  // Tags overlaid on stages — labels from TAG_VOCABULARY in scenarios.ts.
+  // Pre-seeded values are session-initial state; users can add/remove at runtime.
+  tags?: string[];
 };
 
 // ─── Journey step definitions ─────────────────────────────────────────────────
@@ -397,6 +401,7 @@ export const JOBS: Job[] = [
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
+    tags: ["On Hold"],
   },
 
   {
@@ -624,6 +629,7 @@ export const JOBS: Job[] = [
     readOnlyReason: "Insurance — escalate to Kerrie (your skill level: Learning)",
     nextAction: "Scope change approval",
     nextTradeDate: "Today",
+    tags: ["Needs Variation"],
   },
 
   {
