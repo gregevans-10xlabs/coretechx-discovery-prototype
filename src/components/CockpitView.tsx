@@ -125,7 +125,7 @@ function ActivityLog({ items, actionRequired }: {
 }
 
 // ─── Job Detail Panel (unified — works for Logan and Kerrie) ──────────────────
-function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveTag }: {
+function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest }: {
   job: Job;
   persona: string;
   onAction: (id: string, action: string) => void;
@@ -133,6 +133,8 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
   tags: string[];
   onAddTag?: (tag: string) => void;
   onRemoveTag?: (tag: string) => void;
+  activeDeferral?: FieldDeferral;     // present if this operator deferred this job (or anyone in tier path did)
+  onDeferRequest?: () => void;         // open the modal in the parent
 }) {
   const [actionDone, setActionDone] = useState<string | null>(null);
   const isInsurance = job.type === "Insurance Repair";
@@ -281,8 +283,24 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
         </div>
       )}
 
-      {/* Actions — only if not read-only */}
-      {!isReadOnly && job.actionOptions.length > 0 && !actionDone && (() => {
+      {/* Deferred state — replaces action buttons when this job has been
+          deferred up the chain. Job stays in queue (operator doesn't lose
+          sight) but the action area shows the deferral details. */}
+      {!isReadOnly && activeDeferral && !actionDone && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-amber-800 text-xs font-semibold uppercase tracking-wide">Deferred — with {activeDeferral.currentHolder === "aaron" ? "Aaron / National" : activeDeferral.currentHolder} since {activeDeferral.time}</p>
+          </div>
+          <p className="text-slate-700 text-xs italic leading-snug">"You: {activeDeferral.reason}"</p>
+          {(activeDeferral.escalations ?? []).map((e, i) => (
+            <p key={i} className="text-slate-700 text-xs italic leading-snug">"{e.by}: {e.reason}"</p>
+          ))}
+          <p className="text-slate-500 text-[11px] mt-1">Action returns to you when senior responds. Job remains visible in your queue.</p>
+        </div>
+      )}
+
+      {/* Actions — only if not read-only AND not deferred */}
+      {!isReadOnly && !activeDeferral && job.actionOptions.length > 0 && !actionDone && (() => {
         const hardLimit = isHardLimit(job);
         // Hard-limit jobs: strip any defer/reschedule/escalate escape options —
         // Aaron's rule: safety, WHS, and financial >$1k cannot be reprioritised by the actor.
@@ -291,25 +309,37 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
           ? job.actionOptions.filter(a => !DEFER_WORDS.test(a))
           : job.actionOptions;
         return (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {visibleOptions.map((a, i) => (
+          <>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {visibleOptions.map((a, i) => (
+                <button
+                  key={a}
+                  onClick={() => { setActionDone(a); onAction(job.id, a); }}
+                  className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
+                    i === 0
+                      ? `text-white shadow-sm ${isInsurance ? "bg-orange-500 hover:bg-orange-600" : "bg-[#00BDFE] hover:bg-[#0099d4]"}`
+                      : hardLimit
+                      ? "bg-white border border-red-200 hover:bg-red-50 text-red-700"
+                      : i === visibleOptions.length - 1
+                      ? "bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs"
+                      : "bg-white border border-slate-300 hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            {/* Defer to senior — escape hatch for "this is beyond me". Hidden on
+                hard-limit jobs (existing rule: those go straight to authorised tier). */}
+            {!hardLimit && onDeferRequest && (
               <button
-                key={a}
-                onClick={() => { setActionDone(a); onAction(job.id, a); }}
-                className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
-                  i === 0
-                    ? `text-white shadow-sm ${isInsurance ? "bg-orange-500 hover:bg-orange-600" : "bg-[#00BDFE] hover:bg-[#0099d4]"}`
-                    : hardLimit
-                    ? "bg-white border border-red-200 hover:bg-red-50 text-red-700"
-                    : i === visibleOptions.length - 1
-                    ? "bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs"
-                    : "bg-white border border-slate-300 hover:bg-slate-50 text-slate-700"
-                }`}
+                onClick={onDeferRequest}
+                className="text-[11px] text-[#0077a8] hover:text-[#00BDFE] hover:underline font-medium mt-1"
               >
-                {a}
+                ↑ Defer to senior
               </button>
-            ))}
-          </div>
+            )}
+          </>
         );
       })()}
       {actionDone && (
@@ -660,7 +690,7 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
 }
 
 // ─── Queue Items ──────────────────────────────────────────────────────────────
-function LoganQueueItem({ job, selected, onClick, tags }: { job: Job; selected: boolean; onClick: () => void; tags: string[] }) {
+function LoganQueueItem({ job, selected, onClick, tags, isDeferred }: { job: Job; selected: boolean; onClick: () => void; tags: string[]; isDeferred?: boolean }) {
   const urgent = job.geoStatus === "no_checkin" || job.priority === "urgent";
   const jeopardy = job.priority === "jeopardy";
   const unassigned = job.geoStatus === "unassigned";
@@ -703,13 +733,20 @@ function LoganQueueItem({ job, selected, onClick, tags }: { job: Job; selected: 
         </div>
         <RiskBadge conf={job.conf} size="sm" />
       </div>
-      <CardTags tags={tags} />
+      <div className="flex items-center gap-1 mt-1">
+        <CardTags tags={tags} />
+        {isDeferred && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium border bg-amber-50 text-amber-700 border-amber-200">
+            ↑ Deferred
+          </span>
+        )}
+      </div>
       <p className="text-slate-300 text-[9px] font-mono mt-1">{job.id}</p>
     </button>
   );
 }
 
-function KerrieQueueItem({ job, selected, onClick, tags }: { job: Job; selected: boolean; onClick: () => void; tags: string[] }) {
+function KerrieQueueItem({ job, selected, onClick, tags, isDeferred }: { job: Job; selected: boolean; onClick: () => void; tags: string[]; isDeferred?: boolean }) {
   const hasFlags = job.flags.length > 0;
   const isJeopardy = job.priority === "jeopardy";
   const hardLimit = isHardLimit(job);
@@ -753,7 +790,14 @@ function KerrieQueueItem({ job, selected, onClick, tags }: { job: Job; selected:
         <p className="text-slate-400 text-[10px] truncate">{job.insuranceStage ?? job.primeStatus}</p>
         <p className="text-slate-300 text-[9px] font-mono">{job.id}</p>
       </div>
-      <CardTags tags={tags} />
+      <div className="flex items-center gap-1 mt-1">
+        <CardTags tags={tags} />
+        {isDeferred && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium border bg-amber-50 text-amber-700 border-amber-200">
+            ↑ Deferred
+          </span>
+        )}
+      </div>
     </button>
   );
 }
@@ -882,7 +926,7 @@ function CockpitPatternDetail({ pattern: p, onClose }: { pattern: LoganPattern; 
 }
 
 // ─── Main CockpitView ─────────────────────────────────────────────────────────
-export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag, deferrals, onAddEscalation, modelFeedback, onAddModelFeedback }: {
+export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag, deferrals, onAddEscalation, onAddDeferral, modelFeedback, onAddModelFeedback }: {
   persona: string;
   onPersonaSwitch?: (id: string) => void;
   tagsByJob: Record<string, string[]>;
@@ -890,6 +934,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   onRemoveTag: (jobId: string, tag: string) => void;
   deferrals: FieldDeferral[];
   onAddEscalation: (jobId: string, esc: DeferralEscalation) => void;
+  onAddDeferral: (entry: FieldDeferral) => void;
   modelFeedback: ModelFeedback[];
   onAddModelFeedback: (entry: ModelFeedback) => void;
 }) {
@@ -910,6 +955,33 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   // Reset key forces AskAI to remount with fresh state on Clear or persona change.
   const [aiResetCounter, setAiResetCounter] = useState(0);
   const [aiHasConversation, setAiHasConversation] = useState(false);
+  // Defer-from-job flow: modal open when an operator chooses to escalate a job
+  // from their queue up to senior tier.
+  const [deferJobTarget, setDeferJobTarget] = useState<Job | null>(null);
+
+  const submitJobDeferral = (reason: string) => {
+    if (!deferJobTarget) return;
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    const personaName = isKerrie ? "Kerrie Tran" : "Logan Reilly";
+    const personaRole = isKerrie ? "Insurance Coordinator" : "Ops Manager — Installations";
+    onAddDeferral({
+      task: deferJobTarget.actionRequired ?? `Action on ${deferJobTarget.id}`,
+      who: personaName, whoId: persona, role: personaRole,
+      time, jobId: deferJobTarget.id,
+      urgent: deferJobTarget.priority === "jeopardy" || deferJobTarget.priority === "urgent",
+      reason,
+      tierPath: [persona, "national", "aaron"],
+      currentHolder: "aaron",
+    });
+    setDeferJobTarget(null);
+  };
+
+  // Active deferral lookup — used by JobDetail to swap action area for deferred state,
+  // and by queue cards to show a "Deferred" pill. A job is considered deferred from
+  // the operator's perspective when this persona originated a deferral on it.
+  const findActiveJobDeferral = (jobId: string) =>
+    deferrals.find(d => d.jobId === jobId && d.whoId === persona);
 
   const filteredQueue = fullQueue.filter(j => {
     if (filter === "action")  return j.actionRequired !== null;
@@ -1051,12 +1123,12 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
             <p className="text-slate-400 text-xs text-center py-6">No jobs in this view</p>
           ) : isKerrie ? (
             filteredQueue.map(j => (
-              <KerrieQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} />
+              <KerrieQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} isDeferred={!!findActiveJobDeferral(j.id)} />
             ))
           ) : (
             <>
               {filteredQueue.map(j => (
-                <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} />
+                <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} isDeferred={!!findActiveJobDeferral(j.id)} />
               ))}
               {/* Pattern cards — Logan only, shown in Decisions tab */}
               {filter === "action" && loganPatterns.length > 0 && (
@@ -1169,6 +1241,8 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
                 tags={tagsByJob[selectedJob.id] ?? []}
                 onAddTag={selectedJob.readOnlyFor.includes(persona) ? undefined : (t) => onAddTag(selectedJob.id, t)}
                 onRemoveTag={selectedJob.readOnlyFor.includes(persona) ? undefined : (t) => onRemoveTag(selectedJob.id, t)}
+                activeDeferral={findActiveJobDeferral(selectedJob.id)}
+                onDeferRequest={selectedJob.readOnlyFor.includes(persona) ? undefined : () => setDeferJobTarget(selectedJob)}
               />
             </div>
           )}
@@ -1219,6 +1293,19 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
           }
         </div>
       </div>
+
+      {/* Defer-from-job modal — opens when an operator chooses to push a job
+          from their queue up to senior tier with a reason. Same modal pattern
+          as Troy's site-audit defer and Logan's escalation. */}
+      <DeferralReasonModal
+        open={deferJobTarget !== null}
+        title="Defer to senior"
+        itemDescription={deferJobTarget ? `${deferJobTarget.id} · ${deferJobTarget.actionRequired ?? deferJobTarget.customer}` : ""}
+        destinationLabel="Aaron / National"
+        submitLabel="Defer to senior"
+        onSubmit={submitJobDeferral}
+        onCancel={() => setDeferJobTarget(null)}
+      />
 
     </div>
   );

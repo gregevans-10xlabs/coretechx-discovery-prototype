@@ -326,7 +326,7 @@ export default function App() {
   if (isField) return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <FieldView persona={persona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback} />
+      <FieldView persona={persona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback} deferrals={deferrals} onAddDeferral={addDeferral} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
@@ -386,7 +386,7 @@ export default function App() {
   return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} onAddEscalation={addEscalation} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback}/>
+      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} onAddEscalation={addEscalation} onAddDeferral={addDeferral} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback}/>
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );

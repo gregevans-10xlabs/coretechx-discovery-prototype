@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
-import { riskState, riskBadgeClass, TAG_VOCABULARY, SILENT_DECISIONS, type ModelFeedback } from "../data/scenarios";
+import { riskState, riskBadgeClass, TAG_VOCABULARY, SILENT_DECISIONS, type ModelFeedback, type FieldDeferral } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
 import AIAuditTab from "./AIAuditTab";
+import DeferralReasonModal from "./DeferralReasonModal";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -50,7 +51,7 @@ function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) 
 }
 
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
-function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void }) {
+function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void; activeDeferral?: FieldDeferral; onDeferRequest?: () => void }) {
   const [actionDone, setActionDone] = useState<string | null>(null);
 
   return (
@@ -141,8 +142,22 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }:
           </div>
         </div>
 
-        {/* Action required */}
-        {job.actionRequired && !actionDone && (
+        {/* Deferred state — shown when this operator deferred the job upward */}
+        {activeDeferral && !actionDone && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
+            <p className="text-amber-800 text-xs font-semibold uppercase tracking-wide">
+              Deferred — with {activeDeferral.currentHolder === "aaron" ? "Aaron / National" : activeDeferral.currentHolder} since {activeDeferral.time}
+            </p>
+            <p className="text-slate-700 text-xs italic leading-snug">"You: {activeDeferral.reason}"</p>
+            {(activeDeferral.escalations ?? []).map((e, i) => (
+              <p key={i} className="text-slate-700 text-xs italic leading-snug">"{e.by}: {e.reason}"</p>
+            ))}
+            <p className="text-slate-500 text-[11px] mt-1">Action returns to you when senior responds. Job remains visible in your queue.</p>
+          </div>
+        )}
+
+        {/* Action required — hidden when job has been deferred upward */}
+        {job.actionRequired && !actionDone && !activeDeferral && (
           <div className="border-2 border-amber-400 bg-amber-50 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-amber-500 text-base">⚡</span>
@@ -158,6 +173,14 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }:
                   }`}>{opt}</button>
               ))}
             </div>
+            {onDeferRequest && (
+              <button
+                onClick={onDeferRequest}
+                className="text-[11px] text-[#0077a8] hover:text-[#00BDFE] hover:underline font-medium mt-2"
+              >
+                ↑ Defer to senior
+              </button>
+            )}
           </div>
         )}
         {actionDone && (
@@ -216,13 +239,15 @@ const FIELD_CONFIG: Record<string, {
   },
 };
 
-export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, modelFeedback, onAddModelFeedback }: {
+export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, modelFeedback, onAddModelFeedback, deferrals, onAddDeferral }: {
   persona: string;
   tagsByJob: Record<string, string[]>;
   onAddTag: (jobId: string, tag: string) => void;
   onRemoveTag: (jobId: string, tag: string) => void;
   modelFeedback: ModelFeedback[];
   onAddModelFeedback: (entry: ModelFeedback) => void;
+  deferrals: FieldDeferral[];
+  onAddDeferral: (entry: FieldDeferral) => void;
 }) {
   const config  = FIELD_CONFIG[persona] ?? FIELD_CONFIG.blake;
   const allJobs = sortDecisionFirst(JOBS.filter(j => j.visibleTo.includes(persona)));
@@ -232,6 +257,7 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
   const aiHandling   = regionTotal - decisionJobs.length;
 
   const [filterTab, setFilterTab] = useState<"action" | "browse" | "complete" | "audit">("action");
+  const [deferJobTarget, setDeferJobTarget] = useState<Job | null>(null);
 
   // AI Audit — silent decisions scoped to this persona's job type.
   const auditDecisions = SILENT_DECISIONS.filter(d => {
@@ -239,6 +265,27 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
     if (persona === "blake")  return d.jobType === "Facilities Management";
     return false;
   });
+
+  const findActiveJobDeferral = (jobId: string) =>
+    deferrals.find(d => d.jobId === jobId && d.whoId === persona);
+
+  const submitJobDeferral = (reason: string) => {
+    if (!deferJobTarget) return;
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+    const personaName = persona === "conner" ? "Conner Reilly" : "Blake Henderson";
+    const personaRole = persona === "conner" ? "Ops Manager — Construction" : "Ops Manager — FM";
+    onAddDeferral({
+      task: deferJobTarget.actionRequired ?? `Action on ${deferJobTarget.id}`,
+      who: personaName, whoId: persona, role: personaRole,
+      time, jobId: deferJobTarget.id,
+      urgent: deferJobTarget.priority === "jeopardy" || deferJobTarget.priority === "urgent",
+      reason,
+      tierPath: [persona, "national", "aaron"],
+      currentHolder: "aaron",
+    });
+    setDeferJobTarget(null);
+  };
   const [selectedId, setSelectedId] = useState<string | null>(decisionJobs[0]?.id ?? null);
   // Prefill question fired into the AI bar by the "Why is this here?" button.
   const [aiTrigger, setAiTrigger] = useState<{ text: string; nonce: number } | undefined>(undefined);
@@ -340,7 +387,14 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
                     {job.actionRequired && (
                       <p className="text-amber-700 text-[10px] mt-1.5 font-medium truncate">⚡ {job.actionRequired}</p>
                     )}
-                    <CardTags tags={tagsByJob[job.id] ?? []} />
+                    <div className="flex items-center gap-1 mt-1">
+                      <CardTags tags={tagsByJob[job.id] ?? []} />
+                      {findActiveJobDeferral(job.id) && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium border bg-amber-50 text-amber-700 border-amber-200">
+                          ↑ Deferred
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[9px] font-mono text-slate-300 mt-1">{job.id}</p>
                   </button>
                 );
@@ -389,6 +443,8 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
                 tags={tagsByJob[selectedJob.id] ?? []}
                 onAddTag={(t) => onAddTag(selectedJob.id, t)}
                 onRemoveTag={(t) => onRemoveTag(selectedJob.id, t)}
+                activeDeferral={findActiveJobDeferral(selectedJob.id)}
+                onDeferRequest={() => setDeferJobTarget(selectedJob)}
               />
             )}
           </div>
@@ -455,6 +511,17 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
         </div>
 
       </div>
+
+      {/* Defer-from-job modal */}
+      <DeferralReasonModal
+        open={deferJobTarget !== null}
+        title="Defer to senior"
+        itemDescription={deferJobTarget ? `${deferJobTarget.id} · ${deferJobTarget.actionRequired ?? deferJobTarget.customer}` : ""}
+        destinationLabel="Aaron / National"
+        submitLabel="Defer to senior"
+        onSubmit={submitJobDeferral}
+        onCancel={() => setDeferJobTarget(null)}
+      />
     </div>
   );
 }
