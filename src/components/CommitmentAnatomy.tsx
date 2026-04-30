@@ -104,6 +104,10 @@ function FieldRow({ label, value, muted, alert }: { label: string; value: string
 
 export default function CommitmentAnatomy({ job }: { job: Job }) {
   const [showAll, setShowAll] = useState(false);
+  // Default collapsed — at scale a job carries dozens of commitments and the
+  // section dwarfs everything else on the detail panel. Operator clicks the
+  // header to expand when they want to see the structure.
+  const [expanded, setExpanded] = useState(false);
   const all = job.commitments ?? [];
 
   if (all.length === 0) {
@@ -134,28 +138,51 @@ export default function CommitmentAnatomy({ job }: { job: Job }) {
   };
   const sorted = [...visible].sort((a, b) => (stateOrder[a.state] ?? 9) - (stateOrder[b.state] ?? 9));
 
+  // Most-attention summary line for the collapsed view — the highest-priority
+  // live item gives the operator a glanceable read on what's happening without
+  // expanding the section.
+  const breach = all.find(c => c.state === "breach");
+  const active = all.find(c => c.state === "active" || c.state === "in_progress");
+  const headline = breach ?? active ?? sorted[0] ?? null;
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Commitments</p>
+      {/* Header is the toggle — whole row clickable */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-start gap-2 mb-2 text-left group"
+      >
+        <span className="text-slate-300 text-[10px] mt-1 group-hover:text-slate-500 flex-shrink-0">{expanded ? "▾" : "▸"}</span>
+        <div className="flex-1">
+          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider group-hover:text-slate-600">Commitments</span>
           <p className="text-slate-400 text-[10px] mt-0.5">
             {all.length} total · {live.length} live · {closed.length} closed{voided.length > 0 ? ` · ${voided.length} voided` : ""}
+            {!expanded && headline && (
+              <span className="text-slate-500"> · most attention: {headline.promise.slice(0, 50)}{headline.promise.length > 50 ? "…" : ""}</span>
+            )}
           </p>
         </div>
-        {all.length > defaultVisible.length && (
-          <button
-            onClick={() => setShowAll(s => !s)}
-            className="text-[11px] text-[#00BDFE] hover:text-[#0099d4] hover:underline font-medium"
-          >
-            {showAll ? `Show live only (hide ${hidden} more)` : `Show all (${all.length})`}
-          </button>
-        )}
-      </div>
+      </button>
 
-      <div className="space-y-2">
-        {sorted.map(c => <CommitmentCard key={c.id} c={c} />)}
-      </div>
+      {expanded && (
+        <>
+          {/* Show all toggle — inside the expanded body so it isn't nested in
+              the header <button> (would be invalid HTML and break click). */}
+          {all.length > defaultVisible.length && (
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => setShowAll(s => !s)}
+                className="text-[11px] text-[#00BDFE] hover:text-[#0099d4] hover:underline font-medium"
+              >
+                {showAll ? `Show live only (hide ${hidden} more)` : `Show all (${all.length})`}
+              </button>
+            </div>
+          )}
+          <div className="space-y-2">
+            {sorted.map(c => <CommitmentCard key={c.id} c={c} />)}
+          </div>
+        </>
+      )}
     </div>
   );
 }
