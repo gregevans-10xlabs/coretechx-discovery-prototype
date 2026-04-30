@@ -8,6 +8,7 @@ import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
 import DeferralReasonModal from "./DeferralReasonModal";
 import AIAuditTab from "./AIAuditTab";
+import TradeLink from "./TradeLink";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned" | "audit";
@@ -125,7 +126,7 @@ function ActivityLog({ items, actionRequired }: {
 }
 
 // ─── Job Detail Panel (unified — works for Logan and Kerrie) ──────────────────
-function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest, onRecallRequest }: {
+function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest, onRecallRequest, onSelectTrade }: {
   job: Job;
   persona: string;
   onAction: (id: string, action: string) => void;
@@ -136,6 +137,7 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
   activeDeferral?: FieldDeferral;     // present if this operator deferred this job
   onDeferRequest?: () => void;
   onRecallRequest?: () => void;        // open recall modal — only when this operator can recall
+  onSelectTrade?: (name: string) => void;
 }) {
   const [actionDone, setActionDone] = useState<string | null>(null);
   const isInsurance = job.type === "Insurance Repair";
@@ -179,7 +181,9 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
             )}
           </div>
           <p className="text-slate-800 font-semibold text-base leading-tight">
-            {isInsurance ? job.customer : job.trade}
+            {isInsurance
+              ? job.customer
+              : <TradeLink name={job.trade} onSelectTrade={onSelectTrade} className="text-slate-800 font-semibold" />}
           </p>
           <p className="text-slate-500 text-xs mt-0.5">
             {isInsurance ? `${job.suburb} · ${job.tradeType}` : `${job.suburb} · ${job.window}`}
@@ -222,7 +226,11 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
           ] as { label: string; value: string; warn: boolean }[]).map(f => (
             <div key={f.label} className="bg-slate-50 rounded-lg px-3 py-2">
               <p className="text-slate-400 text-[10px] uppercase tracking-wide">{f.label}</p>
-              <p className={`font-semibold mt-0.5 text-xs ${f.warn ? "text-amber-600" : "text-slate-700"}`}>{f.value}</p>
+              {f.label === "Trade"
+                ? <p className={`font-semibold mt-0.5 text-xs ${f.warn ? "text-amber-600" : "text-slate-700"}`}>
+                    <TradeLink name={job.trade} onSelectTrade={onSelectTrade} className="text-slate-700 font-semibold" />
+                  </p>
+                : <p className={`font-semibold mt-0.5 text-xs ${f.warn ? "text-amber-600" : "text-slate-700"}`}>{f.value}</p>}
             </div>
           ))
         ) : (
@@ -264,7 +272,7 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
         <p className="text-slate-500 text-xs font-medium mb-2">Journey Progress</p>
         <JourneyBar job={job} accentColor={accentColor} tags={tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
 
-        <CommitmentAnatomy job={job} />
+        <CommitmentAnatomy job={job} onSelectTrade={onSelectTrade} />
       </div>
 
       {/* Activity log */}
@@ -699,7 +707,7 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
 }
 
 // ─── Queue Items ──────────────────────────────────────────────────────────────
-function LoganQueueItem({ job, selected, onClick, tags, isDeferred }: { job: Job; selected: boolean; onClick: () => void; tags: string[]; isDeferred?: boolean }) {
+function LoganQueueItem({ job, selected, onClick, tags, isDeferred, onSelectTrade }: { job: Job; selected: boolean; onClick: () => void; tags: string[]; isDeferred?: boolean; onSelectTrade?: (name: string) => void }) {
   const urgent = job.geoStatus === "no_checkin" || job.priority === "urgent";
   const jeopardy = job.priority === "jeopardy";
   const unassigned = job.geoStatus === "unassigned";
@@ -728,8 +736,12 @@ function LoganQueueItem({ job, selected, onClick, tags, isDeferred }: { job: Job
       )}
       {/* Primary: customer name */}
       <p className="text-slate-800 font-semibold text-sm truncate leading-tight">{job.customer}</p>
-      {/* Secondary: trade name */}
-      <p className="text-slate-500 text-xs mt-0.5 truncate">{job.trade === "Trade Allocation Required" ? "⚠ No trade allocated" : job.trade}</p>
+      {/* Secondary: trade name (clickable when allocated) */}
+      <p className="text-slate-500 text-xs mt-0.5 truncate">
+        {job.trade === "Trade Allocation Required"
+          ? "⚠ No trade allocated"
+          : <TradeLink name={job.trade} onSelectTrade={onSelectTrade} />}
+      </p>
       {/* Tertiary: suburb + window */}
       <p className="text-slate-400 text-[10px] mt-0.5 truncate">{job.suburb} · {job.window}</p>
       {/* Status row */}
@@ -935,7 +947,7 @@ function CockpitPatternDetail({ pattern: p, onClose }: { pattern: LoganPattern; 
 }
 
 // ─── Main CockpitView ─────────────────────────────────────────────────────────
-export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag, deferrals, onAddEscalation, onAddDeferral, onRecallDeferral, modelFeedback, onAddModelFeedback }: {
+export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag, deferrals, onAddEscalation, onAddDeferral, onRecallDeferral, modelFeedback, onAddModelFeedback, onSelectTrade }: {
   persona: string;
   onPersonaSwitch?: (id: string) => void;
   tagsByJob: Record<string, string[]>;
@@ -947,6 +959,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   onRecallDeferral: (jobId: string, reason: string) => void;
   modelFeedback: ModelFeedback[];
   onAddModelFeedback: (entry: ModelFeedback) => void;
+  onSelectTrade?: (name: string) => void;
 }) {
   const isKerrie = persona === "kerrie";
 
@@ -1146,7 +1159,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
           ) : (
             <>
               {filteredQueue.map(j => (
-                <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} isDeferred={!!findActiveJobDeferral(j.id)} />
+                <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} isDeferred={!!findActiveJobDeferral(j.id)} onSelectTrade={onSelectTrade} />
               ))}
               {/* Pattern cards — Logan only, shown in Decisions tab */}
               {filter === "action" && loganPatterns.length > 0 && (
@@ -1262,6 +1275,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
                 activeDeferral={findActiveJobDeferral(selectedJob.id)}
                 onDeferRequest={selectedJob.readOnlyFor.includes(persona) ? undefined : () => setDeferJobTarget(selectedJob)}
                 onRecallRequest={findActiveJobDeferral(selectedJob.id) ? () => setRecallJobTarget(selectedJob) : undefined}
+                onSelectTrade={onSelectTrade}
               />
             </div>
           )}

@@ -6,6 +6,7 @@ import {
   COMMITMENT_CONTROL_META,
   COMMITMENT_REL_META,
 } from "../data/scenarios";
+import TradeLink, { isAIAgent } from "./TradeLink";
 
 // CommitmentAnatomy — exposes the canonical 5-field commitment structure
 // (Discovery OS Commitment Model Specification, updated 29 Apr 2026).
@@ -19,12 +20,13 @@ import {
 
 const LIVE_STATES: CommitmentState[] = ["active", "in_progress", "breach", "potential"];
 
-function CommitmentCard({ c }: { c: Commitment }) {
+function CommitmentCard({ c, onSelectTrade }: { c: Commitment; onSelectTrade?: (name: string) => void }) {
   const stateMeta = COMMITMENT_STATE_META[c.state];
   const classMeta = COMMITMENT_CLASS_META[c.klass];
   const controlMeta = COMMITMENT_CONTROL_META[c.controlMode];
   const isVoided = c.state === "voided";
   const isBreach = c.state === "breach";
+  const ownerIsAgent = isAIAgent(c.owner);
 
   return (
     <div className={`rounded-lg border p-3 transition-all ${
@@ -60,7 +62,9 @@ function CommitmentCard({ c }: { c: Commitment }) {
       <div className="flex items-center justify-between gap-2 text-xs mb-2 pb-2 border-b border-slate-100">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-slate-400 text-[10px] uppercase tracking-wide flex-shrink-0">Owner</span>
-          <span className="text-slate-700 truncate">{c.owner}</span>
+          <span className="text-slate-700 truncate">
+            <TradeLink name={c.owner} onSelectTrade={onSelectTrade} disabled={ownerIsAgent} className="text-slate-700" />
+          </span>
           {c.ownerTier && <span className="text-slate-400 text-[10px] flex-shrink-0">· {c.ownerTier}</span>}
         </div>
         <span className={`text-[10px] font-semibold ${controlMeta.color} flex-shrink-0`}>
@@ -102,7 +106,7 @@ function FieldRow({ label, value, muted, alert }: { label: string; value: string
   );
 }
 
-export default function CommitmentAnatomy({ job }: { job: Job }) {
+export default function CommitmentAnatomy({ job, onSelectTrade }: { job: Job; onSelectTrade?: (name: string) => void }) {
   const [showAll, setShowAll] = useState(false);
   // Default collapsed — at scale a job carries dozens of commitments and the
   // section dwarfs everything else on the detail panel. Operator clicks the
@@ -179,7 +183,7 @@ export default function CommitmentAnatomy({ job }: { job: Job }) {
             </div>
           )}
           <div className="space-y-2">
-            {sorted.map(c => <CommitmentCard key={c.id} c={c} />)}
+            {sorted.map(c => <CommitmentCard key={c.id} c={c} onSelectTrade={onSelectTrade} />)}
           </div>
         </>
       )}

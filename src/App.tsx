@@ -6,6 +6,7 @@ import CockpitView from "./components/CockpitView";
 import PortfolioView from "./components/PortfolioView";
 import FieldView from "./components/FieldView";
 import FieldSupervisorView from "./components/FieldSupervisorView";
+import TradeDrawer from "./components/TradeDrawer";
 
 // ─── Workflow Config View ─────────────────────────────────────────────────────
 function WorkflowConfig({ canConfig, onBack }: { canConfig: boolean; onBack: () => void }) {
@@ -243,6 +244,12 @@ export default function App() {
   // training examples for the per-step CNN models (Discovery OS Req 3 +
   // 22 Apr 2026 architecture decision).
   const [modelFeedback, setModelFeedback] = useState<ModelFeedback[]>([]);
+
+  // Trade detail drawer — operator clicks any trade name (queue cards,
+  // job detail header, commitment owners) and a slide-out drawer shows
+  // profile, compliance, performance, active work, recent jobs. Trades
+  // are Circl's competitive moat — operators look this up constantly.
+  const [selectedTradeName, setSelectedTradeName] = useState<string | null>(null);
   const addModelFeedback = (entry: ModelFeedback) => setModelFeedback(curr => {
     // De-duplicate: if this user already feedback'd this decision, replace
     const existing = curr.findIndex(f => f.decisionId === entry.decisionId && f.flaggedById === entry.flaggedById);
@@ -336,20 +343,26 @@ export default function App() {
 
   // ── Portfolio view — Aaron and National ───────────────────────────────────
   if (isPortfolio) return (
+    <>
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <PortfolioView persona={persona} onWorkflowConfig={() => setView("workflow")} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} modelFeedback={modelFeedback} />
+      <PortfolioView persona={persona} onWorkflowConfig={() => setView("workflow")} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} modelFeedback={modelFeedback} onSelectTrade={setSelectedTradeName} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
+    <TradeDrawer tradeName={selectedTradeName} onClose={() => setSelectedTradeName(null)} onSelectJob={() => setSelectedTradeName(null)} />
+    </>
   );
 
   // ── Field view — Conner and Blake ─────────────────────────────────────────
   if (isField) return (
+    <>
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <FieldView persona={persona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback} deferrals={deferrals} onAddDeferral={addDeferral} onRecallDeferral={recallDeferral} />
+      <FieldView persona={persona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback} deferrals={deferrals} onAddDeferral={addDeferral} onRecallDeferral={recallDeferral} onSelectTrade={setSelectedTradeName} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
+    <TradeDrawer tradeName={selectedTradeName} onClose={() => setSelectedTradeName(null)} onSelectJob={() => setSelectedTradeName(null)} />
+    </>
   );
 
   // ── Field Supervisor view — Troy ──────────────────────────────────────────
@@ -405,10 +418,13 @@ export default function App() {
 
   // ── Cockpit view — Logan and Kerrie (default; aaron/national/conner/blake/troy handled above) ─
   return (
+    <>
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} onAddEscalation={addEscalation} onAddDeferral={addDeferral} onRecallDeferral={recallDeferral} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback}/>
+      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} onAddEscalation={addEscalation} onAddDeferral={addDeferral} onRecallDeferral={recallDeferral} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback} onSelectTrade={setSelectedTradeName}/>
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
+    <TradeDrawer tradeName={selectedTradeName} onClose={() => setSelectedTradeName(null)} onSelectJob={() => setSelectedTradeName(null)} />
+    </>
   );
 }

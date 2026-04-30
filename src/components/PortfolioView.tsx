@@ -2,6 +2,7 @@ import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
+import TradeLink from "./TradeLink";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
@@ -184,7 +185,7 @@ function ExceptionCard({ item, selected, onClick }: { item: ExceptionItem; selec
 }
 
 // ─── Pattern Detail Panel ─────────────────────────────────────────────────────
-function PatternDetailPanel({ pattern, onClose }: { pattern: PatternItem; onClose: () => void }) {
+function PatternDetailPanel({ pattern, onClose, onSelectTrade }: { pattern: PatternItem; onClose: () => void; onSelectTrade?: (name: string) => void }) {
   const [actioned, setActioned] = useState(false);
 
   const affectedIds: string[] = (pattern.detail.match(/CG\d{5}/g) ?? []);
@@ -240,7 +241,9 @@ function PatternDetailPanel({ pattern, onClose }: { pattern: PatternItem; onClos
                   j.priority === "jeopardy" ? "bg-red-50 border-red-200" : j.priority === "urgent" ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"
                 }`}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-slate-700">{j.trade}</span>
+                    <span className="font-semibold text-slate-700">
+                      <TradeLink name={j.trade} onSelectTrade={onSelectTrade} className="text-slate-700 font-semibold" />
+                    </span>
                     <span className="font-mono text-slate-300 text-[10px]">{j.id}</span>
                   </div>
                   <p className="text-slate-500">{j.suburb} · {j.primeStatus}</p>
@@ -352,7 +355,7 @@ function DecisionDetailPanel({ dec, onClose }: { dec: DecisionItem; onClose: () 
 }
 
 // ─── Job Type Detail Panel ────────────────────────────────────────────────────
-function JobTypeDetailPanel({ jtLabel, onClose, tagsByJob }: { jtLabel: string; onClose: () => void; tagsByJob: Record<string, string[]> }) {
+function JobTypeDetailPanel({ jtLabel, onClose, tagsByJob, onSelectTrade }: { jtLabel: string; onClose: () => void; tagsByJob: Record<string, string[]>; onSelectTrade?: (name: string) => void }) {
   const jobs = JOBS.filter(j => j.type === jtLabel);
   const jt = JOB_TYPES.find(j => j.label === jtLabel);
   return (
@@ -394,7 +397,9 @@ function JobTypeDetailPanel({ jtLabel, onClose, tagsByJob }: { jtLabel: string; 
             j.priority === "jeopardy" ? "bg-red-50 border-red-200" : j.priority === "urgent" ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"
           }`}>
             <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-slate-700">{j.trade}</span>
+              <span className="font-semibold text-slate-700">
+                <TradeLink name={j.trade} onSelectTrade={onSelectTrade} className="text-slate-700 font-semibold" />
+              </span>
               <RiskBadge conf={j.conf} size="sm" />
             </div>
             <p className="text-slate-500">{j.suburb} · {j.primeStatus}</p>
@@ -410,7 +415,7 @@ function JobTypeDetailPanel({ jtLabel, onClose, tagsByJob }: { jtLabel: string; 
 }
 
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
-function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void }) {
+function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, onSelectTrade }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void; onSelectTrade?: (name: string) => void }) {
   const [chosen, setChosen] = useState<string | null>(null);
 
   return (
@@ -431,7 +436,7 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }:
               {job.priority === "urgent" && <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-semibold">URGENT</span>}
             </div>
             <h2 className="text-base font-bold text-slate-800">{job.customer}</h2>
-            <p className="text-slate-500 text-xs">{job.suburb} {job.state} · {job.trade}</p>
+            <p className="text-slate-500 text-xs">{job.suburb} {job.state} · <TradeLink name={job.trade} onSelectTrade={onSelectTrade} className="text-slate-500" /></p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs">✕ close</button>
         </div>
@@ -445,7 +450,7 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag }:
         </div>
 
         <div>
-          <CommitmentAnatomy job={job} />
+          <CommitmentAnatomy job={job} onSelectTrade={onSelectTrade} />
         </div>
 
         {/* Flags */}
@@ -835,7 +840,7 @@ function PlatformHealth({ isAaron, onWorkflowConfig, deferrals, modelFeedback }:
 }
 
 // ─── PortfolioView ────────────────────────────────────────────────────────────
-export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, onAddTag, onRemoveTag, deferrals, modelFeedback }: {
+export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, onAddTag, onRemoveTag, deferrals, modelFeedback, onSelectTrade }: {
   persona: string;
   onWorkflowConfig?: () => void;
   tagsByJob: Record<string, string[]>;
@@ -843,6 +848,7 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
   onRemoveTag: (jobId: string, tag: string) => void;
   deferrals: FieldDeferral[];
   modelFeedback: ModelFeedback[];
+  onSelectTrade?: (name: string) => void;
 }) {
   const isAaron = persona === "aaron";
   const exceptions = buildExceptions(isAaron);
@@ -1013,13 +1019,14 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
                 tags={tagsByJob[focus.job.id] ?? []}
                 onAddTag={isAaron ? (t) => onAddTag(focus.job.id, t) : undefined}
                 onRemoveTag={isAaron ? (t) => onRemoveTag(focus.job.id, t) : undefined}
+                onSelectTrade={onSelectTrade}
               />
             ) : focus.type === "pattern" ? (
-              <PatternDetailPanel pattern={focus.pattern} onClose={() => setFocus(null)} />
+              <PatternDetailPanel pattern={focus.pattern} onClose={() => setFocus(null)} onSelectTrade={onSelectTrade} />
             ) : focus.type === "decision" ? (
               <DecisionDetailPanel dec={focus.dec} onClose={() => setFocus(null)} />
             ) : focus.type === "jobtype" ? (
-              <JobTypeDetailPanel jtLabel={focus.jtLabel} onClose={() => setFocus(null)} tagsByJob={tagsByJob} />
+              <JobTypeDetailPanel jtLabel={focus.jtLabel} onClose={() => setFocus(null)} tagsByJob={tagsByJob} onSelectTrade={onSelectTrade} />
             ) : focus.type === "briefing" ? (
               <BriefingDetailPanel msg={focus.msg} icon={focus.icon} onClose={() => setFocus(null)} />
             ) : null}

@@ -20,6 +20,15 @@ body {
   animation: fadeIn 0.15s ease-out;
 }
 
+/* Slide-in from right for drawers (e.g. TradeDrawer) */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.animate-slideInRight {
+  animation: slideInRight 0.18s ease-out;
+}
+
 /* Slim scrollbars inside cockpit columns */
 .overflow-y-auto::-webkit-scrollbar {
   width: 4px;

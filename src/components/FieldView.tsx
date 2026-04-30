@@ -7,6 +7,7 @@ import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
 import AIAuditTab from "./AIAuditTab";
 import DeferralReasonModal from "./DeferralReasonModal";
+import TradeLink from "./TradeLink";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -51,7 +52,7 @@ function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) 
 }
 
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
-function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest, onRecallRequest }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void; activeDeferral?: FieldDeferral; onDeferRequest?: () => void; onRecallRequest?: () => void }) {
+function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest, onRecallRequest, onSelectTrade }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void; activeDeferral?: FieldDeferral; onDeferRequest?: () => void; onRecallRequest?: () => void; onSelectTrade?: (name: string) => void }) {
   const [actionDone, setActionDone] = useState<string | null>(null);
 
   return (
@@ -78,7 +79,9 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
         )}
 
         <div className="flex items-center justify-between mt-3">
-          <h2 className="text-slate-800 font-bold text-base leading-tight">{job.trade}</h2>
+          <h2 className="text-slate-800 font-bold text-base leading-tight">
+            <TradeLink name={job.trade} onSelectTrade={onSelectTrade} className="text-slate-800 font-bold" />
+          </h2>
           <div className="text-right flex-shrink-0">
             <RiskBadge conf={job.conf} />
             <button
@@ -126,7 +129,7 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
           <JourneyBar job={job} tags={tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
         </div>
 
-        <CommitmentAnatomy job={job} />
+        <CommitmentAnatomy job={job} onSelectTrade={onSelectTrade} />
 
         {/* AI Log */}
         <div>
@@ -249,7 +252,7 @@ const FIELD_CONFIG: Record<string, {
   },
 };
 
-export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, modelFeedback, onAddModelFeedback, deferrals, onAddDeferral, onRecallDeferral }: {
+export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, modelFeedback, onAddModelFeedback, deferrals, onAddDeferral, onRecallDeferral, onSelectTrade }: {
   persona: string;
   tagsByJob: Record<string, string[]>;
   onAddTag: (jobId: string, tag: string) => void;
@@ -259,6 +262,7 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
   deferrals: FieldDeferral[];
   onAddDeferral: (entry: FieldDeferral) => void;
   onRecallDeferral: (jobId: string, reason: string) => void;
+  onSelectTrade?: (name: string) => void;
 }) {
   const config  = FIELD_CONFIG[persona] ?? FIELD_CONFIG.blake;
   const allJobs = sortDecisionFirst(JOBS.filter(j => j.visibleTo.includes(persona)));
@@ -392,7 +396,9 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
                       isSelected ? "border-[#00BDFE]" : "border-slate-200 hover:border-slate-300"
                     } ${accentBorder}`}>
                     <div className="flex items-start justify-between gap-1 mb-1">
-                      <p className="text-slate-800 text-xs font-semibold leading-tight truncate">{job.trade}</p>
+                      <p className="text-slate-800 text-xs font-semibold leading-tight truncate">
+                        <TradeLink name={job.trade} onSelectTrade={onSelectTrade} className="text-slate-800 font-semibold" />
+                      </p>
                       <RiskBadge conf={job.conf} size="sm" />
                     </div>
                     <p className="text-slate-500 text-[10px] truncate">{job.suburb} · {job.window}</p>
@@ -464,6 +470,7 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
                 activeDeferral={findActiveJobDeferral(selectedJob.id)}
                 onDeferRequest={() => setDeferJobTarget(selectedJob)}
                 onRecallRequest={findActiveJobDeferral(selectedJob.id) ? () => setRecallJobTarget(selectedJob) : undefined}
+                onSelectTrade={onSelectTrade}
               />
             )}
           </div>
