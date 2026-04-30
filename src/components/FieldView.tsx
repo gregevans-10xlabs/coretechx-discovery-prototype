@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { JOBS, type Job } from "../data/jobs";
-import { riskState, riskBadgeClass, TAG_VOCABULARY, SILENT_DECISIONS, type ModelFeedback, type FieldDeferral } from "../data/scenarios";
+import { riskState, riskBadgeClass, TAG_VOCABULARY, SILENT_DECISIONS, RECALL_REASON_CHIPS, type ModelFeedback, type FieldDeferral } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
@@ -51,7 +51,7 @@ function RiskBadge({ conf, size = "md" }: { conf: number; size?: "sm" | "md" }) 
 }
 
 // ─── Job Detail Panel ─────────────────────────────────────────────────────────
-function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void; activeDeferral?: FieldDeferral; onDeferRequest?: () => void }) {
+function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest, onRecallRequest }: { job: Job; onClose: () => void; onAskWhy: () => void; tags: string[]; onAddTag?: (tag: string) => void; onRemoveTag?: (tag: string) => void; activeDeferral?: FieldDeferral; onDeferRequest?: () => void; onRecallRequest?: () => void }) {
   const [actionDone, setActionDone] = useState<string | null>(null);
 
   return (
@@ -145,14 +145,24 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
         {/* Deferred state — shown when this operator deferred the job upward */}
         {activeDeferral && !actionDone && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
-            <p className="text-amber-800 text-xs font-semibold uppercase tracking-wide">
-              Deferred — with {activeDeferral.currentHolder === "aaron" ? "Aaron / National" : activeDeferral.currentHolder} since {activeDeferral.time}
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-amber-800 text-xs font-semibold uppercase tracking-wide">
+                Deferred — with {activeDeferral.currentHolder === "aaron" ? "Aaron / National" : activeDeferral.currentHolder} since {activeDeferral.time}
+              </p>
+              {onRecallRequest && (
+                <button
+                  onClick={onRecallRequest}
+                  className="text-[11px] text-[#0077a8] hover:text-[#00BDFE] hover:underline font-medium flex-shrink-0"
+                >
+                  ↻ Recall from senior
+                </button>
+              )}
+            </div>
             <p className="text-slate-700 text-xs italic leading-snug">"You: {activeDeferral.reason}"</p>
             {(activeDeferral.escalations ?? []).map((e, i) => (
               <p key={i} className="text-slate-700 text-xs italic leading-snug">"{e.by}: {e.reason}"</p>
             ))}
-            <p className="text-slate-500 text-[11px] mt-1">Action returns to you when senior responds. Job remains visible in your queue.</p>
+            <p className="text-slate-500 text-[11px] mt-1">Action returns to you when senior responds — or recall now if you've worked it out.</p>
           </div>
         )}
 
@@ -239,7 +249,7 @@ const FIELD_CONFIG: Record<string, {
   },
 };
 
-export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, modelFeedback, onAddModelFeedback, deferrals, onAddDeferral }: {
+export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, modelFeedback, onAddModelFeedback, deferrals, onAddDeferral, onRecallDeferral }: {
   persona: string;
   tagsByJob: Record<string, string[]>;
   onAddTag: (jobId: string, tag: string) => void;
@@ -248,6 +258,7 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
   onAddModelFeedback: (entry: ModelFeedback) => void;
   deferrals: FieldDeferral[];
   onAddDeferral: (entry: FieldDeferral) => void;
+  onRecallDeferral: (jobId: string, reason: string) => void;
 }) {
   const config  = FIELD_CONFIG[persona] ?? FIELD_CONFIG.blake;
   const allJobs = sortDecisionFirst(JOBS.filter(j => j.visibleTo.includes(persona)));
@@ -258,6 +269,13 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
 
   const [filterTab, setFilterTab] = useState<"action" | "browse" | "complete" | "audit">("action");
   const [deferJobTarget, setDeferJobTarget] = useState<Job | null>(null);
+  const [recallJobTarget, setRecallJobTarget] = useState<Job | null>(null);
+
+  const submitJobRecall = (reason: string) => {
+    if (!recallJobTarget) return;
+    onRecallDeferral(recallJobTarget.id, reason);
+    setRecallJobTarget(null);
+  };
 
   // AI Audit — silent decisions scoped to this persona's job type.
   const auditDecisions = SILENT_DECISIONS.filter(d => {
@@ -445,6 +463,7 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
                 onRemoveTag={(t) => onRemoveTag(selectedJob.id, t)}
                 activeDeferral={findActiveJobDeferral(selectedJob.id)}
                 onDeferRequest={() => setDeferJobTarget(selectedJob)}
+                onRecallRequest={findActiveJobDeferral(selectedJob.id) ? () => setRecallJobTarget(selectedJob) : undefined}
               />
             )}
           </div>
@@ -517,10 +536,25 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
         open={deferJobTarget !== null}
         title="Defer to senior"
         itemDescription={deferJobTarget ? `${deferJobTarget.id} · ${deferJobTarget.actionRequired ?? deferJobTarget.customer}` : ""}
-        destinationLabel="Aaron / National"
+        destinationLabel="Going to Aaron / National"
         submitLabel="Defer to senior"
         onSubmit={submitJobDeferral}
         onCancel={() => setDeferJobTarget(null)}
+      />
+
+      {/* Recall modal */}
+      <DeferralReasonModal
+        open={recallJobTarget !== null}
+        title="Recall from senior"
+        itemDescription={recallJobTarget ? `${recallJobTarget.id} · ${recallJobTarget.actionRequired ?? recallJobTarget.customer}` : ""}
+        destinationLabel="Action returns to you"
+        submitLabel="Recall"
+        chips={RECALL_REASON_CHIPS}
+        requireText={false}
+        textareaLabel="Add a note"
+        textareaPlaceholder="e.g. Trade just rang back and confirmed they're on their way."
+        onSubmit={submitJobRecall}
+        onCancel={() => setRecallJobTarget(null)}
       />
     </div>
   );

@@ -258,6 +258,27 @@ export default function App() {
       : d
     )
   );
+  // Recall — operator pulls a deferred job back from senior. If chained
+  // escalations exist, pop the last one (currentHolder reverts to whoever
+  // pushed it up most recently). Otherwise remove the entry entirely.
+  // Discovery OS event-sourced auditability would archive the recall as an
+  // event in production; for the prototype we drop the record. Reason accepted
+  // for consistency with defer modal but not yet fed into a training stream.
+  const recallDeferral = (jobId: string, _reason: string) => setDeferrals(curr => {
+    const def = curr.find(d => d.jobId === jobId);
+    if (!def) return curr;
+    const escs = def.escalations ?? [];
+    if (escs.length > 0) {
+      const newEscs = escs.slice(0, -1);
+      // currentHolder reverts to whoever did the popped escalation (they're taking it back)
+      const reverted = escs[escs.length - 1].byId;
+      return curr.map(d => d.jobId === jobId
+        ? { ...d, escalations: newEscs.length > 0 ? newEscs : undefined, currentHolder: reverted }
+        : d);
+    }
+    // No escalations — operator originated this; remove entirely
+    return curr.filter(d => d.jobId !== jobId);
+  });
 
   const isPortfolio = persona === "aaron" || persona === "national";
   const isField     = persona === "conner" || persona === "blake";
@@ -326,7 +347,7 @@ export default function App() {
   if (isField) return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <FieldView persona={persona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback} deferrals={deferrals} onAddDeferral={addDeferral} />
+      <FieldView persona={persona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback} deferrals={deferrals} onAddDeferral={addDeferral} onRecallDeferral={recallDeferral} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );
@@ -386,7 +407,7 @@ export default function App() {
   return (
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
-      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} onAddEscalation={addEscalation} onAddDeferral={addDeferral} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback}/>
+      <CockpitView persona={persona} onPersonaSwitch={setPersona} tagsByJob={tagsByJob} onAddTag={addTag} onRemoveTag={removeTag} deferrals={deferrals} onAddEscalation={addEscalation} onAddDeferral={addDeferral} onRecallDeferral={recallDeferral} modelFeedback={modelFeedback} onAddModelFeedback={addModelFeedback}/>
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
   );

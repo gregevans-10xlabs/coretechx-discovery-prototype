@@ -271,7 +271,7 @@ export default function FieldSupervisorView({ onPersonaSwitch, deferrals, onAddD
         open={deferModalOpen}
         title="Defer to Logan"
         itemDescription={selected ? `Site audit — ${selected.trade}` : ""}
-        destinationLabel="Logan (Ops Manager — Installations)"
+        destinationLabel="Going to Logan (Ops Manager — Installations)"
         submitLabel="Defer to Logan"
         onSubmit={submitDeferral}
         onCancel={() => setDeferModalOpen(false)}

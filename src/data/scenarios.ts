@@ -289,6 +289,17 @@ export const DEFERRAL_REASON_CHIPS = [
   "Other",
 ];
 
+// Suggested-reason chips for Recall — operator pulls a deferred job back from
+// senior. Free text is optional here (chip alone often tells the story) since
+// the recall has no downstream receiver who needs context.
+export const RECALL_REASON_CHIPS = [
+  "I have the info I need now",
+  "Situation resolved itself",
+  "Customer/trade contact resumed",
+  "I can handle it after all",
+  "Other",
+];
+
 // ─── AI Audit / Missed-prioritisation surface ────────────────────────────────
 // Per Discovery OS req (17 Apr 2026, High priority): operators must be able to
 // see what the system chose NOT to put on their queue, to catch cases where

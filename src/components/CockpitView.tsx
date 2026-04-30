@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { loganQueueJobs, kerrieQueueJobs } from "../data/jobs";
 import type { Job } from "../data/jobs";
-import { ALL_PATTERNS, SUPERVISORS, TAG_VOCABULARY, SILENT_DECISIONS, type FieldDeferral, type DeferralEscalation, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
+import { ALL_PATTERNS, SUPERVISORS, TAG_VOCABULARY, SILENT_DECISIONS, RECALL_REASON_CHIPS, type FieldDeferral, type DeferralEscalation, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
 import AskAI from "./AskAI";
 import JourneyBar from "./JourneyBar";
@@ -125,7 +125,7 @@ function ActivityLog({ items, actionRequired }: {
 }
 
 // ─── Job Detail Panel (unified — works for Logan and Kerrie) ──────────────────
-function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest }: {
+function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveTag, activeDeferral, onDeferRequest, onRecallRequest }: {
   job: Job;
   persona: string;
   onAction: (id: string, action: string) => void;
@@ -133,8 +133,9 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
   tags: string[];
   onAddTag?: (tag: string) => void;
   onRemoveTag?: (tag: string) => void;
-  activeDeferral?: FieldDeferral;     // present if this operator deferred this job (or anyone in tier path did)
-  onDeferRequest?: () => void;         // open the modal in the parent
+  activeDeferral?: FieldDeferral;     // present if this operator deferred this job
+  onDeferRequest?: () => void;
+  onRecallRequest?: () => void;        // open recall modal — only when this operator can recall
 }) {
   const [actionDone, setActionDone] = useState<string | null>(null);
   const isInsurance = job.type === "Insurance Repair";
@@ -290,12 +291,20 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
           <div className="flex items-center justify-between gap-2">
             <p className="text-amber-800 text-xs font-semibold uppercase tracking-wide">Deferred — with {activeDeferral.currentHolder === "aaron" ? "Aaron / National" : activeDeferral.currentHolder} since {activeDeferral.time}</p>
+            {onRecallRequest && (
+              <button
+                onClick={onRecallRequest}
+                className="text-[11px] text-[#0077a8] hover:text-[#00BDFE] hover:underline font-medium flex-shrink-0"
+              >
+                ↻ Recall from senior
+              </button>
+            )}
           </div>
           <p className="text-slate-700 text-xs italic leading-snug">"You: {activeDeferral.reason}"</p>
           {(activeDeferral.escalations ?? []).map((e, i) => (
             <p key={i} className="text-slate-700 text-xs italic leading-snug">"{e.by}: {e.reason}"</p>
           ))}
-          <p className="text-slate-500 text-[11px] mt-1">Action returns to you when senior responds. Job remains visible in your queue.</p>
+          <p className="text-slate-500 text-[11px] mt-1">Action returns to you when senior responds — or recall now if you've worked it out.</p>
         </div>
       )}
 
@@ -519,7 +528,7 @@ function LoganKPIs({ jobs, onInspect, onPersonaSwitch, deferrals: allDeferrals, 
         open={escalateTarget !== null}
         title="Escalate to senior"
         itemDescription={escalateTarget ? `${escalateTarget.task} · ${escalateTarget.jobId}` : ""}
-        destinationLabel="Aaron / National"
+        destinationLabel="Going to Aaron / National"
         submitLabel="Escalate"
         onSubmit={submitEscalation}
         onCancel={() => setEscalateTarget(null)}
@@ -926,7 +935,7 @@ function CockpitPatternDetail({ pattern: p, onClose }: { pattern: LoganPattern; 
 }
 
 // ─── Main CockpitView ─────────────────────────────────────────────────────────
-export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag, deferrals, onAddEscalation, onAddDeferral, modelFeedback, onAddModelFeedback }: {
+export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAddTag, onRemoveTag, deferrals, onAddEscalation, onAddDeferral, onRecallDeferral, modelFeedback, onAddModelFeedback }: {
   persona: string;
   onPersonaSwitch?: (id: string) => void;
   tagsByJob: Record<string, string[]>;
@@ -935,6 +944,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   deferrals: FieldDeferral[];
   onAddEscalation: (jobId: string, esc: DeferralEscalation) => void;
   onAddDeferral: (entry: FieldDeferral) => void;
+  onRecallDeferral: (jobId: string, reason: string) => void;
   modelFeedback: ModelFeedback[];
   onAddModelFeedback: (entry: ModelFeedback) => void;
 }) {
@@ -958,6 +968,14 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   // Defer-from-job flow: modal open when an operator chooses to escalate a job
   // from their queue up to senior tier.
   const [deferJobTarget, setDeferJobTarget] = useState<Job | null>(null);
+  // Recall flow: modal open when the operator wants to take back a deferred job
+  const [recallJobTarget, setRecallJobTarget] = useState<Job | null>(null);
+
+  const submitJobRecall = (reason: string) => {
+    if (!recallJobTarget) return;
+    onRecallDeferral(recallJobTarget.id, reason);
+    setRecallJobTarget(null);
+  };
 
   const submitJobDeferral = (reason: string) => {
     if (!deferJobTarget) return;
@@ -1243,6 +1261,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
                 onRemoveTag={selectedJob.readOnlyFor.includes(persona) ? undefined : (t) => onRemoveTag(selectedJob.id, t)}
                 activeDeferral={findActiveJobDeferral(selectedJob.id)}
                 onDeferRequest={selectedJob.readOnlyFor.includes(persona) ? undefined : () => setDeferJobTarget(selectedJob)}
+                onRecallRequest={findActiveJobDeferral(selectedJob.id) ? () => setRecallJobTarget(selectedJob) : undefined}
               />
             </div>
           )}
@@ -1301,10 +1320,26 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
         open={deferJobTarget !== null}
         title="Defer to senior"
         itemDescription={deferJobTarget ? `${deferJobTarget.id} · ${deferJobTarget.actionRequired ?? deferJobTarget.customer}` : ""}
-        destinationLabel="Aaron / National"
+        destinationLabel="Going to Aaron / National"
         submitLabel="Defer to senior"
         onSubmit={submitJobDeferral}
         onCancel={() => setDeferJobTarget(null)}
+      />
+
+      {/* Recall modal — operator pulls a deferred job back. Reasons are quick
+          chips, free text optional. */}
+      <DeferralReasonModal
+        open={recallJobTarget !== null}
+        title="Recall from senior"
+        itemDescription={recallJobTarget ? `${recallJobTarget.id} · ${recallJobTarget.actionRequired ?? recallJobTarget.customer}` : ""}
+        destinationLabel="Action returns to you"
+        submitLabel="Recall"
+        chips={RECALL_REASON_CHIPS}
+        requireText={false}
+        textareaLabel="Add a note"
+        textareaPlaceholder="e.g. Trade just rang back and confirmed they're on their way."
+        onSubmit={submitJobRecall}
+        onCancel={() => setRecallJobTarget(null)}
       />
 
     </div>
