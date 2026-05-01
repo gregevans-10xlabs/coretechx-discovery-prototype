@@ -68,7 +68,10 @@ export default function AskAI({ context, placeholder, trigger, suggestions, onCo
   const [loading,setLoading]=useState(false);
   const bot=useRef<HTMLDivElement>(null);
 
-  useEffect(()=>{ bot.current?.scrollIntoView({behavior:"smooth"}); },[msgs]);
+  // Only scroll once there's something to scroll to. `block: "nearest"` keeps the
+  // scroll contained to the chat's own overflow container — without it, mounting
+  // AskAI scrolls the entire page (which yanks the viewport on persona switch).
+  useEffect(()=>{ if(msgs.length>0) bot.current?.scrollIntoView({behavior:"smooth",block:"nearest"}); },[msgs]);
   useEffect(()=>{ onConversationChange?.(msgs.length > 0); }, [msgs.length, onConversationChange]);
 
   const ask=async(override?:string)=>{
