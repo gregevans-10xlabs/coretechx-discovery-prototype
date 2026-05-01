@@ -151,18 +151,31 @@ export default function CommitmentAnatomy({ job, onSelectTrade }: { job: Job; on
 
   return (
     <div>
-      {/* Header is the toggle — whole row clickable */}
+      {/* Header is the toggle — framed as a card-shaped button so the affordance
+          is obvious. Section labels elsewhere are non-interactive uppercase
+          headings; without a frame this row was indistinguishable from them
+          and got lost on a busy detail panel. */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-start gap-2 mb-2 text-left group"
+        aria-expanded={expanded}
+        className={`w-full flex items-center gap-2.5 mb-2 text-left group rounded-lg border px-3 py-2 transition-colors ${
+          expanded
+            ? "bg-white border-slate-200"
+            : "bg-slate-50 border-slate-200 hover:bg-white hover:border-[#00BDFE]/50"
+        }`}
       >
-        <span className="text-slate-300 text-[10px] mt-1 group-hover:text-slate-500 flex-shrink-0">{expanded ? "▾" : "▸"}</span>
-        <div className="flex-1">
-          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider group-hover:text-slate-600">Commitments</span>
-          <p className="text-slate-400 text-[10px] mt-0.5">
+        <span className="text-slate-500 text-sm leading-none flex-shrink-0 group-hover:text-[#0099d4] transition-colors">{expanded ? "▾" : "▸"}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-600 text-xs font-semibold uppercase tracking-wider group-hover:text-slate-800 transition-colors">Commitments</span>
+            <span className="text-[10px] font-medium text-slate-400 group-hover:text-[#0099d4] flex-shrink-0 transition-colors">
+              {expanded ? "Hide" : "Show details"}
+            </span>
+          </div>
+          <p className="text-slate-500 text-[10px] mt-0.5 truncate">
             {all.length} total · {live.length} live · {closed.length} closed{voided.length > 0 ? ` · ${voided.length} voided` : ""}
             {!expanded && headline && (
-              <span className="text-slate-500"> · most attention: {headline.promise.slice(0, 50)}{headline.promise.length > 50 ? "…" : ""}</span>
+              <span> · most attention: {headline.promise.slice(0, 50)}{headline.promise.length > 50 ? "…" : ""}</span>
             )}
           </p>
         </div>
