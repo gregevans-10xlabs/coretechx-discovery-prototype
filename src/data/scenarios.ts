@@ -63,11 +63,11 @@ export const PRIME_STATUSES = [
 
 // ─── Personas ─────────────────────────────────────────────────────────────────
 // Order matters: shown in this sequence in the persona switcher. T1/T2
-// frontline operators come first (Shari) so the persona switcher reads bottom-
+// frontline operators come first (Sharon) so the persona switcher reads bottom-
 // up through the org — the people who do the work, then the managers who
 // govern it, then the executives.
 export const PERSONAS = [
-  { id:"shari",    label:"Shari",    title:"T1 Intake & Dispatch",                 region:"North East (NSW/QLD)", types:["starlink","hn","jbhifi"],                                      canConfig:false },
+  { id:"sharon",    label:"Sharon",    title:"T1 Intake & Dispatch",                 region:"North East (NSW/QLD)", types:["starlink","hn","jbhifi"],                                      canConfig:false },
   { id:"logan",    label:"Logan",    title:"Ops Manager — Installation Services", region:"North East (NSW/QLD)", types:["starlink","hn","jbhifi"],                                      canConfig:false },
   { id:"kerrie",   label:"Kerrie",   title:"Insurance Coordinator",                region:"National",             types:["insurance"],                                                   canConfig:false },
   { id:"troy",     label:"Troy",     title:"Field Supervisor",                     region:"North East NSW",       types:[],                                                              canConfig:false },
@@ -278,11 +278,11 @@ export const INITIAL_FIELD_DEFERRALS: FieldDeferral[] = [
   { task:"Site audit — Penrith Install",        who:"Troy Macpherson", whoId:"troy",  role:"Field Supervisor",            time:"07:42", jobId:"CG-2417931", urgent:true,  reason:"WHS observation flagged — needs Logan sign-off before re-attendance.",                  tierPath:["troy","logan","national","aaron"],  currentHolder:"logan" },
   { task:"Photo evidence upload — Minto",       who:"MJ Electrical",   whoId:null,    role:"Trade",                       time:"08:15", jobId:"CG-2418042", urgent:false, reason:"Trade portal sync error. Coordinator manual upload required.",                          tierPath:["logan","national","aaron"],         currentHolder:"logan" },
   { task:"Customer call-back — Coffs Harbour",  who:"Kylie Tran",      whoId:"kylie", role:"Field Supervisor",            time:"09:03", jobId:"CG-2418109", urgent:false, reason:"Customer requested manager-level discussion on rescheduling.",                          tierPath:["kylie","logan","national","aaron"], currentHolder:"logan" },
-  // Shari → Logan: T1 has hit the limit of her authority and bumped a second
+  // Sharon → Logan: T1 has hit the limit of her authority and bumped a second
   // no-show / formal-warning decision up to the ops manager. Demonstrates the
   // T1-tier chain that exists upstream of the patterns Logan was already
   // handling.
-  { task:"Formal warning — Smart Techie 2nd no-show", who:"Shari Patel",     whoId:"shari", role:"T1 Intake & Dispatch",         time:"09:08", jobId:"CG35930",    urgent:true,  reason:"Second no-show in 14 days. Logging a formal warning is beyond my authority — needs Logan's call.",  tierPath:["shari","logan","national","aaron"], currentHolder:"logan" },
+  { task:"Formal warning — Smart Techie 2nd no-show", who:"Sharon Patel",     whoId:"sharon", role:"T1 Intake & Dispatch",         time:"09:08", jobId:"CG35930",    urgent:true,  reason:"Second no-show in 14 days. Logging a formal warning is beyond my authority — needs Logan's call.",  tierPath:["sharon","logan","national","aaron"], currentHolder:"logan" },
   { task:"Coverage gap — Mid North Coast (NSW)",who:"Logan Reilly",    whoId:"logan", role:"Ops Manager — Installations", time:"09:18", jobId:"P-041",      urgent:true,  reason:"Beyond my procurement authority — pattern P-039 persisting 5+ days, 3 jobs unmatched in 2295 postcode. Need approval to onboard 1–2 trades for this corridor.", tierPath:["logan","national","aaron"], currentHolder:"aaron" },
 ];
 
@@ -502,7 +502,7 @@ export const STAFF_PERFORMANCE: {
   improvements?: string[];
 }[] = [
   {
-    persona:"shari", name:"Shari", role:"T1 Intake & Dispatch",
+    persona:"sharon", name:"Sharon", role:"T1 Intake & Dispatch",
     tier:"Gold",
     rank:3, rankTotal:8, rankNoun:"T1 dispatch operators",
     streak:2,
@@ -511,7 +511,7 @@ export const STAFF_PERFORMANCE: {
     weeklyChallenge:"⚡ Sub-15 Sprint — hold intake-to-allocation under 15 minutes for the rest of the week to unlock Dispatch Hawk.",
     badges:[
       { icon:"⚡", label:"Quick Hands",      desc:"Resolved 11.4 allocation decisions per hour this week — well above the 10/hr threshold for the badge. Top-quartile pace for T1 dispatch.",                                  earned:true  },
-      { icon:"🔁", label:"Routing Right",    desc:"94% of escalations to Logan accepted as appropriate first time. No bounce-backs this week — Shari is correctly identifying what needs T2/T3 judgment.",                  earned:true  },
+      { icon:"🔁", label:"Routing Right",    desc:"94% of escalations to Logan accepted as appropriate first time. No bounce-backs this week — Sharon is correctly identifying what needs T2/T3 judgment.",                  earned:true  },
       { icon:"📞", label:"Callback Closer",  desc:"28 of 30 customer callbacks closed within 30 min this week. Two open are awaiting customer return-call, which is outside her control.",                                   earned:true  },
       { icon:"📷", label:"Evidence Hawk",    desc:"Close 25 photo-evidence chases in a single week. Currently at 17 — closing 8 more before Friday unlocks this. The York Digital pattern is consuming most of the queue.", earned:false },
       { icon:"🦅", label:"Dispatch Hawk",    desc:"Hold intake-to-allocation time under 15 min across a full week. Currently averaging 14.2 min for 4 days running — three more days to lock in the badge.",                  earned:false },

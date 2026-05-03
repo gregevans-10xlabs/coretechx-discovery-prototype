@@ -1133,11 +1133,11 @@ export const JOBS: Job[] = [
     readOnlyFor: [],
   },
 
-  // ── T1 INTAKE & DISPATCH JOBS (Shari primary) ───────────────────────────────
+  // ── T1 INTAKE & DISPATCH JOBS (Sharon primary) ───────────────────────────────
   // These are the kinds of low-stakes, high-cadence exceptions that anchor a
   // T1 operator's day: a settle-stage RCTI portal failure that's blocking
   // trade payment, and a customer callback request the AI couldn't action.
-  // Both are skill-appropriate for Shari without escalation.
+  // Both are skill-appropriate for Sharon without escalation.
 
   {
     id: "CG36245",
@@ -1200,29 +1200,29 @@ export const JOBS: Job[] = [
 
 ];
 
-// ─── T1 frontline operator (Shari) — visibility post-processing ──────────────
+// ─── T1 frontline operator (Sharon) — visibility post-processing ──────────────
 // Rather than touching every install-type job declaratively, we apply a single
-// skill-tier rule here: Shari sees all install jobs that Logan sees, and can
+// skill-tier rule here: Sharon sees all install jobs that Logan sees, and can
 // action them unless they trip a hard limit (compliance gap or financial
 // scope change) — those need T2/T3 judgment and become read-only for her with
 // an explanatory reason.
 //
 // Expressed once so it stays consistent as the dataset grows. Mutates JOBS
 // items in place; the array reference itself is not changed.
-const T1_SHARI_INSTALL_TYPES = ["Starlink Install", "Harvey Norman Install", "JB Hi-Fi Install"];
+const T1_SHARON_INSTALL_TYPES = ["Starlink Install", "Harvey Norman Install", "JB Hi-Fi Install"];
 for (const job of JOBS) {
-  if (!T1_SHARI_INSTALL_TYPES.includes(job.type)) continue;
+  if (!T1_SHARON_INSTALL_TYPES.includes(job.type)) continue;
   if (!job.visibleTo.includes("logan")) continue;
 
   const hardLimit = job.flags.some(f => f.type === "compliance_gap" || f.type === "scope_change");
-  if (!job.visibleTo.includes("shari")) job.visibleTo.push("shari");
+  if (!job.visibleTo.includes("sharon")) job.visibleTo.push("sharon");
   if (hardLimit) {
-    if (!job.readOnlyFor.includes("shari")) job.readOnlyFor.push("shari");
+    if (!job.readOnlyFor.includes("sharon")) job.readOnlyFor.push("sharon");
     if (!job.readOnlyReason) {
       job.readOnlyReason = "Compliance / financial decision — escalate to Logan (skill: Learning)";
     }
-  } else if (!job.actionableBy.includes("shari")) {
-    job.actionableBy.push("shari");
+  } else if (!job.actionableBy.includes("sharon")) {
+    job.actionableBy.push("sharon");
   }
 }
 
@@ -1259,12 +1259,12 @@ export function kerrieQueueJobs(): Job[] {
   });
 }
 
-/** Shari's T1 dispatch queue — install-type jobs only. Includes hard-limit
+/** Sharon's T1 dispatch queue — install-type jobs only. Includes hard-limit
  *  jobs as read-only so the skill-gating story is visible (she sees the
  *  compliance/scope items but can't action them). */
-export function shariQueueJobs(): Job[] {
+export function sharonQueueJobs(): Job[] {
   return JOBS.filter(j =>
-    j.visibleTo.includes("shari") &&
-    T1_SHARI_INSTALL_TYPES.includes(j.type)
+    j.visibleTo.includes("sharon") &&
+    T1_SHARON_INSTALL_TYPES.includes(j.type)
   ).sort((a, b) => a.minsToWindow - b.minsToWindow);
 }

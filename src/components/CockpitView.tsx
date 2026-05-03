@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { loganQueueJobs, kerrieQueueJobs, shariQueueJobs } from "../data/jobs";
+import { loganQueueJobs, kerrieQueueJobs, sharonQueueJobs } from "../data/jobs";
 import type { Job } from "../data/jobs";
 import { ALL_PATTERNS, SUPERVISORS, TAG_VOCABULARY, SILENT_DECISIONS, RECALL_REASON_CHIPS, type FieldDeferral, type DeferralEscalation, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
@@ -30,12 +30,12 @@ function sortDecisionFirst(jobs: Job[]): Job[] {
 }
 
 // Background job volume (illustrative — prototype data is a regional slice).
-// Shari's number is set higher than Logan's because T1 dispatch sees the full
+// Sharon's number is set higher than Logan's because T1 dispatch sees the full
 // intake firehose for the region, including high-volume routine work that
 // never bubbles up to ops management.
 const LOGAN_REGION_TOTAL  = 3450;
 const KERRIE_REGION_TOTAL = 240;
-const SHARI_REGION_TOTAL  = 1240;
+const SHARON_REGION_TOTAL  = 1240;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function geoStatusLabel(job: Job): string {
@@ -725,26 +725,26 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
   );
 }
 
-// ─── KPI Panel — Shari (T1 Intake & Dispatch) ────────────────────────────────
+// ─── KPI Panel — Sharon (T1 Intake & Dispatch) ────────────────────────────────
 // Distinct from Logan's portfolio framing: T1 work is throughput-shaped, so
 // the panel leads with decisions/hour, intake-to-allocation time, and the
 // callback queue. PerformanceHub provides the weighted KPI surface; the
 // panels below it are operational cadence indicators for the day in front.
-function ShariKPIs({ jobs, allDeferrals }: { jobs: Job[]; allDeferrals: FieldDeferral[] }) {
+function SharonKPIs({ jobs, allDeferrals }: { jobs: Job[]; allDeferrals: FieldDeferral[] }) {
   const decisionCount = jobs.filter(j => j.actionRequired !== null).length;
   const closedToday = jobs.filter(j => j.primeStatus === "Works Complete" || j.primeStatus === "Invoiced").length;
   const callbacksOpen = jobs.filter(j => j.actionRequired?.toLowerCase().includes("callback") || j.actionRequired?.toLowerCase().includes("call customer") || j.actionRequired?.toLowerCase().includes("return call")).length;
   const photoChasesOpen = jobs.filter(j => j.flags.some(f => f.type === "photo_missing")).length;
   const rctiBlocked = jobs.filter(j => j.actionRequired?.toLowerCase().includes("rcti")).length;
 
-  // Items Shari has deferred up to Logan today — gives her a glanceable read
+  // Items Sharon has deferred up to Logan today — gives her a glanceable read
   // on what's bouncing around above her, with the recall path one click away
   // from the queue card.
-  const myDeferralsToLogan = allDeferrals.filter(d => d.whoId === "shari");
+  const myDeferralsToLogan = allDeferrals.filter(d => d.whoId === "sharon");
 
   return (
     <div className="space-y-3">
-      <PerformanceHub persona="shari" />
+      <PerformanceHub persona="sharon" />
 
       {/* Today's throughput — the cadence numbers a T1 operator lives by */}
       <div className="grid grid-cols-2 gap-2">
@@ -800,7 +800,7 @@ function ShariKPIs({ jobs, allDeferrals }: { jobs: Job[]; allDeferrals: FieldDef
       </div>
 
       {/* Skill development — mirrors the Skills block other personas show, but
-          frames this as Shari's path forward (T1 → T2). */}
+          frames this as Sharon's path forward (T1 → T2). */}
       <div className="bg-white rounded-xl border border-slate-200 p-3">
         <p className="text-slate-500 text-xs font-semibold mb-2">Skills</p>
         <div className="space-y-1.5">
@@ -1086,12 +1086,12 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   onSelectTrade?: (name: string) => void;
 }) {
   const isKerrie = persona === "kerrie";
-  const isShari  = persona === "shari";
+  const isSharon  = persona === "sharon";
 
   const loganQueue  = sortDecisionFirst(loganQueueJobs());
   const kerrieQueue = sortDecisionFirst(kerrieQueueJobs());
-  const shariQueue  = sortDecisionFirst(shariQueueJobs());
-  const fullQueue   = isKerrie ? kerrieQueue : isShari ? shariQueue : loganQueue;
+  const sharonQueue  = sortDecisionFirst(sharonQueueJobs());
+  const fullQueue   = isKerrie ? kerrieQueue : isSharon ? sharonQueue : loganQueue;
 
   // Decision queue: only jobs that need a human decision
   const decisionQueue = fullQueue.filter(j => j.actionRequired !== null);
@@ -1120,13 +1120,13 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
     if (!deferJobTarget) return;
     const now = new Date();
     const time = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
-    const personaName = isKerrie ? "Kerrie Tran" : isShari ? "Shari Patel" : "Logan Reilly";
-    const personaRole = isKerrie ? "Insurance Coordinator" : isShari ? "T1 Intake & Dispatch" : "Ops Manager — Installations";
-    // Defer chain: Shari's natural escalation goes to her direct manager Logan
+    const personaName = isKerrie ? "Kerrie Tran" : isSharon ? "Sharon Patel" : "Logan Reilly";
+    const personaRole = isKerrie ? "Insurance Coordinator" : isSharon ? "T1 Intake & Dispatch" : "Ops Manager — Installations";
+    // Defer chain: Sharon's natural escalation goes to her direct manager Logan
     // first; ops managers (Logan/Kerrie) skip up to National. Keeps the chain
     // accurate to the org structure rather than always jumping to the top.
-    const tierPath = isShari ? ["shari", "logan", "national", "aaron"] : [persona, "national", "aaron"];
-    const currentHolder = isShari ? "logan" : "aaron";
+    const tierPath = isSharon ? ["sharon", "logan", "national", "aaron"] : [persona, "national", "aaron"];
+    const currentHolder = isSharon ? "logan" : "aaron";
     onAddDeferral({
       task: deferJobTarget.actionRequired ?? `Action on ${deferJobTarget.id}`,
       who: personaName, whoId: persona, role: personaRole,
@@ -1165,7 +1165,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
     : null;
 
   const decisionCount   = decisionQueue.length;
-  const aiHandlingCount = (isKerrie ? KERRIE_REGION_TOTAL : isShari ? SHARI_REGION_TOTAL : LOGAN_REGION_TOTAL) - decisionCount;
+  const aiHandlingCount = (isKerrie ? KERRIE_REGION_TOTAL : isSharon ? SHARON_REGION_TOTAL : LOGAN_REGION_TOTAL) - decisionCount;
 
   // Queue summary — one compact line per visible job, included in every AI context
   // so the agent can answer lookups by customer, trade, address, or job number
@@ -1181,14 +1181,14 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   // co-located so adding personas is a single touch-point.
   const personaSubtitle = isKerrie
     ? "Kerrie — Insurance Coordinator, National"
-    : isShari
-    ? "Shari — T1 Intake & Dispatch, North East NSW/QLD"
+    : isSharon
+    ? "Sharon — T1 Intake & Dispatch, North East NSW/QLD"
     : "Logan — Ops Manager, North East NSW/QLD";
-  const personaShort = isKerrie ? "Kerrie" : isShari ? "Shari" : "Logan";
+  const personaShort = isKerrie ? "Kerrie" : isSharon ? "Sharon" : "Logan";
   const personaSummary = isKerrie
     ? "Kerrie — Insurance Coordinator. National insurance portfolio."
-    : isShari
-    ? "Shari — T1 Intake & Dispatch. Routine allocations, callbacks, RCTI sync, photo evidence chases for the North East region."
+    : isSharon
+    ? "Sharon — T1 Intake & Dispatch. Routine allocations, callbacks, RCTI sync, photo evidence chases for the North East region."
     : "Logan — Ops Manager. North East NSW/QLD.";
 
   // AI bar: context shifts to match whatever is selected, but the full queue
@@ -1214,7 +1214,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
         { label: "All open work for this insurer", question: "An insurer's name has come up — please ask me which insurer, then walk me through all their open jobs, where they sit against SLA, and any concerns." },
         { label: "Insurance jobs near SLA breach today", question: "Which insurance jobs are at risk of breaching SLA today, and what's driving the risk for each?" },
       ]
-    : isShari
+    : isSharon
     ? [
         { label: "Customer rang back", question: "A customer is on the phone about an install. Please ask me for the job number, customer name, or suburb, and pull up the full picture — trade allocated, status, what AI has done, what they probably want to know." },
         { label: "Allocations needing my call today", question: "Which allocations need me to make a call today — soft reservations expiring, no-checkin trades, or callbacks not yet returned? Group them by urgency." },
@@ -1229,11 +1229,11 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   // AI Audit — silent decisions scoped to this persona's region/job-types.
   // Discovery OS Req 3 (17 Apr 2026): operators must see what AI chose NOT
   // to surface, to catch cases where the prioritisation model is wrong.
-  // Shari shares Logan's region/job-type scope (T1 dispatch operates over the
+  // Sharon shares Logan's region/job-type scope (T1 dispatch operates over the
   // same install-type firehose Logan governs).
   const auditDecisions = SILENT_DECISIONS.filter(d => {
     if (isKerrie) return d.jobType === "Insurance Repair";
-    // Logan + Shari: starlink/HN/JBHF in the North East
+    // Logan + Sharon: starlink/HN/JBHF in the North East
     return d.region === "North East NSW/QLD" && (d.jobType === "Starlink Install" || d.jobType === "Harvey Norman Install" || d.jobType === "JB Hi-Fi Install");
   });
 
@@ -1288,7 +1288,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
               decisions={auditDecisions}
               feedback={modelFeedback}
               onAddFeedback={onAddModelFeedback}
-              flaggedByName={isKerrie ? "Kerrie Tran" : isShari ? "Shari Patel" : "Logan Reilly"}
+              flaggedByName={isKerrie ? "Kerrie Tran" : isSharon ? "Sharon Patel" : "Logan Reilly"}
               flaggedById={persona}
             />
           ) : (
@@ -1300,7 +1300,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
               </div>
               <p className="text-slate-600 text-xs font-semibold">Nothing needs your attention</p>
               <p className="text-slate-400 text-[10px] leading-relaxed">
-                AI is handling all {(isKerrie ? KERRIE_REGION_TOTAL : isShari ? SHARI_REGION_TOTAL : LOGAN_REGION_TOTAL).toLocaleString()} active jobs in your region
+                AI is handling all {(isKerrie ? KERRIE_REGION_TOTAL : isSharon ? SHARON_REGION_TOTAL : LOGAN_REGION_TOTAL).toLocaleString()} active jobs in your region
               </p>
             </div>
           ) : filteredQueue.length === 0 ? (
@@ -1314,10 +1314,10 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
               {filteredQueue.map(j => (
                 <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} isDeferred={!!findActiveJobDeferral(j.id)} onSelectTrade={onSelectTrade} />
               ))}
-              {/* Pattern cards — Logan only (Shari reads patterns through the
+              {/* Pattern cards — Logan only (Sharon reads patterns through the
                   AI Audit tab; ops-management governance work doesn't belong
                   in T1's exception queue). */}
-              {!isShari && filter === "action" && loganPatterns.length > 0 && (
+              {!isSharon && filter === "action" && loganPatterns.length > 0 && (
                 <>
                   <div className="px-1 pt-2 pb-0.5">
                     <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider">AI Patterns Detected</p>
@@ -1477,8 +1477,8 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
         <div className="flex-1 overflow-y-auto p-3">
           {isKerrie
             ? <KerrieKPIs jobs={kerrieQueue} />
-            : isShari
-            ? <ShariKPIs jobs={shariQueue} allDeferrals={deferrals} />
+            : isSharon
+            ? <SharonKPIs jobs={sharonQueue} allDeferrals={deferrals} />
             : <LoganKPIs jobs={loganQueue} onInspect={(id) => setSelectedId(`INSPECT:${id}`)} onPersonaSwitch={onPersonaSwitch} deferrals={deferrals} onAddEscalation={onAddEscalation} />
           }
         </div>
