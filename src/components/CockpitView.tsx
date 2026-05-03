@@ -11,6 +11,7 @@ import AIAuditTab from "./AIAuditTab";
 import TradeLink from "./TradeLink";
 import ShadowPlanPill from "./ShadowPlanPill";
 import CountdownPill from "./CountdownPill";
+import TradeChain from "./TradeChain";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned" | "audit";
@@ -272,6 +273,13 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
           ⚠ {flag.detail}
         </div>
       ))}
+
+      {/* Trade Chain — multi-trade jobs only. Sits above the Journey bar so
+          operators see the live coordination state before the abstract
+          lifecycle position. */}
+      {job.tradeActors && job.tradeActors.length > 1 && (
+        <TradeChain actors={job.tradeActors} onSelectTrade={onSelectTrade} />
+      )}
 
       {/* Journey */}
       <div>

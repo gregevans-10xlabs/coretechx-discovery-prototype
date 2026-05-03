@@ -10,6 +10,7 @@ import DeferralReasonModal from "./DeferralReasonModal";
 import TradeLink from "./TradeLink";
 import ShadowPlanPill from "./ShadowPlanPill";
 import CountdownPill from "./CountdownPill";
+import TradeChain from "./TradeChain";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -124,6 +125,13 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
             </div>
           )}
         </div>
+
+        {/* Trade Chain — multi-trade jobs only (typical for AHO Construction).
+            Sits above the Journey bar so operators see live coordination
+            state before the abstract lifecycle position. */}
+        {job.tradeActors && job.tradeActors.length > 1 && (
+          <TradeChain actors={job.tradeActors} onSelectTrade={onSelectTrade} />
+        )}
 
         {/* Journey */}
         <div>

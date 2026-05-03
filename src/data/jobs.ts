@@ -126,6 +126,32 @@ export type Job = {
   // for those who want the deeper structure. Optional — only modelled jobs have
   // these; others show a placeholder in the Commitment Anatomy block.
   commitments?: Commitment[];
+
+  // Trade chain — only populated on multi-trade jobs (typically Construction /
+  // Insurance multi-trade repairs). The Job's `trade` field carries the lead
+  // trade; this gives operators a glanceable read on the full chain — who's
+  // doing what right now, and who's waiting on whom. Aaron specifically
+  // listed "trade chain visibility" as one of the things he cares about.
+  tradeActors?: TradeActor[];
+};
+
+// ─── Trade Chain ─────────────────────────────────────────────────────────────
+// One entry per trade actor on a multi-trade job. Order is presentation
+// order (typically: lead trade first, then sub-trades, then any non-trade
+// actor like an inspector who closes out the job).
+export type TradeActorStatus =
+  | "complete"        // their work signed off
+  | "in_progress"     // actively on site / executing
+  | "waiting"         // ready but blocked by another trade in the chain
+  | "scheduled"       // booked but hasn't started yet
+  | "blocked";        // explicit blocker (compliance, scope change, etc.)
+
+export type TradeActor = {
+  name: string;        // trade business name (clickable to TradeDrawer)
+  role: string;        // e.g. "Builder (lead)", "HVAC", "QA Inspector"
+  stage: string;       // current stage / detail line, e.g. "Frame · Day 4/28"
+  status: TradeActorStatus;
+  dependsOn?: string[]; // trade names this actor is waiting on
 };
 
 // ─── Shadow Plan ─────────────────────────────────────────────────────────────
@@ -971,13 +997,18 @@ export const JOBS: Job[] = [
       { time: "10 days ago", actor: "ai", msg: "Site survey completed. Scope approved by AHO." },
       { time: "1 week ago", actor: "ai", msg: "AusCorp Energy Pty Ltd allocated. J1 Air Conditioning allocated for HVAC component." },
       { time: "3 days ago", actor: "ai", msg: "Works commenced. AHO booking confirmed." },
-      { time: "08:00", actor: "ai", msg: "Both trades geo-confirmed on site. Day 4 of works. On track." },
+      { time: "08:00", actor: "ai", msg: "AusCorp on site — frame in progress (Day 4/28). J1 HVAC pre-rough-in scheduled to start when frame completes (~Day 8)." },
     ],
     actionRequired: null,
     actionOptions: [],
     visibleTo: ["conner", "national", "aaron"],
     actionableBy: ["conner", "national", "aaron"],
     readOnlyFor: [],
+    tradeActors: [
+      { name: "AusCorp Energy Pty Ltd", role: "Builder (lead)", stage: "Frame · Day 4 of 28", status: "in_progress" },
+      { name: "J1 Air Conditioning", role: "HVAC", stage: "Pre-rough-in scheduled Day 8", status: "waiting", dependsOn: ["AusCorp Energy Pty Ltd"] },
+      { name: "Troy Macpherson", role: "Field Supervisor (WHS)", stage: "Twice-weekly observations", status: "in_progress" },
+    ],
     commitments: [
       { id: "C-CG36385-01", state: "closed", klass: "client_provider", type: "staged",
         promise: "AHO work order received and intake completed",
@@ -1075,6 +1106,11 @@ export const JOBS: Job[] = [
     visibleTo: ["conner", "national", "aaron"],
     actionableBy: ["conner", "national", "aaron"],
     readOnlyFor: [],
+    tradeActors: [
+      { name: "AusCorp Energy Pty Ltd", role: "Builder (lead)", stage: "Build complete · final photos submitted", status: "complete" },
+      { name: "J1 Air Conditioning", role: "HVAC", stage: "Install complete · final photos submitted", status: "complete" },
+      { name: "AHO Inspector", role: "Client QA", stage: "Available 2–4pm today", status: "scheduled", dependsOn: ["AusCorp Energy Pty Ltd", "J1 Air Conditioning"] },
+    ],
   },
 
   // ── HOME REPAIR JOBS (Blake / general) ───────────────────────────────────────

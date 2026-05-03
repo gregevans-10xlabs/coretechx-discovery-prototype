@@ -5,6 +5,7 @@ import CommitmentAnatomy from "./CommitmentAnatomy";
 import TradeLink from "./TradeLink";
 import ShadowPlanPill from "./ShadowPlanPill";
 import CountdownPill from "./CountdownPill";
+import TradeChain from "./TradeChain";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
@@ -445,6 +446,11 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, o
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">
         <div className="max-w-3xl mx-auto space-y-4">
+        {/* Trade Chain — multi-trade jobs only. */}
+        {job.tradeActors && job.tradeActors.length > 1 && (
+          <TradeChain actors={job.tradeActors} onSelectTrade={onSelectTrade} />
+        )}
+
         {/* Journey */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey</p>
