@@ -212,7 +212,11 @@ export type Commitment = {
 
 // ─── Journey step definitions ─────────────────────────────────────────────────
 // Per-job-type client labels (kept for reference; AI log strings still use these).
-export const STARLINK_JOURNEY  = ["Intake", "Triage", "Qualify", "Match", "Allocate", "Schedule", "Execute", "Complete"];
+// Starlink gains a "Settle" client step (29 Apr 2026): RCTI generation and
+// payment remittance had been platform-only, but operators need visibility on
+// settlement exceptions (failed RCTI sync, payment held) per Discovery OS
+// universal-stages alignment.
+export const STARLINK_JOURNEY  = ["Intake", "Triage", "Qualify", "Match", "Allocate", "Schedule", "Execute", "Complete", "Settle"];
 export const HN_JOURNEY        = ["Intake", "Qualify", "Match", "Allocate", "Schedule", "Execute", "QA", "Complete"];
 export const INSURANCE_JOURNEY = ["Assessment", "Scope", "Approved", "Allocated", "In Progress", "Awaiting", "Portal", "Closed"];
 export const AHO_JOURNEY       = ["Intake", "Site Survey", "Scope", "Approved", "Allocated", "In Progress", "Inspection", "Complete"];
@@ -231,11 +235,11 @@ export type JourneyMap = {
   clientLabels: string[][];   // length 8 (one per universal stage); each entry is client labels at that stage
 };
 
-// Starlink: Match→Plan, Schedule co-locates with Allocate, Complete→Complete.
-// No client step lives in Settle today (post-job invoice/feedback handled in workflow agents).
+// Starlink: Match→Plan, Schedule co-locates with Allocate, Complete→Complete,
+// Settle→Settle (added 29 Apr 2026 — see STARLINK_JOURNEY note above).
 export const STARLINK_MAP: JourneyMap = {
-  toUniversal:  [0, 1, 2, 3, 4, 4, 5, 6],
-  clientLabels: [["Intake"], ["Triage"], ["Qualify"], ["Match"], ["Allocate", "Schedule"], ["Execute"], ["Complete"], []],
+  toUniversal:  [0, 1, 2, 3, 4, 4, 5, 6, 7],
+  clientLabels: [["Intake"], ["Triage"], ["Qualify"], ["Match"], ["Allocate", "Schedule"], ["Execute"], ["Complete"], ["Settle"]],
 };
 
 // Harvey Norman / JB Hi-Fi: no Triage step; QA sits in Complete; "Complete" → Settle.
@@ -1188,7 +1192,7 @@ export const JOBS: Job[] = [
     geoStatus: "confirmed_en_route", geoTime: "Completed", minsToWindow: -2880,
     value: 359,
     conf: 0.62,
-    journeyStep: 7,
+    journeyStep: 8,  // Settle — install done, settlement is the live work
     flags: [],
     aiLog: [
       { time: "2 days ago", actor: "ai", msg: "Install completed. Photos and customer signature received." },
@@ -1203,6 +1207,43 @@ export const JOBS: Job[] = [
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
+    commitments: [
+      { id: "C-CG36245-01", state: "closed", klass: "operational", type: "staged",
+        promise: "Trade attended and completed install in window",
+        owner: "Newcastle Tv And Satellite Pty Ltd", ownerTier: "Trade · T1",
+        controlMode: "ai_autonomous",
+        proofRequired: "Geo check-in + completion event",
+      },
+      { id: "C-CG36245-02", state: "closed", klass: "proof", type: "staged",
+        promise: "Install evidence pack submitted (photos + customer signature + serial scan)",
+        owner: "Newcastle Tv And Satellite Pty Ltd", ownerTier: "Trade · T1",
+        controlMode: "ai_assisted",
+        proofRequired: "≥6 photos + signed customer form + serial number scan",
+      },
+      { id: "C-CG36245-03", state: "breach", klass: "payment", type: "staged",
+        promise: "RCTI generated and remitted to trade portal",
+        owner: "AI Settlement Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "Portal sync acknowledged with RCTI ID",
+        breachEarly: "T+12h: second auto-retry triggered",
+        breachHard: "T+24h after 3 failed retries: escalation to T1 dispatch",
+        autonomyProgression: "Autonomous since Aug 2025 · 99.7% accuracy — Newcastle TV portal sync is a known intermittent fault",
+        relationships: [{ type: "blocks", target: "Trade payment confirmed" }],
+      },
+      { id: "C-CG36245-04", state: "potential", klass: "payment", type: "staged",
+        promise: "Trade payment confirmed (funds remitted)",
+        owner: "AI Settlement Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "Bank confirmation event received",
+        relationships: [{ type: "depends_on", target: "RCTI generated and remitted" }],
+      },
+      { id: "C-CG36245-05", state: "active", klass: "customer", type: "staged",
+        promise: "Customer satisfaction survey sent and response collected",
+        owner: "AI Customer Comms Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "Survey delivered + response captured (or 7-day timeout)",
+      },
+    ],
   },
 
   {
@@ -1232,6 +1273,73 @@ export const JOBS: Job[] = [
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
+  },
+
+  // ── SETTLE-STAGE HAPPY PATH ─────────────────────────────────────────────────
+  // Demonstrates the lifecycle close: install done two days ago, AI Settlement
+  // Agent has generated the RCTI, payment is being processed, customer survey
+  // is out. No human action required — the loop closes itself. Lives in
+  // Logan's "Browse all" tab as a normal completed install settling cleanly,
+  // counterpoint to CG36245's settlement exception.
+  {
+    id: "CG36210",
+    type: "Harvey Norman Install",
+    primeStatus: "Invoiced",
+    priority: "standard",
+    suburb: "Tuggerah", state: "New South Wales", postcode: "2259",
+    customer: "H. Brennan",
+    trade: "UNITED INFOCOM TECH PTY LTD",
+    tradeType: "AV Installer",
+    window: "Complete", scheduledDate: "2026-04-07",
+    geoStatus: "confirmed_en_route", geoTime: "Completed", minsToWindow: -2880,
+    value: 280,
+    conf: 0.97,
+    journeyStep: 7,  // Settle (HN_MAP step 7 → universal Settle)
+    flags: [],
+    aiLog: [
+      { time: "2 days ago", actor: "ai", msg: "Install completed in window. Photos and customer signature received. QA pass auto-confirmed." },
+      { time: "2 days ago", actor: "ai", msg: "HN portal updated with completion event. Acknowledged." },
+      { time: "Yesterday", actor: "ai", msg: "RCTI generated and remitted: $280. Payment terms: 14 days. Awaiting bank confirmation." },
+      { time: "Yesterday", actor: "ai", msg: "Customer satisfaction survey sent via Cynnch. Response received: 5/5. Auto-logged." },
+    ],
+    actionRequired: null,
+    actionOptions: [],
+    visibleTo: ["logan", "national", "aaron"],
+    actionableBy: ["logan", "national", "aaron"],
+    readOnlyFor: [],
+    commitments: [
+      { id: "C-CG36210-01", state: "closed", klass: "operational", type: "staged",
+        promise: "Trade attended and completed install in window",
+        owner: "UNITED INFOCOM TECH PTY LTD", ownerTier: "Trade · T1",
+        controlMode: "ai_autonomous",
+        proofRequired: "Geo check-in + completion event",
+      },
+      { id: "C-CG36210-02", state: "closed", klass: "proof", type: "staged",
+        promise: "Install QA evidence pack submitted",
+        owner: "UNITED INFOCOM TECH PTY LTD", ownerTier: "Trade · T1",
+        controlMode: "ai_assisted",
+        proofRequired: "≥4 photos + signed customer form + serial scan",
+      },
+      { id: "C-CG36210-03", state: "closed", klass: "client_provider", type: "staged",
+        promise: "HN portal updated with completion event",
+        owner: "AI Portal Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "HN portal acknowledgement event received",
+      },
+      { id: "C-CG36210-04", state: "in_progress", klass: "payment", type: "staged",
+        promise: "Trade payment confirmed (RCTI sent, awaiting bank confirmation)",
+        owner: "AI Settlement Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "Bank confirmation event received within 14-day terms",
+        autonomyProgression: "Autonomous since Aug 2025 · 99.7% accuracy",
+      },
+      { id: "C-CG36210-05", state: "closed", klass: "customer", type: "staged",
+        promise: "Customer satisfaction survey sent and response collected",
+        owner: "AI Customer Comms Agent", ownerTier: "Ops · AI",
+        controlMode: "ai_autonomous",
+        proofRequired: "Survey delivered + response captured (got 5/5)",
+      },
+    ],
   },
 
 ];

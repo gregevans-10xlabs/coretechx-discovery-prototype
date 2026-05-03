@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { JOBS, type Job } from "../data/jobs";
+import { JOBS, type Job, journeyMapForJob } from "../data/jobs";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
 import TradeLink from "./TradeLink";
@@ -618,6 +618,68 @@ function BriefingDetailPanel({ msg, icon, onClose }: { msg: string; icon: string
 }
 
 // ─── Platform Health (Column 3) ───────────────────────────────────────────────
+// ─── Settlement panel — Settle-stage visibility for portfolio personas ───────
+// Pulls real Settle-stage refs from the JOBS dataset so Aaron can drill in,
+// but the aggregate volume figures are illustrative (the prototype dataset is
+// a regional slice, not the full population).
+function SettlementPanel() {
+  // Identify Settle-stage jobs by mapping each job's journeyStep through its
+  // type's JourneyMap to the universal-stage index. universal stage 7 = Settle.
+  const settleJobs = JOBS.filter(j => {
+    const map = journeyMapForJob(j);
+    const clamped = Math.min(j.journeyStep, map.toUniversal.length - 1);
+    return map.toUniversal[clamped] === 7;
+  });
+  const exceptions = settleJobs.filter(j => j.actionRequired !== null);
+  const settling   = settleJobs.filter(j => j.actionRequired === null);
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Settle — Lifecycle Close</p>
+        <p className="text-slate-400 text-[10px]">AI Settlement Agent</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
+          <p className="text-lg font-black text-slate-800">312</p>
+          <p className="text-[10px] text-slate-400 leading-tight">Settled this week</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
+          <p className="text-lg font-black text-slate-800">18</p>
+          <p className="text-[10px] text-slate-400 leading-tight">Settling now</p>
+        </div>
+        <div className={`rounded-xl border p-2.5 text-center ${exceptions.length > 0 ? "bg-red-50 border-red-200" : "bg-white border-slate-200"}`}>
+          <p className={`text-lg font-black ${exceptions.length > 0 ? "text-red-600" : "text-green-600"}`}>{exceptions.length}</p>
+          <p className="text-[10px] text-slate-400 leading-tight">Exceptions</p>
+        </div>
+      </div>
+
+      {/* Recent — show real refs (exceptions first, then completed) so the
+          panel reads as live operational data, not a placeholder. */}
+      {settleJobs.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl p-2.5">
+          <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide mb-1.5">Recent</p>
+          <div className="space-y-1">
+            {[...exceptions, ...settling].slice(0, 5).map(j => {
+              const isException = j.actionRequired !== null;
+              return (
+                <div key={j.id} className="flex items-center gap-2 text-xs">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isException ? "bg-red-500" : "bg-green-500"}`} />
+                  <span className="font-mono text-slate-400 text-[10px] flex-shrink-0 w-14">{j.id}</span>
+                  <span className="text-slate-600 flex-1 truncate">{j.type.replace(" Install", "")} · ${j.value.toLocaleString()}</span>
+                  <span className={`text-[10px] flex-shrink-0 ${isException ? "text-red-600 font-semibold" : "text-green-600"}`}>
+                    {isException ? "⚠ exception" : "✓ settled"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlatformHealth({ isAaron, onWorkflowConfig, deferrals, modelFeedback }: { isAaron: boolean; onWorkflowConfig?: () => void; deferrals: FieldDeferral[]; modelFeedback: ModelFeedback[] }) {
   // Team deferrals visible at portfolio level — Discovery OS roll-up requirement
   // (17 Apr 2026): every deferral remains visible at tier N+1 and N+2 with
@@ -668,6 +730,14 @@ function PlatformHealth({ isAaron, onWorkflowConfig, deferrals, modelFeedback }:
           ))}
         </div>
       </div>
+
+      {/* Settle stage — proves the lifecycle close is alive. Volumes are
+          illustrative (full population isn't in the prototype dataset);
+          recent items are real refs from the JOBS array so Aaron can drill
+          in. Demonstrates the universal-stage backbone runs end to end —
+          AI Settlement Agent generates RCTIs, remits payment, and only
+          surfaces exceptions like CG36245 (RCTI portal sync failed). */}
+      <SettlementPanel />
 
       {/* Team deferrals — full roll-up: every record where the senior tier is
           part of the path, i.e. visible to portfolio personas. Items currently
