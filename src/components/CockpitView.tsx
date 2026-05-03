@@ -1101,8 +1101,11 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   const sharonQueue  = sortDecisionFirst(sharonQueueJobs());
   const fullQueue   = isKerrie ? kerrieQueue : isSharon ? sharonQueue : loganQueue;
 
-  // Decision queue: only jobs that need a human decision
-  const decisionQueue = fullQueue.filter(j => j.actionRequired !== null);
+  // Decision queue: jobs that need a decision FROM THIS PERSONA — read-only
+  // items (skill-gated to a different tier) are not decisions for this user
+  // and are excluded from the count, the auto-select, and the AI handling
+  // total. They remain reachable via Browse and the AI Assistant.
+  const decisionQueue = fullQueue.filter(j => j.actionRequired !== null && !j.readOnlyFor.includes(persona));
   // First decision job auto-selected on load
   const [filter, setFilter]       = useState<QueueFilter>("action");
   const [selectedId, setSelectedId] = useState<string | null>(decisionQueue[0]?.id ?? null);
@@ -1153,10 +1156,17 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   const findActiveJobDeferral = (jobId: string) =>
     deferrals.find(d => d.jobId === jobId && d.whoId === persona);
 
+  // Read-only-for-this-persona filter: a job that's gated by skill tier (e.g.
+  // a compliance/financial decision Sharon can see but Logan must action) is
+  // by definition NOT a decision for this user. Hide from Decisions and
+  // Planned tabs so the queue reflects the operator's actual workload; keep
+  // them in Browse so the job remains findable for lookups (customer rings,
+  // chat-as-search, etc.).
+  const isReadOnlyHere = (j: Job) => j.readOnlyFor.includes(persona);
   const filteredQueue = fullQueue.filter(j => {
-    if (filter === "action")  return j.actionRequired !== null;
-    if (filter === "planned") return j.minsToWindow > 60 && j.geoStatus !== "no_checkin" && !j.actionRequired;
-    return true; // "browse"
+    if (filter === "action")  return j.actionRequired !== null && !isReadOnlyHere(j);
+    if (filter === "planned") return j.minsToWindow > 60 && j.geoStatus !== "no_checkin" && !j.actionRequired && !isReadOnlyHere(j);
+    return true; // "browse" — show everything visible to this persona, including read-only
   });
 
   const isPatternView    = selectedId?.startsWith("PATTERN:") ?? false;
