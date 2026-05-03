@@ -8,6 +8,8 @@ import CommitmentAnatomy from "./CommitmentAnatomy";
 import AIAuditTab from "./AIAuditTab";
 import DeferralReasonModal from "./DeferralReasonModal";
 import TradeLink from "./TradeLink";
+import ShadowPlanPill from "./ShadowPlanPill";
+import CountdownPill from "./CountdownPill";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -131,6 +133,12 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
 
         <CommitmentAnatomy job={job} onSelectTrade={onSelectTrade} />
 
+        {/* Shadow plan — pre-computed backup trade. Shown above the AI log so
+            the safety net is visible before the prose. */}
+        {job.shadowTrade && (
+          <ShadowPlanPill shadow={job.shadowTrade} onSelectTrade={onSelectTrade} />
+        )}
+
         {/* AI Log */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Activity Log — AI handled everything below</p>
@@ -176,6 +184,11 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
               <span className="text-amber-500 text-base">⚡</span>
               <p className="text-amber-800 text-sm font-bold">{job.actionRequired}</p>
             </div>
+            {job.actionDeadlineMin != null && (
+              <div className="mb-3">
+                <CountdownPill deadlineMin={job.actionDeadlineMin} autoExecuteOption={job.autoExecuteOption} />
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {job.actionOptions.map((opt, i) => (
                 <button key={i} onClick={() => setActionDone(opt)}
@@ -411,12 +424,16 @@ export default function FieldView({ persona, tagsByJob, onAddTag, onRemoveTag, m
                     {job.actionRequired && (
                       <p className="text-amber-700 text-[10px] mt-1.5 font-medium truncate">⚡ {job.actionRequired}</p>
                     )}
-                    <div className="flex items-center gap-1 mt-1">
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
                       <CardTags tags={tagsByJob[job.id] ?? []} />
                       {findActiveJobDeferral(job.id) && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium border bg-amber-50 text-amber-700 border-amber-200">
                           ↑ Deferred
                         </span>
+                      )}
+                      {job.shadowTrade && <ShadowPlanPill shadow={job.shadowTrade} compact />}
+                      {job.actionRequired && job.actionDeadlineMin != null && (
+                        <CountdownPill deadlineMin={job.actionDeadlineMin} autoExecuteOption={job.autoExecuteOption} compact />
                       )}
                     </div>
                     <p className="text-[9px] font-mono text-slate-300 mt-1">{job.id}</p>

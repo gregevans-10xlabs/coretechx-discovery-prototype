@@ -3,6 +3,8 @@ import { JOBS, type Job } from "../data/jobs";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
 import TradeLink from "./TradeLink";
+import ShadowPlanPill from "./ShadowPlanPill";
+import CountdownPill from "./CountdownPill";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
@@ -469,6 +471,11 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, o
           </div>
         )}
 
+        {/* Shadow plan — pre-computed backup trade. */}
+        {job.shadowTrade && (
+          <ShadowPlanPill shadow={job.shadowTrade} onSelectTrade={onSelectTrade} />
+        )}
+
         {/* AI Log */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">AI Activity Log</p>
@@ -496,6 +503,12 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, o
             <p className="text-amber-700 text-xs font-semibold mb-1">Action Required</p>
             <p className="text-amber-800 text-sm font-bold">{job.actionRequired}</p>
           </div>
+        )}
+
+        {/* Auto-execute countdown — sits above the action buttons so executives
+            see what AI will do if no operator overrides. */}
+        {job.actionRequired && job.actionDeadlineMin != null && (
+          <CountdownPill deadlineMin={job.actionDeadlineMin} autoExecuteOption={job.autoExecuteOption} />
         )}
 
         {/* Buttons */}

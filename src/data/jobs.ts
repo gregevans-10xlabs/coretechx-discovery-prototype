@@ -103,6 +103,20 @@ export type Job = {
   nextAction?: string;
   nextTradeDate?: string;
 
+  // Shadow Plan — pre-computed backup trade reserved at booking time. The
+  // 60-second cancellation-to-replacement guarantee depends on this being
+  // ready before the primary trade fails, not computed in response.
+  shadowTrade?: ShadowTrade;
+
+  // Decision urgency — drives the live countdown shown next to actionRequired.
+  // actionDeadlineMin is minutes-from-session-start (NOT wall-clock); if the
+  // operator doesn't act within the window, the AI executes autoExecuteOption.
+  // Both must be set together. Demo behaviour: when the timer hits zero the
+  // countdown UI flips to "auto-executed" but the underlying job state is not
+  // mutated — sufficient to demonstrate the principle.
+  actionDeadlineMin?: number;
+  autoExecuteOption?: string;
+
   // Tags overlaid on stages — labels from TAG_VOCABULARY in scenarios.ts.
   // Pre-seeded values are session-initial state; users can add/remove at runtime.
   tags?: string[];
@@ -112,6 +126,20 @@ export type Job = {
   // for those who want the deeper structure. Optional — only modelled jobs have
   // these; others show a placeholder in the Commitment Anatomy block.
   commitments?: Commitment[];
+};
+
+// ─── Shadow Plan ─────────────────────────────────────────────────────────────
+// Pre-computed backup trade attached to a job at booking time. If `activated`
+// is false, the trade is soft-reserved and ready; if true, the operator (or
+// AI) has activated the shadow and the original trade has been swapped out.
+export type ShadowTrade = {
+  name: string;                  // backup trade business name
+  etaMin?: number;               // ETA from current location
+  distanceKm?: number;           // distance from site (used when ETA not relevant)
+  rating?: number;               // 0-5 star rating, optional
+  softReserved: boolean;         // capacity held with the trade
+  activated?: boolean;           // true = shadow has been swapped in
+  activatedAt?: string;          // wall-clock time string e.g. "09:22"
 };
 
 // ─── Commitment model ────────────────────────────────────────────────────────
@@ -244,6 +272,9 @@ export const JOBS: Job[] = [
     ],
     actionRequired: "Activate shadow plan or call trade directly",
     actionOptions: ["Activate shadow plan", "Call Shane's Handyman", "Mark jeopardy"],
+    actionDeadlineMin: 4,
+    autoExecuteOption: "Activate shadow plan",
+    shadowTrade: { name: "Metro Handyman Services Pty Ltd", etaMin: 22, softReserved: true, rating: 4.8 },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -274,6 +305,8 @@ export const JOBS: Job[] = [
     ],
     actionRequired: "Confirm York Digital Solutions or find alternate trade",
     actionOptions: ["Confirm York Digital Solutions", "Search alternate trades", "Reschedule job"],
+    actionDeadlineMin: 12,
+    autoExecuteOption: "Confirm York Digital Solutions",
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -302,6 +335,7 @@ export const JOBS: Job[] = [
     ],
     actionRequired: null,
     actionOptions: [],
+    shadowTrade: { name: "Coastline Antennas Pty Ltd", etaMin: 28, softReserved: true, rating: 4.6 },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -333,6 +367,9 @@ export const JOBS: Job[] = [
     ],
     actionRequired: "Call trade — likely running late, shadow plan ready if needed",
     actionOptions: ["Call trade", "Activate shadow plan", "Mark jeopardy"],
+    actionDeadlineMin: 6,
+    autoExecuteOption: "Activate shadow plan",
+    shadowTrade: { name: "Fadi Ezzeddine T/A Air Securitel", distanceKm: 18, softReserved: true, rating: 4.7 },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -360,6 +397,7 @@ export const JOBS: Job[] = [
     ],
     actionRequired: null,
     actionOptions: [],
+    shadowTrade: { name: "Central Coast Satellite Pty Ltd", etaMin: 35, softReserved: true, rating: 4.5 },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -446,6 +484,7 @@ export const JOBS: Job[] = [
     ],
     actionRequired: "Confirm Sandbar will submit SWMS before attending — or reallocate",
     actionOptions: ["Request SWMS urgently", "Reallocate to alternate trade", "Log and monitor"],
+    shadowTrade: { name: "DRC Solar & Electrical Pty Ltd", etaMin: 45, softReserved: true, rating: 4.4 },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -555,6 +594,7 @@ export const JOBS: Job[] = [
     ],
     actionRequired: null,
     actionOptions: [],
+    shadowTrade: { name: "Coastal AV Solutions Pty Ltd", etaMin: 24, softReserved: true, rating: 4.7 },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -635,6 +675,9 @@ export const JOBS: Job[] = [
     ],
     actionRequired: "Activate shadow plan — second no-show from this trade in 14 days",
     actionOptions: ["Activate shadow plan (Remiria Pty Ltd)", "Call Smart Techie", "Log formal warning + reassign"],
+    actionDeadlineMin: 8,
+    autoExecuteOption: "Activate shadow plan (Remiria Pty Ltd)",
+    shadowTrade: { name: "Remiria Pty Ltd", distanceKm: 12, softReserved: true, rating: 4.6 },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -662,6 +705,9 @@ export const JOBS: Job[] = [
     ],
     actionRequired: "Confirm trade allocation — soft reservation expires today",
     actionOptions: ["Confirm Modern Lighting & Electrical", "Review alternates", "Reschedule"],
+    actionDeadlineMin: 30,
+    autoExecuteOption: "Confirm Modern Lighting & Electrical",
+    shadowTrade: { name: "South West Comms Pty Ltd", etaMin: 38, softReserved: true, rating: 4.4 },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -1087,7 +1133,98 @@ export const JOBS: Job[] = [
     readOnlyFor: [],
   },
 
+  // ── T1 INTAKE & DISPATCH JOBS (Shari primary) ───────────────────────────────
+  // These are the kinds of low-stakes, high-cadence exceptions that anchor a
+  // T1 operator's day: a settle-stage RCTI portal failure that's blocking
+  // trade payment, and a customer callback request the AI couldn't action.
+  // Both are skill-appropriate for Shari without escalation.
+
+  {
+    id: "CG36245",
+    type: "Starlink Install",
+    primeStatus: "Invoiced",
+    priority: "standard",
+    suburb: "Salamander Bay", state: "New South Wales", postcode: "2317",
+    customer: "T. Williams",
+    trade: "Newcastle Tv And Satellite Pty Ltd",
+    tradeType: "Antenna Installer",
+    window: "Complete", scheduledDate: "2026-04-07",
+    geoStatus: "confirmed_en_route", geoTime: "Completed", minsToWindow: -2880,
+    value: 359,
+    conf: 0.62,
+    journeyStep: 7,
+    flags: [],
+    aiLog: [
+      { time: "2 days ago", actor: "ai", msg: "Install completed. Photos and customer signature received." },
+      { time: "Yesterday", actor: "ai", msg: "RCTI generation triggered. First sync attempt to Newcastle TV portal failed (timeout)." },
+      { time: "Yesterday", actor: "ai", msg: "Auto-retry scheduled at 04:00. Second attempt failed (HTTP 500)." },
+      { time: "08:30", actor: "ai", msg: "Third retry failed. AI Settlement Agent escalated — trade payment blocked. Flagging for T1 dispatch." },
+    ],
+    actionRequired: "RCTI portal sync failed 3× — retry, switch to manual remittance, or escalate to billing",
+    actionOptions: ["Retry RCTI sync", "Switch to manual remittance", "Escalate to billing"],
+    actionDeadlineMin: 18,
+    autoExecuteOption: "Switch to manual remittance",
+    visibleTo: ["logan", "national", "aaron"],
+    actionableBy: ["logan", "national", "aaron"],
+    readOnlyFor: [],
+  },
+
+  {
+    id: "CG36241",
+    type: "Starlink Install",
+    primeStatus: "Works Scheduled - Trade Confirmed",
+    priority: "urgent",
+    suburb: "Forster", state: "New South Wales", postcode: "2428",
+    customer: "D. Marchetti",
+    trade: "Metro Handyman Services Pty Ltd",
+    tradeType: "Antenna Installer",
+    window: "Tomorrow 8–10am", scheduledDate: "2026-04-10",
+    geoStatus: "confirmed_en_route", geoTime: null, minsToWindow: 1380,
+    value: 359,
+    conf: 0.74,
+    journeyStep: 5,
+    flags: [],
+    aiLog: [
+      { time: "Yesterday", actor: "ai", msg: "Auto-classified. Metro Handyman Services matched and allocated. Confirmation received." },
+      { time: "08:52", actor: "ai", msg: "Customer phoned in (call routed via Cynnch). Requested reschedule — work commitment changed. AI offered same-week alternates; customer asked for human callback." },
+      { time: "08:53", actor: "ai", msg: "Callback request logged. Target: return call within 30 min. Flagging for T1 dispatch." },
+    ],
+    actionRequired: "Customer requested reschedule — return call within 30 min",
+    actionOptions: ["Call customer", "Send SMS reschedule options", "Defer callback"],
+    actionDeadlineMin: 22,
+    autoExecuteOption: "Send SMS reschedule options",
+    visibleTo: ["logan", "national", "aaron"],
+    actionableBy: ["logan", "national", "aaron"],
+    readOnlyFor: [],
+  },
+
 ];
+
+// ─── T1 frontline operator (Shari) — visibility post-processing ──────────────
+// Rather than touching every install-type job declaratively, we apply a single
+// skill-tier rule here: Shari sees all install jobs that Logan sees, and can
+// action them unless they trip a hard limit (compliance gap or financial
+// scope change) — those need T2/T3 judgment and become read-only for her with
+// an explanatory reason.
+//
+// Expressed once so it stays consistent as the dataset grows. Mutates JOBS
+// items in place; the array reference itself is not changed.
+const T1_SHARI_INSTALL_TYPES = ["Starlink Install", "Harvey Norman Install", "JB Hi-Fi Install"];
+for (const job of JOBS) {
+  if (!T1_SHARI_INSTALL_TYPES.includes(job.type)) continue;
+  if (!job.visibleTo.includes("logan")) continue;
+
+  const hardLimit = job.flags.some(f => f.type === "compliance_gap" || f.type === "scope_change");
+  if (!job.visibleTo.includes("shari")) job.visibleTo.push("shari");
+  if (hardLimit) {
+    if (!job.readOnlyFor.includes("shari")) job.readOnlyFor.push("shari");
+    if (!job.readOnlyReason) {
+      job.readOnlyReason = "Compliance / financial decision — escalate to Logan (skill: Learning)";
+    }
+  } else if (!job.actionableBy.includes("shari")) {
+    job.actionableBy.push("shari");
+  }
+}
 
 // ─── Derived views ────────────────────────────────────────────────────────────
 
@@ -1120,4 +1257,14 @@ export function kerrieQueueJobs(): Job[] {
     const priority = { jeopardy: 0, urgent: 1, standard: 2 };
     return priority[a.priority] - priority[b.priority];
   });
+}
+
+/** Shari's T1 dispatch queue — install-type jobs only. Includes hard-limit
+ *  jobs as read-only so the skill-gating story is visible (she sees the
+ *  compliance/scope items but can't action them). */
+export function shariQueueJobs(): Job[] {
+  return JOBS.filter(j =>
+    j.visibleTo.includes("shari") &&
+    T1_SHARI_INSTALL_TYPES.includes(j.type)
+  ).sort((a, b) => a.minsToWindow - b.minsToWindow);
 }

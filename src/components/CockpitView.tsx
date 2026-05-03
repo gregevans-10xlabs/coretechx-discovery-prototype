@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { loganQueueJobs, kerrieQueueJobs } from "../data/jobs";
+import { loganQueueJobs, kerrieQueueJobs, shariQueueJobs } from "../data/jobs";
 import type { Job } from "../data/jobs";
 import { ALL_PATTERNS, SUPERVISORS, TAG_VOCABULARY, SILENT_DECISIONS, RECALL_REASON_CHIPS, type FieldDeferral, type DeferralEscalation, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import PerformanceHub from "./PerformanceHub";
@@ -9,6 +9,8 @@ import CommitmentAnatomy from "./CommitmentAnatomy";
 import DeferralReasonModal from "./DeferralReasonModal";
 import AIAuditTab from "./AIAuditTab";
 import TradeLink from "./TradeLink";
+import ShadowPlanPill from "./ShadowPlanPill";
+import CountdownPill from "./CountdownPill";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned" | "audit";
@@ -27,9 +29,13 @@ function sortDecisionFirst(jobs: Job[]): Job[] {
   return [...jobs].sort((a, b) => score(a) - score(b));
 }
 
-// Background job volume (illustrative — prototype data is a regional slice)
+// Background job volume (illustrative — prototype data is a regional slice).
+// Shari's number is set higher than Logan's because T1 dispatch sees the full
+// intake firehose for the region, including high-volume routine work that
+// never bubbles up to ops management.
 const LOGAN_REGION_TOTAL  = 3450;
 const KERRIE_REGION_TOTAL = 240;
+const SHARI_REGION_TOTAL  = 1240;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function geoStatusLabel(job: Job): string {
@@ -275,6 +281,13 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
         <CommitmentAnatomy job={job} onSelectTrade={onSelectTrade} />
       </div>
 
+      {/* Shadow plan — pre-computed backup trade reserved at booking time. Sits
+          above the activity log so the safety net is visible before the prose
+          of what's happening. */}
+      {job.shadowTrade && (
+        <ShadowPlanPill shadow={job.shadowTrade} onSelectTrade={onSelectTrade} />
+      )}
+
       {/* Activity log */}
       <div>
         <p className="text-slate-500 text-xs font-medium mb-2">Activity Log — AI handled everything below</p>
@@ -327,6 +340,12 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
           : job.actionOptions;
         return (
           <>
+            {/* Auto-execute countdown — sits directly above the action buttons
+                so the operator sees what AI will do if they don't act. Skipped
+                on hard-limit jobs (those never auto-execute). */}
+            {!hardLimit && job.actionDeadlineMin != null && (
+              <CountdownPill deadlineMin={job.actionDeadlineMin} autoExecuteOption={job.autoExecuteOption} />
+            )}
             <div className="flex flex-wrap gap-2 pt-1">
               {visibleOptions.map((a, i) => (
                 <button
@@ -706,6 +725,103 @@ function KerrieKPIs({ jobs }: { jobs: Job[] }) {
   );
 }
 
+// ─── KPI Panel — Shari (T1 Intake & Dispatch) ────────────────────────────────
+// Distinct from Logan's portfolio framing: T1 work is throughput-shaped, so
+// the panel leads with decisions/hour, intake-to-allocation time, and the
+// callback queue. PerformanceHub provides the weighted KPI surface; the
+// panels below it are operational cadence indicators for the day in front.
+function ShariKPIs({ jobs, allDeferrals }: { jobs: Job[]; allDeferrals: FieldDeferral[] }) {
+  const decisionCount = jobs.filter(j => j.actionRequired !== null).length;
+  const closedToday = jobs.filter(j => j.primeStatus === "Works Complete" || j.primeStatus === "Invoiced").length;
+  const callbacksOpen = jobs.filter(j => j.actionRequired?.toLowerCase().includes("callback") || j.actionRequired?.toLowerCase().includes("call customer") || j.actionRequired?.toLowerCase().includes("return call")).length;
+  const photoChasesOpen = jobs.filter(j => j.flags.some(f => f.type === "photo_missing")).length;
+  const rctiBlocked = jobs.filter(j => j.actionRequired?.toLowerCase().includes("rcti")).length;
+
+  // Items Shari has deferred up to Logan today — gives her a glanceable read
+  // on what's bouncing around above her, with the recall path one click away
+  // from the queue card.
+  const myDeferralsToLogan = allDeferrals.filter(d => d.whoId === "shari");
+
+  return (
+    <div className="space-y-3">
+      <PerformanceHub persona="shari" />
+
+      {/* Today's throughput — the cadence numbers a T1 operator lives by */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
+          <p className="text-2xl font-bold text-green-500">{closedToday}</p>
+          <p className="text-slate-400 text-xs mt-0.5">Closed today</p>
+        </div>
+        <div className={`rounded-xl border p-3 text-center ${decisionCount > 0 ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
+          <p className={`text-2xl font-bold ${decisionCount > 0 ? "text-amber-600" : "text-green-500"}`}>{decisionCount}</p>
+          <p className="text-slate-400 text-xs mt-0.5">In queue</p>
+        </div>
+      </div>
+
+      {/* Operational cadence — the things AI auto-routes to T1 today */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3">
+        <p className="text-slate-500 text-xs font-semibold mb-2">Cadence</p>
+        <div className="space-y-2 text-xs">
+          {[
+            { label: "Decisions/hr (rolling)", value: "11.4", note: "Target 12 — on track", color: "text-green-600" },
+            { label: "Intake → allocation",     value: "14.2 min", note: "Avg today", color: "text-green-600" },
+            { label: "Callbacks open",           value: callbacksOpen.toString(), note: callbacksOpen > 0 ? "Return within 30 min" : "All cleared", color: callbacksOpen > 0 ? "text-amber-600" : "text-green-500" },
+            { label: "Photo chases open",        value: photoChasesOpen.toString(), note: photoChasesOpen > 0 ? "York Digital still leading" : "All cleared", color: photoChasesOpen > 0 ? "text-amber-600" : "text-green-500" },
+            { label: "RCTI sync blocked",        value: rctiBlocked.toString(), note: rctiBlocked > 0 ? "Trade payment held" : "Clear", color: rctiBlocked > 0 ? "text-red-600" : "text-green-500" },
+          ].map(m => (
+            <div key={m.label}>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">{m.label}</span>
+                <span className={`font-bold ${m.color}`}>{m.value}</span>
+              </div>
+              {m.note && <p className="text-slate-400 text-[10px] mt-0.5">{m.note}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Items deferred up to Logan — recall path lives on the queue card,
+          so this panel is read-only. Demonstrates the upward chain visibility
+          without duplicating Logan's "Defer-by-team" governance panel. */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3">
+        <p className="text-slate-500 text-xs font-semibold mb-2">My escalations to Logan ({myDeferralsToLogan.length})</p>
+        {myDeferralsToLogan.length === 0 ? (
+          <p className="text-slate-400 text-[11px]">No items currently with senior. Nice work.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {myDeferralsToLogan.map(d => (
+              <div key={d.jobId} className="text-xs border-l-2 border-amber-300 pl-2">
+                <p className="text-slate-700 font-medium leading-tight">{d.task}</p>
+                <p className="text-slate-400 text-[10px] mt-0.5">{d.jobId} · {d.time} · with Logan</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Skill development — mirrors the Skills block other personas show, but
+          frames this as Shari's path forward (T1 → T2). */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3">
+        <p className="text-slate-500 text-xs font-semibold mb-2">Skills</p>
+        <div className="space-y-1.5">
+          {[
+            { label: "Intake & Dispatch",        level: "T1 Certified",  color: "text-green-600" },
+            { label: "RCTI / Settlement",        level: "T1 Certified",  color: "text-green-600" },
+            { label: "Customer Comms",           level: "T1 Certified",  color: "text-green-600" },
+            { label: "Compliance Exceptions",    level: "Learning (T2)", color: "text-amber-500" },
+            { label: "Insurance Coordination",   level: "Locked",        color: "text-slate-400" },
+          ].map(s => (
+            <div key={s.label} className="flex items-center justify-between text-xs">
+              <span className="text-slate-600">{s.label}</span>
+              <span className={`font-medium ${s.color}`}>{s.level}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Queue Items ──────────────────────────────────────────────────────────────
 function LoganQueueItem({ job, selected, onClick, tags, isDeferred, onSelectTrade }: { job: Job; selected: boolean; onClick: () => void; tags: string[]; isDeferred?: boolean; onSelectTrade?: (name: string) => void }) {
   const urgent = job.geoStatus === "no_checkin" || job.priority === "urgent";
@@ -754,12 +870,16 @@ function LoganQueueItem({ job, selected, onClick, tags, isDeferred, onSelectTrad
         </div>
         <RiskBadge conf={job.conf} size="sm" />
       </div>
-      <div className="flex items-center gap-1 mt-1">
+      <div className="flex flex-wrap items-center gap-1 mt-1">
         <CardTags tags={tags} />
         {isDeferred && (
           <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium border bg-amber-50 text-amber-700 border-amber-200">
             ↑ Deferred
           </span>
+        )}
+        {job.shadowTrade && <ShadowPlanPill shadow={job.shadowTrade} compact />}
+        {job.actionRequired && job.actionDeadlineMin != null && (
+          <CountdownPill deadlineMin={job.actionDeadlineMin} autoExecuteOption={job.autoExecuteOption} compact />
         )}
       </div>
       <p className="text-slate-300 text-[9px] font-mono mt-1">{job.id}</p>
@@ -811,12 +931,16 @@ function KerrieQueueItem({ job, selected, onClick, tags, isDeferred }: { job: Jo
         <p className="text-slate-400 text-[10px] truncate">{job.insuranceStage ?? job.primeStatus}</p>
         <p className="text-slate-300 text-[9px] font-mono">{job.id}</p>
       </div>
-      <div className="flex items-center gap-1 mt-1">
+      <div className="flex flex-wrap items-center gap-1 mt-1">
         <CardTags tags={tags} />
         {isDeferred && (
           <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium border bg-amber-50 text-amber-700 border-amber-200">
             ↑ Deferred
           </span>
+        )}
+        {job.shadowTrade && <ShadowPlanPill shadow={job.shadowTrade} compact />}
+        {job.actionRequired && job.actionDeadlineMin != null && (
+          <CountdownPill deadlineMin={job.actionDeadlineMin} autoExecuteOption={job.autoExecuteOption} compact />
         )}
       </div>
     </button>
@@ -962,10 +1086,12 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   onSelectTrade?: (name: string) => void;
 }) {
   const isKerrie = persona === "kerrie";
+  const isShari  = persona === "shari";
 
   const loganQueue  = sortDecisionFirst(loganQueueJobs());
   const kerrieQueue = sortDecisionFirst(kerrieQueueJobs());
-  const fullQueue   = isKerrie ? kerrieQueue : loganQueue;
+  const shariQueue  = sortDecisionFirst(shariQueueJobs());
+  const fullQueue   = isKerrie ? kerrieQueue : isShari ? shariQueue : loganQueue;
 
   // Decision queue: only jobs that need a human decision
   const decisionQueue = fullQueue.filter(j => j.actionRequired !== null);
@@ -994,16 +1120,21 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
     if (!deferJobTarget) return;
     const now = new Date();
     const time = `${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
-    const personaName = isKerrie ? "Kerrie Tran" : "Logan Reilly";
-    const personaRole = isKerrie ? "Insurance Coordinator" : "Ops Manager — Installations";
+    const personaName = isKerrie ? "Kerrie Tran" : isShari ? "Shari Patel" : "Logan Reilly";
+    const personaRole = isKerrie ? "Insurance Coordinator" : isShari ? "T1 Intake & Dispatch" : "Ops Manager — Installations";
+    // Defer chain: Shari's natural escalation goes to her direct manager Logan
+    // first; ops managers (Logan/Kerrie) skip up to National. Keeps the chain
+    // accurate to the org structure rather than always jumping to the top.
+    const tierPath = isShari ? ["shari", "logan", "national", "aaron"] : [persona, "national", "aaron"];
+    const currentHolder = isShari ? "logan" : "aaron";
     onAddDeferral({
       task: deferJobTarget.actionRequired ?? `Action on ${deferJobTarget.id}`,
       who: personaName, whoId: persona, role: personaRole,
       time, jobId: deferJobTarget.id,
       urgent: deferJobTarget.priority === "jeopardy" || deferJobTarget.priority === "urgent",
       reason,
-      tierPath: [persona, "national", "aaron"],
-      currentHolder: "aaron",
+      tierPath,
+      currentHolder,
     });
     setDeferJobTarget(null);
   };
@@ -1034,7 +1165,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
     : null;
 
   const decisionCount   = decisionQueue.length;
-  const aiHandlingCount = isKerrie ? KERRIE_REGION_TOTAL - decisionCount : LOGAN_REGION_TOTAL - decisionCount;
+  const aiHandlingCount = (isKerrie ? KERRIE_REGION_TOTAL : isShari ? SHARI_REGION_TOTAL : LOGAN_REGION_TOTAL) - decisionCount;
 
   // Queue summary — one compact line per visible job, included in every AI context
   // so the agent can answer lookups by customer, trade, address, or job number
@@ -1046,13 +1177,27 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   }).join("\n");
   const queueSummaryBlock = `\nFull visible queue (${fullQueue.length} jobs):\n${queueSummary}`;
 
+  // Persona descriptors used throughout the AI context strings — kept
+  // co-located so adding personas is a single touch-point.
+  const personaSubtitle = isKerrie
+    ? "Kerrie — Insurance Coordinator, National"
+    : isShari
+    ? "Shari — T1 Intake & Dispatch, North East NSW/QLD"
+    : "Logan — Ops Manager, North East NSW/QLD";
+  const personaShort = isKerrie ? "Kerrie" : isShari ? "Shari" : "Logan";
+  const personaSummary = isKerrie
+    ? "Kerrie — Insurance Coordinator. National insurance portfolio."
+    : isShari
+    ? "Shari — T1 Intake & Dispatch. Routine allocations, callbacks, RCTI sync, photo evidence chases for the North East region."
+    : "Logan — Ops Manager. North East NSW/QLD.";
+
   // AI bar: context shifts to match whatever is selected, but the full queue
   // summary is always appended so search/filter questions work.
   const aiContext = (selectedJob
-    ? `${isKerrie ? "Kerrie — Insurance Coordinator, National" : "Logan — Ops Manager, North East NSW/QLD"}. Reviewing: ${selectedJob.id} (${selectedJob.type}), ${selectedJob.customer}, ${selectedJob.suburb}. Priority: ${selectedJob.priority}. Confidence: ${selectedJob.conf.toFixed(2)}. Action required: ${selectedJob.actionRequired ?? "none (AI handling)"}. ${selectedJob.flags.length > 0 ? `Flags: ${selectedJob.flags.map(f => f.detail).join("; ")}.` : ""}`
+    ? `${personaSubtitle}. Reviewing: ${selectedJob.id} (${selectedJob.type}), ${selectedJob.customer}, ${selectedJob.suburb}. Priority: ${selectedJob.priority}. Confidence: ${selectedJob.conf.toFixed(2)}. Action required: ${selectedJob.actionRequired ?? "none (AI handling)"}. ${selectedJob.flags.length > 0 ? `Flags: ${selectedJob.flags.map(f => f.detail).join("; ")}.` : ""}`
     : isPatternView && selectedPattern
-    ? `${isKerrie ? "Kerrie" : "Logan"} reviewing AI-detected pattern ${selectedPattern.id}: "${selectedPattern.title}". ${selectedPattern.detail} Severity: ${selectedPattern.severity}. Affects: ${selectedPattern.affected}.`
-    : `${isKerrie ? "Kerrie — Insurance Coordinator. National insurance portfolio." : "Logan — Ops Manager. North East NSW/QLD."} ${decisionCount} decisions pending. AI handling ${aiHandlingCount.toLocaleString()} others autonomously.`)
+    ? `${personaShort} reviewing AI-detected pattern ${selectedPattern.id}: "${selectedPattern.title}". ${selectedPattern.detail} Severity: ${selectedPattern.severity}. Affects: ${selectedPattern.affected}.`
+    : `${personaSummary} ${decisionCount} decisions pending. AI handling ${aiHandlingCount.toLocaleString()} others autonomously.`)
     + queueSummaryBlock;
   const aiContextLabel = selectedJob
     ? `Focused on ${selectedJob.id}`
@@ -1069,6 +1214,12 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
         { label: "All open work for this insurer", question: "An insurer's name has come up — please ask me which insurer, then walk me through all their open jobs, where they sit against SLA, and any concerns." },
         { label: "Insurance jobs near SLA breach today", question: "Which insurance jobs are at risk of breaching SLA today, and what's driving the risk for each?" },
       ]
+    : isShari
+    ? [
+        { label: "Customer rang back", question: "A customer is on the phone about an install. Please ask me for the job number, customer name, or suburb, and pull up the full picture — trade allocated, status, what AI has done, what they probably want to know." },
+        { label: "Allocations needing my call today", question: "Which allocations need me to make a call today — soft reservations expiring, no-checkin trades, or callbacks not yet returned? Group them by urgency." },
+        { label: "Photo evidence chases still open", question: "Which trades have outstanding photo-evidence chases? Group by trade so I can do them in one call — and flag any where I should escalate to Logan." },
+      ]
     : [
         { label: "Customer/trade on the phone", question: "A customer or trade is calling about a job. Please ask me for the job number, customer name, or address, then bring up the full picture — trade, status, AI activity, geo, flags, and what I need to know to help them." },
         { label: "What else does this trade have?", question: "A trade's name has come up — please ask me which trade, then walk me through all their open jobs, how they're tracking, and any concerns." },
@@ -1078,9 +1229,11 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
   // AI Audit — silent decisions scoped to this persona's region/job-types.
   // Discovery OS Req 3 (17 Apr 2026): operators must see what AI chose NOT
   // to surface, to catch cases where the prioritisation model is wrong.
+  // Shari shares Logan's region/job-type scope (T1 dispatch operates over the
+  // same install-type firehose Logan governs).
   const auditDecisions = SILENT_DECISIONS.filter(d => {
     if (isKerrie) return d.jobType === "Insurance Repair";
-    // Logan: starlink/HN/JBHF in his region
+    // Logan + Shari: starlink/HN/JBHF in the North East
     return d.region === "North East NSW/QLD" && (d.jobType === "Starlink Install" || d.jobType === "Harvey Norman Install" || d.jobType === "JB Hi-Fi Install");
   });
 
@@ -1135,7 +1288,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
               decisions={auditDecisions}
               feedback={modelFeedback}
               onAddFeedback={onAddModelFeedback}
-              flaggedByName={isKerrie ? "Kerrie Tran" : "Logan Reilly"}
+              flaggedByName={isKerrie ? "Kerrie Tran" : isShari ? "Shari Patel" : "Logan Reilly"}
               flaggedById={persona}
             />
           ) : (
@@ -1147,7 +1300,7 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
               </div>
               <p className="text-slate-600 text-xs font-semibold">Nothing needs your attention</p>
               <p className="text-slate-400 text-[10px] leading-relaxed">
-                AI is handling all {(isKerrie ? KERRIE_REGION_TOTAL : LOGAN_REGION_TOTAL).toLocaleString()} active jobs in your region
+                AI is handling all {(isKerrie ? KERRIE_REGION_TOTAL : isShari ? SHARI_REGION_TOTAL : LOGAN_REGION_TOTAL).toLocaleString()} active jobs in your region
               </p>
             </div>
           ) : filteredQueue.length === 0 ? (
@@ -1161,8 +1314,10 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
               {filteredQueue.map(j => (
                 <LoganQueueItem key={j.id} job={j} selected={selectedId === j.id} onClick={() => setSelectedId(j.id)} tags={tagsByJob[j.id] ?? []} isDeferred={!!findActiveJobDeferral(j.id)} onSelectTrade={onSelectTrade} />
               ))}
-              {/* Pattern cards — Logan only, shown in Decisions tab */}
-              {filter === "action" && loganPatterns.length > 0 && (
+              {/* Pattern cards — Logan only (Shari reads patterns through the
+                  AI Audit tab; ops-management governance work doesn't belong
+                  in T1's exception queue). */}
+              {!isShari && filter === "action" && loganPatterns.length > 0 && (
                 <>
                   <div className="px-1 pt-2 pb-0.5">
                     <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider">AI Patterns Detected</p>
@@ -1322,6 +1477,8 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
         <div className="flex-1 overflow-y-auto p-3">
           {isKerrie
             ? <KerrieKPIs jobs={kerrieQueue} />
+            : isShari
+            ? <ShariKPIs jobs={shariQueue} allDeferrals={deferrals} />
             : <LoganKPIs jobs={loganQueue} onInspect={(id) => setSelectedId(`INSPECT:${id}`)} onPersonaSwitch={onPersonaSwitch} deferrals={deferrals} onAddEscalation={onAddEscalation} />
           }
         </div>

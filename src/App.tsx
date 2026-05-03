@@ -416,7 +416,7 @@ export default function App() {
     </div></div>
   );
 
-  // ── Cockpit view — Logan and Kerrie (default; aaron/national/conner/blake/troy handled above) ─
+  // ── Cockpit view — Shari, Logan and Kerrie (default; aaron/national/conner/blake/troy handled above) ─
   return (
     <>
     <div className={bg}><div className={maxW + " space-y-5"}>
