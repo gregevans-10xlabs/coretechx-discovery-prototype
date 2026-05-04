@@ -7,6 +7,7 @@ import ShadowPlanPill from "./ShadowPlanPill";
 import CountdownPill from "./CountdownPill";
 import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
+import EquipmentPanel from "./EquipmentPanel";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import AskAI from "./AskAI";
 
@@ -463,6 +464,11 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, o
           <TradeChain actors={job.tradeActors} onSelectTrade={onSelectTrade} />
         )}
 
+        {/* Equipment — 4th actor */}
+        {job.equipment && job.equipment.length > 0 && (
+          <EquipmentPanel items={job.equipment} />
+        )}
+
         {/* Journey */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey</p>
@@ -692,6 +698,69 @@ function SettlementPanel() {
   );
 }
 
+// ─── Equipment Health panel — Settle-stage analogue for the 4th actor ───────
+// Aggregates equipment items across all jobs so portfolio personas can see
+// the logistics state at a glance. Counts on-hand / in-transit / delayed,
+// and surfaces recent items with real refs from JOBS for drill-in.
+function EquipmentHealthPanel() {
+  // Flatten all equipment items across the dataset, attaching the job ID for
+  // drill-in context.
+  const allItems = JOBS.flatMap(j => (j.equipment ?? []).map(item => ({ ...item, jobId: j.id })));
+
+  const onHand     = allItems.filter(i => i.status === "on_hand" || i.status === "delivered");
+  const inTransit  = allItems.filter(i => i.status === "in_transit" || i.status === "at_destination" || i.status === "ordered");
+  const delayed    = allItems.filter(i => i.status === "delayed" || i.status === "exception");
+
+  // Recent — exceptions first (always interesting), then in-transit, then a
+  // sample of on-hand. Keeps the panel small but representative.
+  const recent = [...delayed, ...inTransit, ...onHand].slice(0, 4);
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Equipment Health</p>
+        <p className="text-slate-400 text-[10px]">AI Logistics Agent</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
+          <p className="text-lg font-black text-slate-800">{onHand.length}</p>
+          <p className="text-[10px] text-slate-400 leading-tight">On hand</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
+          <p className="text-lg font-black text-slate-800">{inTransit.length}</p>
+          <p className="text-[10px] text-slate-400 leading-tight">In transit</p>
+        </div>
+        <div className={`rounded-xl border p-2.5 text-center ${delayed.length > 0 ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
+          <p className={`text-lg font-black ${delayed.length > 0 ? "text-amber-600" : "text-green-600"}`}>{delayed.length}</p>
+          <p className="text-[10px] text-slate-400 leading-tight">Delayed</p>
+        </div>
+      </div>
+      {recent.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl p-2.5">
+          <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide mb-1.5">Recent</p>
+          <div className="space-y-1">
+            {recent.map(item => {
+              const isException = item.status === "delayed" || item.status === "exception";
+              const dotColor = isException ? "bg-amber-500" : item.status === "in_transit" ? "bg-sky-500" : "bg-green-500";
+              const statusLabel = item.status === "delayed" ? "delayed" : item.status === "exception" ? "exception" : item.status === "in_transit" ? "in transit" : item.status === "on_hand" ? "on hand" : item.status;
+              return (
+                <div key={item.id + item.jobId} className="flex items-center gap-2 text-xs">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotColor}`} />
+                  <span className="font-mono text-slate-400 text-[10px] flex-shrink-0 w-14">{item.jobId}</span>
+                  <span className="text-slate-600 flex-1 truncate">{item.description}</span>
+                  <span className={`text-[10px] flex-shrink-0 ${isException ? "text-amber-600 font-semibold" : "text-slate-500"}`}>
+                    {isException ? `⚠ ${statusLabel}` : statusLabel}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlatformHealth({ isAaron, onWorkflowConfig, deferrals, modelFeedback }: { isAaron: boolean; onWorkflowConfig?: () => void; deferrals: FieldDeferral[]; modelFeedback: ModelFeedback[] }) {
   // Team deferrals visible at portfolio level — Discovery OS roll-up requirement
   // (17 Apr 2026): every deferral remains visible at tier N+1 and N+2 with
@@ -750,6 +819,12 @@ function PlatformHealth({ isAaron, onWorkflowConfig, deferrals, modelFeedback }:
           AI Settlement Agent generates RCTIs, remits payment, and only
           surfaces exceptions like CG36245 (RCTI portal sync failed). */}
       <SettlementPanel />
+
+      {/* Equipment health — the 4th actor at portfolio level. Same shape as
+          the Settle panel: counts + recent items with real refs for drill-in.
+          Surfaces logistics exceptions (delivery delays) that would
+          otherwise be invisible at the portfolio level. */}
+      <EquipmentHealthPanel />
 
       {/* Team deferrals — full roll-up: every record where the senior tier is
           part of the path, i.e. visible to portfolio personas. Items currently

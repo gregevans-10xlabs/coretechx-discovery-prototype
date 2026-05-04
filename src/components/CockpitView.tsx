@@ -13,6 +13,7 @@ import ShadowPlanPill from "./ShadowPlanPill";
 import CountdownPill from "./CountdownPill";
 import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
+import EquipmentPanel from "./EquipmentPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned" | "audit";
@@ -295,6 +296,12 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
           lifecycle position. */}
       {job.tradeActors && job.tradeActors.length > 1 && (
         <TradeChain actors={job.tradeActors} onSelectTrade={onSelectTrade} />
+      )}
+
+      {/* Equipment — 4th actor. Compact summary when all on hand, full
+          panel when there's something to know (delayed/exception). */}
+      {job.equipment && job.equipment.length > 0 && (
+        <EquipmentPanel items={job.equipment} />
       )}
 
       {/* Journey */}

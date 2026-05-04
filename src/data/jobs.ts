@@ -111,6 +111,11 @@ export type Job = {
   riskNarrative?: string;
   confidenceBreakdown?: ConfidenceBreakdown;
 
+  // Equipment items required to execute this job. The 4th actor in the
+  // operational model. Most jobs: kit on-hand with trade (uneventful).
+  // Exception jobs: delayed/missing equipment that may block install.
+  equipment?: EquipmentItem[];
+
   // Shadow Plan — pre-computed backup trade reserved at booking time. The
   // 60-second cancellation-to-replacement guarantee depends on this being
   // ready before the primary trade fails, not computed in response.
@@ -160,6 +165,35 @@ export type TradeActor = {
   stage: string;       // current stage / detail line, e.g. "Frame · Day 4/28"
   status: TradeActorStatus;
   dependsOn?: string[]; // trade names this actor is waiting on
+};
+
+// ─── Equipment / Logistics ──────────────────────────────────────────────────
+// The 4th actor in the operational model — alongside customer, trade, and
+// Circl staff. Equipment delivery delays cascade through the platform; making
+// equipment a structured concern lets operators see and act on those
+// cascades. Equipment status also feeds into ConfidenceDriver category
+// "equipment" — see the integration with confidence drivers below.
+export type EquipmentStatus =
+  | "on_hand"         // already with the trade
+  | "ordered"         // order placed, pending dispatch
+  | "in_transit"      // dispatched, en route
+  | "at_destination"  // arrived at delivery point (depot/site/hub)
+  | "delivered"       // ready for use at the trade
+  | "delayed"         // ETA slipped — exception that may need action
+  | "exception";      // explicit issue requiring attention (lost/damaged/wrong-item)
+
+export type EquipmentItem = {
+  id: string;
+  description: string;            // "Starlink kit (Gen 3)", "75\" Sony TV"
+  supplier: string;               // "Starlink direct", "HN Wyong DC", etc.
+  qty: number;
+  status: EquipmentStatus;
+  etaDate?: string;               // when it'll be ready, or revised ETA on delay
+  originalEta?: string;           // original promised date — populated on delay
+  deliveryPoint?: string;         // "Trade depot" | "Customer site" | "Supplier hub"
+  trackingRef?: string;
+  blockingJob?: boolean;          // is this on the critical path for this job?
+  notes?: string;
 };
 
 // ─── Confidence Drivers ─────────────────────────────────────────────────────
@@ -433,6 +467,10 @@ export const JOBS: Job[] = [
     actionRequired: null,
     actionOptions: [],
     shadowTrade: { name: "Coastline Antennas Pty Ltd", etaMin: 28, softReserved: true, rating: 4.6 },
+    equipment: [
+      { id: "e1", description: "Starlink Gen 3 kit", supplier: "Starlink direct", qty: 1, status: "on_hand", deliveryPoint: "Trade depot", notes: "With Metro Handyman 2 weeks." },
+      { id: "e2", description: "Roof mount bracket + cable kit", supplier: "Starlink direct", qty: 1, status: "on_hand", deliveryPoint: "Trade depot" },
+    ],
     riskNarrative: "Metro Handyman Services geo-confirmed en route 78 minutes ago and is tracking comfortably within window. Compliance is current and the shadow trade (Coastline Antennas) is pre-computed if needed. Nothing requires your attention.",
     confidenceBreakdown: {
       modelRefs: ["Starlink-Allocate v3.4", "Trade-Performance v2.8"],
@@ -606,6 +644,10 @@ export const JOBS: Job[] = [
     actionRequired: "Confirm Sandbar will submit SWMS before attending — or reallocate",
     actionOptions: ["Request SWMS urgently", "Reallocate to alternate trade", "Log and monitor"],
     shadowTrade: { name: "DRC Solar & Electrical Pty Ltd", etaMin: 45, softReserved: true, rating: 4.4 },
+    equipment: [
+      { id: "e1", description: "Starlink Gen 3 kit", supplier: "Starlink direct", qty: 1, status: "on_hand", deliveryPoint: "Trade depot" },
+      { id: "e2", description: "Roof mount bracket + cable kit", supplier: "Starlink direct", qty: 1, status: "on_hand", deliveryPoint: "Trade depot" },
+    ],
     riskNarrative: "Sandbar Electrical has been pulled from new allocations because their SWMS expired, but this job was assigned before the gap was detected. Their public liability is fine and their performance history is strong. The decision is whether to chase the SWMS submission urgently or reallocate to DRC Solar (45 min ETA).",
     confidenceBreakdown: {
       modelRefs: ["Starlink-Allocate v3.4", "Compliance-Check v4.2"],
@@ -727,6 +769,10 @@ export const JOBS: Job[] = [
     actionRequired: null,
     actionOptions: [],
     shadowTrade: { name: "Coastal AV Solutions Pty Ltd", etaMin: 24, softReserved: true, rating: 4.7 },
+    equipment: [
+      { id: "e1", description: "75\" Sony Bravia TV", supplier: "HN Wyong DC", qty: 1, status: "in_transit", etaDate: "Today 11am", deliveryPoint: "Trade depot", trackingRef: "HN-882041", notes: "Trade picks up day-of." },
+      { id: "e2", description: "Wall mount bracket + cable kit", supplier: "HN Wyong DC", qty: 1, status: "on_hand", deliveryPoint: "Trade depot" },
+    ],
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -1300,8 +1346,60 @@ export const JOBS: Job[] = [
   // ── T1 INTAKE & DISPATCH JOBS (Sharon primary) ───────────────────────────────
   // These are the kinds of low-stakes, high-cadence exceptions that anchor a
   // T1 operator's day: a settle-stage RCTI portal failure that's blocking
-  // trade payment, and a customer callback request the AI couldn't action.
-  // Both are skill-appropriate for Sharon without escalation.
+  // trade payment, a customer callback request the AI couldn't action, and an
+  // equipment delivery delay where the install booking is now at risk. The
+  // last one (CG36258) is the canonical example of equipment-driven risk:
+  // shows in the Equipment panel, surfaces as a confidence driver of category
+  // "equipment", and drives the T1 action.
+
+  {
+    id: "CG36258",
+    type: "Starlink Install",
+    primeStatus: "Works Scheduled",
+    priority: "urgent",
+    suburb: "Yamba", state: "New South Wales", postcode: "2464",
+    customer: "K. Donovan",
+    trade: "Coastal Comms Pty Ltd",
+    tradeType: "Antenna Installer",
+    window: "Tomorrow 10am–12pm", scheduledDate: "2026-04-10",
+    geoStatus: "confirmed_en_route", geoTime: null, minsToWindow: 1500,
+    value: 359,
+    conf: 0.48,
+    journeyStep: 5,
+    flags: [
+      { type: "no_checkin", detail: "Roof mount bracket ETA slipped Wed → Thu — install booked Wed will need reschedule or expedited delivery.", severity: "high" },
+    ],
+    aiLog: [
+      { time: "Yesterday", actor: "ai", msg: "Auto-classified. Coastal Comms matched and allocated. Confirmation received." },
+      { time: "Yesterday", actor: "ai", msg: "Equipment ordered: Starlink Gen 3 kit + roof mount bracket. ETA Wednesday 8am to trade depot." },
+      { time: "07:14", actor: "ai", msg: "Supplier exception: roof mount bracket ETA slipped to Thursday 10am. Starlink kit unaffected — already with trade." },
+      { time: "07:15", actor: "ai", msg: "AI Logistics Agent flagged for T1 dispatch — install booked Wednesday 10am at risk." },
+    ],
+    actionRequired: "Roof mount delayed 24h — reschedule customer to Thursday or expedite parts?",
+    actionOptions: ["Reschedule customer to Thursday", "Expedite parts (courier)", "Use trade's spare bracket if available"],
+    actionDeadlineMin: 14,
+    autoExecuteOption: "Reschedule customer to Thursday",
+    riskNarrative: "Coastal Comms is ready and the Starlink kit is with them — but the roof mount bracket ETA has slipped from Wednesday to Thursday, and the install is booked Wednesday 10am. Cheapest option is reschedule the customer; expedited courier costs ~$80 but holds the booking. Trade may have a spare bracket worth checking.",
+    confidenceBreakdown: {
+      modelRefs: ["Starlink-Allocate v3.4", "Logistics-Predict v1.4"],
+      retrainedAt: "12 Apr 2026",
+      drivers: [
+        { id: "d1", category: "equipment", weight: -0.34, label: "Equipment delivery delay", explanation: "Roof mount bracket ETA slipped 24h — install booked Wednesday at risk.", evidence: "Supplier exception, tracking #SL-RM-44892" },
+        { id: "d2", category: "trade_history", weight: 0.18, label: "Trade reliability", explanation: "Coastal Comms 96% completion rate over last 90 days." },
+        { id: "d3", category: "compliance", weight: 0.10, label: "Compliance currency", explanation: "All compliance docs current." },
+        { id: "d4", category: "geo", weight: 0.06, label: "Trade proximity", explanation: "Trade home base 8km from site." },
+        { id: "d5", category: "customer", weight: -0.04, label: "Customer reschedule sensitivity", explanation: "Customer specifically requested Wednesday — third option in original booking flow." },
+      ],
+    },
+    equipment: [
+      { id: "e1", description: "Starlink Gen 3 kit", supplier: "Starlink direct", qty: 1, status: "on_hand", deliveryPoint: "Trade depot", notes: "With Coastal Comms since Mon." },
+      { id: "e2", description: "Roof mount bracket", supplier: "Starlink direct", qty: 1, status: "delayed", originalEta: "Wed 8am", etaDate: "Thu 10am", deliveryPoint: "Trade depot", trackingRef: "SL-RM-44892", blockingJob: true, notes: "Supplier dispatch delay — courier expedite available for $80." },
+      { id: "e3", description: "Cable & connectors", supplier: "Starlink direct", qty: 1, status: "on_hand", deliveryPoint: "Trade depot" },
+    ],
+    visibleTo: ["logan", "national", "aaron"],
+    actionableBy: ["logan", "national", "aaron"],
+    readOnlyFor: [],
+  },
 
   {
     id: "CG36245",

@@ -12,6 +12,7 @@ import ShadowPlanPill from "./ShadowPlanPill";
 import CountdownPill from "./CountdownPill";
 import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
+import EquipmentPanel from "./EquipmentPanel";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -143,6 +144,11 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
             state before the abstract lifecycle position. */}
         {job.tradeActors && job.tradeActors.length > 1 && (
           <TradeChain actors={job.tradeActors} onSelectTrade={onSelectTrade} />
+        )}
+
+        {/* Equipment — 4th actor */}
+        {job.equipment && job.equipment.length > 0 && (
+          <EquipmentPanel items={job.equipment} />
         )}
 
         {/* Journey */}
