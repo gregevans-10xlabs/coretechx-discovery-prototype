@@ -1,214 +1,12 @@
 import { useState } from "react";
-import { LM, WORKFLOW_TEMPLATES, AUDIT_LOG, PERSONAS, ALL_DECISIONS, INITIAL_FIELD_DEFERRALS, type FieldDeferral, type DeferralEscalation, type ModelFeedback, riskState, riskBadgeClass } from "./data/scenarios";
+import { LM, PERSONAS, ALL_DECISIONS, INITIAL_FIELD_DEFERRALS, type FieldDeferral, type DeferralEscalation, type ModelFeedback, riskState, riskBadgeClass } from "./data/scenarios";
 import { JOBS } from "./data/jobs";
-import AskAI from "./components/AskAI";
 import CockpitView from "./components/CockpitView";
 import PortfolioView from "./components/PortfolioView";
 import FieldView from "./components/FieldView";
 import FieldSupervisorView from "./components/FieldSupervisorView";
 import TradeDrawer from "./components/TradeDrawer";
-
-// ─── Workflow Config View ─────────────────────────────────────────────────────
-function WorkflowConfig({ canConfig, onBack }: { canConfig: boolean; onBack: () => void }) {
-  const [selectedTemplate, setSelectedTemplate] = useState("starlink");
-  const [pendingChange, setPendingChange] = useState<{stepId:string;newLevel:number}|null>(null);
-  const [changeReason, setChangeReason] = useState("");
-  const [committed, setCommitted] = useState<Record<string,{level:number;reason:string;date:string}>>({});
-  const [showAudit, setShowAudit] = useState(false);
-
-  const template = WORKFLOW_TEMPLATES.find(t=>t.id===selectedTemplate)!;
-
-  const effectiveLevel = (step: (typeof WORKFLOW_TEMPLATES)[0]['steps'][0]): keyof typeof LM =>
-    (committed[step.id]?.level ?? step.level) as keyof typeof LM;
-
-  const commitChange = () => {
-    if (!changeReason.trim()) return;
-    setCommitted(c=>({...c,[pendingChange!.stepId]:{level:pendingChange!.newLevel, reason:changeReason, date:"Now (prototype)"}}));
-    setPendingChange(null);
-    setChangeReason("");
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <button onClick={onBack} className="text-[#00BDFE] hover:text-[#0099d4] text-sm">← System Health</button>
-        <div className="flex items-center gap-2">
-          {canConfig
-            ? <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full font-medium">✓ Config access — Aaron</span>
-            : <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full">Read-only — configuration requires Aaron sign-off</span>
-          }
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-slate-800 font-bold text-lg">Workflow Configuration</h2>
-        <p className="text-slate-400 text-xs mt-0.5">Autonomy levels per workflow step. Changes are logged, require a reason, and are immutable once committed.</p>
-      </div>
-
-      {/* Template selector */}
-      <div className="flex flex-wrap gap-2">
-        {WORKFLOW_TEMPLATES.map(t=>(
-          <button key={t.id} onClick={()=>setSelectedTemplate(t.id)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${selectedTemplate===t.id?"bg-[#00BDFE] border-[#00BDFE] text-white":"bg-white border-slate-300 text-slate-600 hover:border-[#00BDFE]"}`}>
-            <span className="mr-1">{t.icon}</span>{t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Template header */}
-      <div className="bg-white rounded-xl p-4 border border-slate-200">
-        <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
-          <div>
-            <h3 className="text-slate-800 font-semibold text-sm">{template.icon} {template.label}</h3>
-            <p className="text-slate-500 text-xs mt-0.5">{template.description}</p>
-            <p className="text-slate-400 text-xs mt-0.5">Client: {template.client}</p>
-          </div>
-          <button onClick={()=>setShowAudit(a=>!a)} className="text-[#00BDFE] hover:text-[#0099d4] text-xs underline">
-            {showAudit?"Hide audit log":"View audit log"}
-          </button>
-        </div>
-
-        {/* Level summary bar */}
-        <div className="flex gap-1 rounded-lg overflow-hidden h-2 mb-2">
-          {template.steps.map(s=>{
-            const lv=effectiveLevel(s);
-            const lm=lv==="hard"?LM.hard:LM[lv];
-            return <div key={s.id} className={`flex-1 ${lm.bar} opacity-80`} title={s.name}/>;
-          })}
-        </div>
-        <div className="flex gap-2 flex-wrap text-xs">
-          {[4,3,2,1].map(l=>{
-            const count=template.steps.filter(s=>!s.hard&&effectiveLevel(s)===l).length;
-            if(!count)return null;
-            return <span key={l} className={`px-2 py-0.5 rounded-full ${LM[l as keyof typeof LM].badge}`}>{LM[l as keyof typeof LM].long}: {count}</span>;
-          })}
-          {template.steps.filter(s=>s.hard).length>0&&(
-            <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">🔒 Hard limits: {template.steps.filter(s=>s.hard).length}</span>
-          )}
-        </div>
-      </div>
-
-      {/* Workflow steps */}
-      <div className="space-y-2">
-        {template.steps.map((step, idx) => {
-          const lv = effectiveLevel(step);
-          const lm = step.hard ? LM.hard : LM[lv];
-          const changed = !!committed[step.id];
-          const isPending = pendingChange?.stepId === step.id;
-
-          return (
-            <div key={step.id} className={`rounded-xl border p-4 transition-colors ${step.hard?"bg-red-50 border-red-200":changed?"bg-[#e0f7ff] border-[#00BDFE]/40":"bg-white border-slate-200"}`}>
-              <div className="flex items-start gap-3">
-                <span className="text-slate-400 text-xs font-mono w-5 flex-shrink-0 mt-0.5">{idx+1}.</span>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="text-slate-800 font-semibold text-sm">{step.name}</span>
-                    {step.agent!=="—"&&<span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{step.agent}</span>}
-                    {changed&&<span className="text-xs text-[#0099d4] bg-[#e0f7ff] px-2 py-0.5 rounded">Modified in session</span>}
-                  </div>
-                  <p className="text-slate-500 text-xs mb-2">{step.note}</p>
-
-                  {step.accuracy!==null&&(
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400 text-xs">Accuracy:</span>
-                        <span className={`text-xs font-mono font-bold ${step.accuracy>=0.95?"text-green-600":step.accuracy>=0.85?"text-[#0099d4]":step.accuracy>=0.75?"text-amber-600":"text-orange-500"}`}>{(step.accuracy*100).toFixed(0)}%</span>
-                      </div>
-                      {step.trend&&<span className={`text-xs ${step.trend==="improving"?"text-green-500":step.trend==="declining"?"text-orange-400":"text-slate-400"}`}>{step.trend==="improving"?"↑ improving":step.trend==="declining"?"↓ declining":"→ stable"}</span>}
-                      {step.decisions>0&&<span className="text-xs text-amber-600">{step.decisions} decisions this month</span>}
-                    </div>
-                  )}
-
-                  {isPending&&canConfig&&(
-                    <div className="bg-[#e0f7ff] border border-[#00BDFE]/40 rounded-lg p-3 mb-2">
-                      <p className="text-[#0099d4] text-xs font-semibold mb-2">
-                        Proposing: {lm.long} → {LM[pendingChange!.newLevel as keyof typeof LM].long}
-                      </p>
-                      <textarea
-                        className="w-full bg-white text-slate-800 rounded-lg px-3 py-2 text-xs border border-slate-300 focus:outline-none focus:border-[#00BDFE] mb-2 resize-none"
-                        rows={2} placeholder="Required: reason for this change and evidence of accuracy..."
-                        value={changeReason} onChange={e=>setChangeReason(e.target.value)}
-                      />
-                      <div className="flex gap-2">
-                        <button onClick={commitChange} disabled={!changeReason.trim()}
-                          className="text-xs bg-[#00BDFE] hover:bg-[#0099d4] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg font-medium">
-                          Commit change
-                        </button>
-                        <button onClick={()=>{setPendingChange(null);setChangeReason("");}}
-                          className="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg">
-                          Cancel
-                        </button>
-                      </div>
-                      <p className="text-slate-400 text-xs mt-1.5">This action will be logged with your name, timestamp, and reason. It cannot be undone.</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-shrink-0 text-right">
-                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${lm.badge} ${lm.ring}`}>
-                    {step.hard&&<span>🔒</span>}
-                    <span>{lm.label}</span>
-                    <span className="opacity-70 font-normal hidden sm:inline">— {lm.long}</span>
-                  </div>
-
-                  {canConfig&&!step.hard&&!isPending&&(
-                    <div className="flex gap-1 mt-2 justify-end">
-                      {(lv as number)>1&&(
-                        <button onClick={()=>setPendingChange({stepId:step.id,newLevel:(lv as number)-1})}
-                          className="text-xs bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 px-2 py-1 rounded font-mono transition-colors">
-                          ↓ Level {(lv as number)-1}
-                        </button>
-                      )}
-                      {(lv as number)<4&&(
-                        <button onClick={()=>setPendingChange({stepId:step.id,newLevel:(lv as number)+1})}
-                          className={`text-xs px-2 py-1 rounded font-mono transition-colors ${(step.accuracy??0)>=0.95?"bg-green-50 hover:bg-green-100 text-green-700":"bg-slate-100 hover:bg-[#e0f7ff] text-slate-500 hover:text-[#0099d4]"}`}>
-                          ↑ Level {(lv as number)+1}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {!canConfig&&!step.hard&&(
-                    <p className="text-slate-400 text-xs mt-1">Aaron sign-off required</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Audit log */}
-      {showAudit&&(
-        <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 className="text-slate-800 font-semibold text-sm mb-3">Audit Log — All Workflows</h3>
-          <p className="text-slate-400 text-xs mb-3">All changes are immutable once committed. Retrospective alteration is not permitted.</p>
-          <div className="space-y-2">
-            {AUDIT_LOG.map((e,i)=>(
-              <div key={i} className={`rounded-lg p-3 border text-xs ${e.type==="policy"?"bg-red-50 border-red-200":e.type==="demote"?"bg-orange-50 border-orange-200":"bg-green-50 border-green-200"}`}>
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="text-slate-700 font-semibold">{e.user}</span>
-                  <span className="text-slate-400">{e.date}</span>
-                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${e.type==="policy"?"bg-red-100 text-red-700":e.type==="demote"?"bg-orange-100 text-orange-700":"bg-green-100 text-green-700"}`}>
-                    {e.type==="policy"?"Policy":e.type==="demote"?"Auto-demoted":"Promoted"}
-                  </span>
-                </div>
-                <p className="text-slate-800 font-medium mb-0.5">{e.action}</p>
-                <p className="text-slate-500">{e.detail}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl p-4 border border-slate-200">
-        <h3 className="text-slate-800 font-semibold text-sm mb-3">Ask AI about workflow configuration</h3>
-        <AskAI context={`Workflow config for ${template.label}. ${template.steps.length} steps. Current autonomy distribution: ${[4,3,2,1].map(l=>`Level ${l}: ${template.steps.filter(s=>effectiveLevel(s)===l).length}`).join(", ")}. Hard limits: ${template.steps.filter(s=>s.hard).length}.`}
-          placeholder="e.g. What would need to be true before I could promote scope assessment to Level 3?"/>
-      </div>
-    </div>
-  );
-}
+import ConfigurationView from "./components/ConfigurationView";
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -314,7 +112,18 @@ export default function App() {
             <p className="text-slate-500 text-xs">Mission Control — System Health</p>
           </div>
         </div>
-        <span className="text-xs bg-white border border-slate-200 text-slate-500 px-3 py-1 rounded-full">10x Labs · v7</span>
+        <div className="flex items-center gap-2">
+          {/* Configuration link — visible to all personas; the access tier
+              inside the view determines what's editable */}
+          <button
+            onClick={() => setView("workflow")}
+            className="text-xs bg-white border border-slate-200 text-slate-600 hover:border-[#00BDFE] hover:text-[#0099d4] px-3 py-1 rounded-full transition-colors"
+            title="Workflow & commitment configuration"
+          >
+            ⚙ Configuration
+          </button>
+          <span className="text-xs bg-white border border-slate-200 text-slate-500 px-3 py-1 rounded-full">10x Labs · v7</span>
+        </div>
       </div>
       <div className="bg-white rounded-xl p-3 border border-slate-200">
         <p className="text-slate-400 text-xs mb-2">Viewing as:</p>
@@ -330,14 +139,18 @@ export default function App() {
     </>
   );
 
-  // ── Workflow view — checked before portfolio so Aaron can reach it ─────────
+  // ── Configuration view — workflow + commitment editing surface ─────────────
+  // All personas can navigate here; the access banner inside reflects what
+  // the current persona can/can't do (Reader / Drafter / Reviewer / Authoriser).
+  // Checked before portfolio routing so personas like Aaron and National can
+  // also reach it from their main view.
   if (view==="workflow") return (
     <div className={bg}><div className={maxW}>
       <div className="flex items-center gap-3 mb-6">
         <img src="/circl-logo.svg" alt="Circl" className="h-7" />
         <span className="text-slate-400 text-xs">Mission Control — v7</span>
       </div>
-      <WorkflowConfig canConfig={P.canConfig} onBack={()=>setView("dashboard")}/>
+      <ConfigurationView persona={persona} onBack={()=>setView("dashboard")} />
     </div></div>
   );
 

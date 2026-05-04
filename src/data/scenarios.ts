@@ -66,16 +66,35 @@ export const PRIME_STATUSES = [
 // frontline operators come first (Sharon) so the persona switcher reads bottom-
 // up through the org — the people who do the work, then the managers who
 // govern it, then the executives.
+//
+// configAccess: tiered authority over workflow/commitment configuration. See
+// ConfigAccessTier docs below. canConfig is kept as a derived convenience flag
+// for legacy code paths — true for any persona above Reader.
+export type ConfigAccessTier =
+  | "reader"      // view canvas/library/audit, no edits
+  | "drafter"     // create drafts within division; drafts require senior review
+  | "reviewer"    // publish low-risk drafts; high-risk routes to Authoriser
+  | "authoriser"; // publish anything including hard-limit edits and new-goal authoring
+
 export const PERSONAS = [
-  { id:"sharon",    label:"Sharon",    title:"T1 Intake & Dispatch",                 region:"North East (NSW/QLD)", types:["starlink","hn","jbhifi"],                                      canConfig:false },
-  { id:"logan",    label:"Logan",    title:"Ops Manager — Installation Services", region:"North East (NSW/QLD)", types:["starlink","hn","jbhifi"],                                      canConfig:false },
-  { id:"kerrie",   label:"Kerrie",   title:"Insurance Coordinator",                region:"National",             types:["insurance"],                                                   canConfig:false },
-  { id:"troy",     label:"Troy",     title:"Field Supervisor",                     region:"North East NSW",       types:[],                                                              canConfig:false },
-  { id:"conner",   label:"Conner",   title:"Ops Manager — Construction",           region:"National",             types:["construction"],                                                canConfig:false },
-  { id:"blake",    label:"Blake",    title:"Ops Manager — FM",                     region:"National",             types:["fm"],                                                          canConfig:false },
-  { id:"national", label:"National", title:"Senior Operations — All Regions",      region:"All Regions",          types:["starlink","hn","jbhifi","insurance","construction","fm"],      canConfig:false },
-  { id:"aaron",    label:"Aaron",    title:"Founder / CEO",                        region:"All Regions",          types:["starlink","hn","jbhifi","insurance","construction","fm"],      canConfig:true },
+  { id:"sharon",   label:"Sharon",   title:"T1 Intake & Dispatch",                 region:"North East (NSW/QLD)", types:["starlink","hn","jbhifi"],                                      canConfig:false, configAccess:"reader"     as ConfigAccessTier },
+  { id:"logan",    label:"Logan",    title:"Ops Manager — Installation Services",  region:"North East (NSW/QLD)", types:["starlink","hn","jbhifi"],                                      canConfig:true,  configAccess:"drafter"    as ConfigAccessTier },
+  { id:"kerrie",   label:"Kerrie",   title:"Insurance Coordinator",                region:"National",             types:["insurance"],                                                   canConfig:true,  configAccess:"drafter"    as ConfigAccessTier },
+  { id:"troy",     label:"Troy",     title:"Field Supervisor",                     region:"North East NSW",       types:[],                                                              canConfig:false, configAccess:"reader"     as ConfigAccessTier },
+  { id:"conner",   label:"Conner",   title:"Ops Manager — Construction",           region:"National",             types:["construction"],                                                canConfig:true,  configAccess:"drafter"    as ConfigAccessTier },
+  { id:"blake",    label:"Blake",    title:"Ops Manager — FM",                     region:"National",             types:["fm"],                                                          canConfig:true,  configAccess:"drafter"    as ConfigAccessTier },
+  { id:"national", label:"National", title:"Senior Operations — All Regions",      region:"All Regions",          types:["starlink","hn","jbhifi","insurance","construction","fm"],      canConfig:true,  configAccess:"reviewer"   as ConfigAccessTier },
+  { id:"aaron",    label:"Aaron",    title:"Founder / CEO",                        region:"All Regions",          types:["starlink","hn","jbhifi","insurance","construction","fm"],      canConfig:true,  configAccess:"authoriser" as ConfigAccessTier },
 ];
+
+// Helper: human-readable description of what a tier can do — used in the
+// access banner at the top of the configuration view.
+export const CONFIG_ACCESS_META: Record<ConfigAccessTier, { label: string; canEdit: boolean; canPublish: boolean; description: string; color: string; bg: string; border: string }> = {
+  reader:     { label:"Reader",     canEdit:false, canPublish:false, description:"Read-only view of workflows, goals, and commitments.",                                                                       color:"text-slate-600", bg:"bg-slate-50",  border:"border-slate-200" },
+  drafter:    { label:"Drafter",    canEdit:true,  canPublish:false, description:"Draft changes within your division. Drafts require senior review before publishing.",                                       color:"text-sky-700",   bg:"bg-sky-50",    border:"border-sky-200" },
+  reviewer:   { label:"Reviewer",   canEdit:true,  canPublish:true,  description:"Publish low-risk drafts. High-risk drafts (universal scope, autonomy L4, hard limits) route to the Authoriser.",            color:"text-violet-700",bg:"bg-violet-50", border:"border-violet-200" },
+  authoriser: { label:"Authoriser", canEdit:true,  canPublish:true,  description:"Publish any draft including hard-limit edits, universal scope changes, autonomy promotion to L4, and new goal authoring.",  color:"text-amber-700", bg:"bg-amber-50",  border:"border-amber-200" },
+};
 
 // ─── Job type health (volume stats illustrative — export is a regional subset) ─
 export const JOB_TYPES = [
