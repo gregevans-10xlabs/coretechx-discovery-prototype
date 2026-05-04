@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import {
   STARLINK_GOALS, STARLINK_STANDALONE, PENDING_CHANGES, CONFIG_AUDIT,
-  STAGE_NAMES,
-  type Goal, type StandaloneCommitment, type PendingChange,
+  STAGE_NAMES, SEEDED_SIMULATIONS, simulateChange,
+  type Goal, type StandaloneCommitment, type PendingChange, type ConfigAuditEntry,
 } from "../data/goals";
 import { CONFIG_ACCESS_META, PERSONAS, type ConfigAccessTier } from "../data/scenarios";
 import GoalDrawer, { type DraftEntry } from "./GoalDrawer";
+import SimulationModal from "./SimulationModal";
 
 // ConfigurationView — the workflow canvas + library entry point + Pending
 // Changes panel. Read-only for most personas; edit affordances appear when
@@ -101,27 +102,27 @@ function FloatingLaneItem({
 // Drafts queue shown in the right column. Each row carries its routing
 // destination so the chain of authority is visible.
 
-function PendingPanel({ changes, currentPersona, accessTier }: { changes: PendingChange[]; currentPersona: string; accessTier: ConfigAccessTier }) {
+function PendingPanel({ changes, currentPersona, accessTier, onSimulate }: { changes: PendingChange[]; currentPersona: string; accessTier: ConfigAccessTier; onSimulate: (change: PendingChange) => void }) {
   const access = CONFIG_ACCESS_META[accessTier];
   const myDrafts = changes.filter(c => c.draftedById === currentPersona);
-  const awaitingMe = changes.filter(c => c.routedTo === currentPersona);
+  const awaitingMe = changes.filter(c => c.routedTo === currentPersona && c.draftedById !== currentPersona);
   const others = changes.filter(c => c.draftedById !== currentPersona && c.routedTo !== currentPersona);
 
   return (
     <div className="space-y-3">
       {awaitingMe.length > 0 && (
         <Section title={`Awaiting your review (${awaitingMe.length})`} accent="amber">
-          {awaitingMe.map(c => <PendingCard key={c.id} change={c} canPublish={access.canPublish} />)}
+          {awaitingMe.map(c => <PendingCard key={c.id} change={c} canPublish={access.canPublish} onSimulate={() => onSimulate(c)} />)}
         </Section>
       )}
       {myDrafts.length > 0 && (
         <Section title={`Your drafts (${myDrafts.length})`} accent="sky">
-          {myDrafts.map(c => <PendingCard key={c.id} change={c} canPublish={access.canPublish} />)}
+          {myDrafts.map(c => <PendingCard key={c.id} change={c} canPublish={access.canPublish} onSimulate={() => onSimulate(c)} />)}
         </Section>
       )}
       {others.length > 0 && (
         <Section title={`Other pending (${others.length})`} accent="slate">
-          {others.map(c => <PendingCard key={c.id} change={c} canPublish={access.canPublish} />)}
+          {others.map(c => <PendingCard key={c.id} change={c} canPublish={access.canPublish} onSimulate={() => onSimulate(c)} />)}
         </Section>
       )}
       {changes.length === 0 && (
@@ -141,7 +142,7 @@ function Section({ title, accent, children }: { title: string; accent: "amber" |
   );
 }
 
-function PendingCard({ change, canPublish }: { change: PendingChange; canPublish: boolean }) {
+function PendingCard({ change, canPublish, onSimulate }: { change: PendingChange; canPublish: boolean; onSimulate: () => void }) {
   const routedToLabel = PERSONAS.find(p => p.id === change.routedTo)?.label ?? change.routedTo;
   const showHighRisk = change.reviewState === "needs_authoriser";
   return (
@@ -156,12 +157,17 @@ function PendingCard({ change, canPublish }: { change: PendingChange; canPublish
         <p>{change.scope} · {change.blastRadius}</p>
         <p className="mt-0.5">By {change.draftedBy} · {change.draftedAt} · {showHighRisk ? <span className="text-amber-700 font-semibold">⚠ Authoriser only</span> : <span>Routes to {routedToLabel}</span>}</p>
       </div>
-      {canPublish && (
-        <div className="flex gap-1.5 mt-2">
-          <button className="text-[11px] px-2 py-1 rounded bg-[#00BDFE] hover:bg-[#0099d4] text-white font-medium">Approve & publish</button>
-          <button className="text-[11px] px-2 py-1 rounded border border-slate-200 text-slate-500 hover:bg-slate-50">Request changes</button>
-        </div>
-      )}
+      {/* Simulate is always available — non-publishers can still inspect what
+          a draft would do before deciding to advocate for or against it. */}
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        <button onClick={onSimulate} className="text-[11px] px-2 py-1 rounded border border-[#00BDFE] text-[#0077a8] hover:bg-[#e0f7ff] font-medium">▶ Simulate</button>
+        {canPublish && (
+          <>
+            <button onClick={onSimulate} className="text-[11px] px-2 py-1 rounded bg-[#00BDFE] hover:bg-[#0099d4] text-white font-medium">Approve &amp; publish</button>
+            <button className="text-[11px] px-2 py-1 rounded border border-slate-200 text-slate-500 hover:bg-slate-50">Request changes</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -179,8 +185,41 @@ export default function ConfigurationView({ persona, onBack }: Props) {
   // Local pending-changes state seeded from the static data so drafts added
   // during the session show up in the panel.
   const [pendingChanges, setPendingChanges] = useState(() => [...PENDING_CHANGES]);
+  // Local audit state seeded from CONFIG_AUDIT — published changes append here.
+  const [auditEntries, setAuditEntries] = useState<ConfigAuditEntry[]>(() => [...CONFIG_AUDIT]);
+  // Simulation modal — open when an operator clicks Simulate (or Approve &
+  // publish, which goes through simulation as the default path).
+  const [simulating, setSimulating] = useState<PendingChange | null>(null);
   // Toast feedback when a draft is added.
   const [toast, setToast] = useState<string | null>(null);
+
+  // Resolve a simulation result for a pending change. Seeded data preferred;
+  // otherwise heuristic generation based on changeType.
+  const simulationFor = (change: PendingChange) =>
+    SEEDED_SIMULATIONS[change.id] ?? simulateChange(change);
+
+  // Open simulation modal for a given pending change.
+  const handleSimulate = (change: PendingChange) => setSimulating(change);
+
+  // Publish from within the simulation modal — moves the draft to the audit
+  // log, removes it from pending, and shows confirmation.
+  const handlePublishFromSimulation = () => {
+    if (!simulating) return;
+    const entry: ConfigAuditEntry = {
+      id: `CA-${Date.now()}`,
+      publishedBy: personaMeta.label,
+      publishedAt: "Just now",
+      changeType: simulating.changeType,
+      target: simulating.target,
+      summary: `${simulating.before} → ${simulating.after}. Published with simulation log.${simulating.notes ? ` ${simulating.notes}` : ""}`,
+      version: "v.next",
+    };
+    setAuditEntries(curr => [entry, ...curr]);
+    setPendingChanges(curr => curr.filter(c => c.id !== simulating.id));
+    setSimulating(null);
+    setToast("Published — simulation log attached to audit");
+    setTimeout(() => setToast(null), 2400);
+  };
 
   const handleDraftChange = (entry: DraftEntry) => {
     // Routing: high-risk drafts (L4 promotion, threshold override, hard-limit
@@ -338,20 +377,26 @@ export default function ConfigurationView({ persona, onBack }: Props) {
               <h3 className="text-slate-700 font-semibold text-sm">Pending Changes</h3>
               <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-bold">{pendingChanges.length}</span>
             </div>
-            <PendingPanel changes={pendingChanges} currentPersona={persona} accessTier={accessTier} />
+            <PendingPanel changes={pendingChanges} currentPersona={persona} accessTier={accessTier} onSimulate={handleSimulate} />
           </div>
 
           {/* Recent Audit */}
           <div className="bg-white rounded-2xl border border-slate-200 p-3">
             <h3 className="text-slate-700 font-semibold text-sm mb-2">Recent published changes</h3>
             <div className="space-y-1.5">
-              {CONFIG_AUDIT.map(a => (
-                <div key={a.id} className="border-l-2 border-slate-200 pl-2 text-xs">
-                  <p className="text-slate-700 font-medium leading-snug">{a.target}</p>
-                  <p className="text-slate-500 text-[11px] leading-snug mt-0.5">{a.summary}</p>
-                  <p className="text-slate-400 text-[10px] mt-0.5">{a.publishedBy} · {a.publishedAt} · {a.version}</p>
-                </div>
-              ))}
+              {auditEntries.map(a => {
+                const simulated = a.summary.includes("simulation log");
+                return (
+                  <div key={a.id} className={`border-l-2 pl-2 text-xs ${simulated ? "border-[#00BDFE]" : "border-slate-200"}`}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-slate-700 font-medium leading-snug flex-1">{a.target}</p>
+                      {simulated && <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold border bg-[#e0f7ff] border-[#00BDFE]/30 text-[#0077a8] flex-shrink-0">Simulated</span>}
+                    </div>
+                    <p className="text-slate-500 text-[11px] leading-snug mt-0.5">{a.summary}</p>
+                    <p className="text-slate-400 text-[10px] mt-0.5">{a.publishedBy} · {a.publishedAt} · {a.version}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -363,11 +408,13 @@ export default function ConfigurationView({ persona, onBack }: Props) {
             </p>
           </div>
 
-          {/* Simulation slot — placeholder for item #6 (workflow simulation) */}
-          <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-3 text-xs">
-            <p className="text-slate-500 font-semibold mb-1">Simulation</p>
-            <p className="text-slate-400 leading-snug">
-              Run drafts against the last 30 days of historical jobs before publishing. Deferred from MVP — drafts can still be reviewed and published without it.
+          {/* Simulation — now active. Open from any pending change card via
+              the ▶ Simulate button (or the Approve & publish flow, which
+              routes through simulation as the default path). */}
+          <div className="bg-[#e0f7ff]/40 rounded-2xl border border-[#00BDFE]/20 p-3 text-xs">
+            <p className="text-[#0077a8] font-semibold mb-1">Simulation — active</p>
+            <p className="text-slate-500 leading-snug">
+              Replay any pending change against the last 32 days of historical jobs before publishing. Click <span className="text-[#0077a8] font-semibold">▶ Simulate</span> on any draft to see projected metric deltas, side effects, and example jobs that would have behaved differently.
             </p>
           </div>
         </div>
@@ -383,6 +430,18 @@ export default function ConfigurationView({ persona, onBack }: Props) {
         onClose={() => { setOpenGoal(null); setOpenStandalone(null); }}
         onDraftChange={handleDraftChange}
       />
+
+      {/* Simulation modal — opens from any pending change card. Approve &
+          publish moves the change from pending to audit. */}
+      {simulating && (
+        <SimulationModal
+          change={simulating}
+          result={simulationFor(simulating)}
+          canPublish={access.canPublish}
+          onCancel={() => setSimulating(null)}
+          onPublish={handlePublishFromSimulation}
+        />
+      )}
 
       {/* Toast */}
       {toast && (

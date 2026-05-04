@@ -378,3 +378,157 @@ export const CONFIG_AUDIT: ConfigAuditEntry[] = [
   { id:"CA-202", publishedBy:"Aaron", publishedAt:"3 days ago 14:32", changeType:"autonomy-promote", target:"RCTI generated and synced to trade portal",      summary:"Promoted to L4 — accuracy 99.7% over 90 days, threshold met.",                  version:"v3.0 → v3.1" },
   { id:"CA-203", publishedBy:"National", publishedAt:"5 days ago",    changeType:"commitment-edit",  target:"Trade compliance — SWMS proof required",        summary:"Strengthened proof: now requires SWMS PDF upload (was 'on file').",            version:"v4.1 → v4.2" },
 ];
+
+// ─── Simulation ──────────────────────────────────────────────────────────────
+// "If this change had been live for the last 30 days, what would have
+// changed?" Each PendingChange can be simulated against a historical job
+// dataset before publishing. The result is intentionally honest: it shows
+// side effects, not just the obvious upside, and surfaces caveats so the
+// operator (or Authoriser) knows what they're trusting.
+//
+// In production this would replay the actual event stream against the
+// proposed configuration. For the prototype, results are seeded for staged
+// drafts and generated heuristically for drafts created during the demo.
+
+export type SimulationMetricDirection = "improvement" | "regression" | "side-effect" | "neutral";
+
+export type SimulationMetric = {
+  label: string;
+  before: string;
+  after: string;
+  delta: string;                    // human-readable, e.g. "-67%", "+47", "no change"
+  direction: SimulationMetricDirection;
+  note?: string;
+};
+
+export type SimulationExample = {
+  jobId: string;
+  location: string;
+  difference: string;               // human-readable: what would have changed for this job
+};
+
+export type SimulationResult = {
+  datasetDescription: string;       // honest data scope, e.g. "Last 32 days · 5,847 historical jobs · NSW/QLD"
+  headline: string;                 // one-line summary
+  metrics: SimulationMetric[];
+  examples: SimulationExample[];
+  caveats: string[];
+  recommendation: "approve" | "review_first" | "do_not_approve";
+  recommendationNote: string;
+};
+
+// ─── Seeded simulations for the staged pending changes ──────────────────────
+// Realistic numbers that lead with the upside, surface side effects, and
+// reference specific job IDs from the prototype dataset where possible.
+export const SEEDED_SIMULATIONS: Record<string, SimulationResult> = {
+
+  // PC-101 — Logan: Match trade Search radius 20km → 30km
+  "PC-101": {
+    datasetDescription: "Last 32 days · 5,847 historical jobs · NSW/QLD region",
+    headline: "Would have prevented 4 of 6 manual procurement events by reaching compliant trades in the Mid North Coast corridor.",
+    metrics: [
+      { label: "Manual procurement events",  before: "6",      after: "2",      delta: "-67%",  direction: "improvement" },
+      { label: "Coverage-gap pattern hits",  before: "12",     after: "5",      delta: "-58%",  direction: "improvement" },
+      { label: "Avg time to allocation",     before: "19 min", after: "14 min", delta: "-26%",  direction: "improvement" },
+      { label: "Avg trade travel time",      before: "31 min", after: "38 min", delta: "+23%",  direction: "side-effect", note: "Wider radius pulls trades from further out — may push some windows late." },
+      { label: "Hard-limit hits",            before: "0",      after: "0",      delta: "no change", direction: "neutral" },
+    ],
+    examples: [
+      { jobId: "CG36003", location: "Fern Bay NSW",     difference: "AI would have auto-allocated York Digital Solutions inside the radius — Sharon's manual confirmation step skipped." },
+      { jobId: "CG36015", location: "Coomba Bay NSW",   difference: "Allocated 14 min after intake instead of 90 min — shadow-plan activation avoided entirely." },
+      { jobId: "CG35978", location: "Forster NSW",      difference: "AI reached AMP Electrical (28km) inside the wider radius — manual procurement avoided." },
+      { jobId: "CG36015", location: "Forster NSW",      difference: "Pattern P-039 (coverage gap) would have eased — 2 of 3 affected jobs absorb." },
+    ],
+    caveats: [
+      "Assumes trade availability holds at current levels.",
+      "+7 min average travel may push 4–6 jobs past their window cutoff. Recommend re-evaluation 30 days post-publish.",
+      "Doesn't account for slight increase in trade fuel/time costs (out of scope for autonomy economics).",
+    ],
+    recommendation: "approve",
+    recommendationNote: "Net positive — improvement in 3 metrics, one side-effect with a clear monitoring path.",
+  },
+
+  // PC-102 — Kerrie: Get customer satisfaction Allianz overlay (channel switch + tighter timing)
+  "PC-102": {
+    datasetDescription: "Last 32 days · 421 Allianz jobs · National",
+    headline: "Would have shifted ~340 Allianz customers from external SMS/email to Allianz portal surveys, with surveys reaching customers ~23h earlier.",
+    metrics: [
+      { label: "CSAT surveys sent (Allianz)", before: "421",    after: "421",    delta: "no change",      direction: "neutral" },
+      { label: "Channel: Allianz portal",     before: "0%",     after: "100%",   delta: "+421",           direction: "improvement", note: "Aligns with Allianz operator request — surveys via their portal, not external channels." },
+      { label: "Avg time-to-send",            before: "T+24h",  after: "T+1h",   delta: "-23h",           direction: "improvement", note: "Closer to event = higher recall, projected response rate +14pp." },
+      { label: "Projected response rate",     before: "62%",    after: "76%",    delta: "+14pp",          direction: "improvement", note: "Based on 2025 H2 portal-channel cohort (n=2,184)." },
+      { label: "Customers reachable",         before: "421",    after: "418",    delta: "-3 customers",   direction: "side-effect", note: "Customers without Allianz portal access (3) would not receive a survey." },
+    ],
+    examples: [
+      { jobId: "CG36078", location: "Shailer Park QLD", difference: "Survey would have been delivered via Allianz portal at T+1h instead of SMS at T+24h." },
+      { jobId: "CG36011", location: "Port Macquarie NSW", difference: "Customer would have received survey through portal — likely higher engagement given portal-active customer." },
+      { jobId: "CG36069", location: "Mardi NSW", difference: "Same survey content delivered via Allianz portal; SMS path retired for this client." },
+    ],
+    caveats: [
+      "Allianz client overlay only — universal CSAT goal unchanged for other clients.",
+      "Response-rate projection (+14pp) assumes Allianz portal cohort behaviour holds.",
+      "3 customers without portal access (legacy customers, ~0.7% of Allianz base) lose CSAT signal entirely — alternative channel needed for those.",
+    ],
+    recommendation: "review_first",
+    recommendationNote: "High upside but introduces a small uncovered cohort (3 customers) that should be addressed before publish.",
+  },
+};
+
+// Heuristic simulation for drafts created live during the demo. Picks a
+// result shape based on changeType + draft metadata. Numbers are illustrative
+// at the prototype scope; real production would replay the event stream.
+export function simulateChange(change: PendingChange): SimulationResult {
+  if (change.changeType === "autonomy-promote") {
+    const isPromotion = /L\d → L[34]/i.test(`${change.before} → ${change.after}`);
+    const isOverride  = /override/i.test(change.after);
+    const targetIsL4  = /L4/i.test(change.after);
+    const baseHandled = targetIsL4 ? 47 : 23;
+    return {
+      datasetDescription: "Last 32 days · 5,847 historical jobs · NSW/QLD region",
+      headline: isPromotion
+        ? `Would have shifted ~${baseHandled} ${change.target.split("—")[0].trim().toLowerCase()} actions from human dispatch to AI auto-execution.`
+        : "Demotion: AI would have surfaced more decisions for human review.",
+      metrics: [
+        { label: "Decisions auto-handled by AI", before: "3,421", after: `${3421 + baseHandled}`, delta: `+${baseHandled} (+${(baseHandled / 3421 * 100).toFixed(1)}%)`, direction: isPromotion ? "improvement" : "regression" },
+        { label: "Decisions routed to T1 dispatch", before: "487", after: `${487 - baseHandled}`, delta: `-${baseHandled} (-${(baseHandled / 487 * 100).toFixed(1)}%)`, direction: isPromotion ? "improvement" : "regression" },
+        ...(isOverride ? [{
+          label: "Projected false positives",
+          before: "—",
+          after: `~${Math.round(baseHandled * 0.07)}`,
+          delta: "estimated",
+          direction: "side-effect" as SimulationMetricDirection,
+          note: "Based on current accuracy ~89%. If accuracy drops below 85%, false positives climb sharply — recommend monitoring window after publish.",
+        }] : []),
+        { label: "Avg time-to-action", before: "12.4 min", after: "2.1 min", delta: "-83%", direction: "improvement", note: "AI execution is near-instantaneous; T1 dispatch involves callback queue + human latency." },
+      ],
+      examples: [
+        { jobId: "CG36241", location: "Forster NSW",      difference: "Would have been auto-handled by AI without the T1 callback step." },
+        { jobId: "CG36245", location: "Salamander Bay NSW", difference: "AI would have applied the auto-execute option directly; no escalation to dispatch." },
+      ],
+      caveats: [
+        isOverride ? "Threshold override applied — accuracy below the 95% bar required for L4." : "Accuracy meets threshold for proposed level.",
+        "Assumes current model accuracy holds. Sustained drop below 85% would warrant rollback.",
+      ],
+      recommendation: isOverride ? "review_first" : "approve",
+      recommendationNote: isOverride
+        ? "Sub-threshold promotion — Authoriser approval required, monitoring window strongly recommended."
+        : "Threshold met. Net positive on automation rate; low risk.",
+    };
+  }
+  // Generic goal-control edit
+  return {
+    datasetDescription: "Last 32 days · 5,847 historical jobs · NSW/QLD region",
+    headline: `Would have applied to ~${change.scope.includes("Starlink") ? 1240 : 4200} jobs over the simulation window.`,
+    metrics: [
+      { label: "Jobs affected", before: "—", after: change.scope.includes("Starlink") ? "~1,240" : "~4,200", delta: "scope of replay", direction: "neutral" },
+      { label: "Hard-limit hits", before: "0", after: "0", delta: "no change", direction: "neutral" },
+      { label: "Operational delta", before: "baseline", after: "modified", delta: "see notes", direction: "neutral", note: "Goal-control edits typically affect downstream behaviour incrementally; no direct breach impact projected." },
+    ],
+    examples: [],
+    caveats: [
+      "Generic simulation for prototype scope — production simulation would model the specific control change in detail.",
+    ],
+    recommendation: "approve",
+    recommendationNote: "Low-risk goal-control edit. Standard publish flow.",
+  };
+}
