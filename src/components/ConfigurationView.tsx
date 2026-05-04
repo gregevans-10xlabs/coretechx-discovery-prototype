@@ -5,7 +5,7 @@ import {
   type Goal, type StandaloneCommitment, type PendingChange,
 } from "../data/goals";
 import { CONFIG_ACCESS_META, PERSONAS, type ConfigAccessTier } from "../data/scenarios";
-import GoalDrawer from "./GoalDrawer";
+import GoalDrawer, { type DraftEntry } from "./GoalDrawer";
 
 // ConfigurationView — the workflow canvas + library entry point + Pending
 // Changes panel. Read-only for most personas; edit affordances appear when
@@ -182,26 +182,40 @@ export default function ConfigurationView({ persona, onBack }: Props) {
   // Toast feedback when a draft is added.
   const [toast, setToast] = useState<string | null>(null);
 
-  const handleDraftChange = (description: string) => {
+  const handleDraftChange = (entry: DraftEntry) => {
+    // Routing: high-risk drafts (L4 promotion, threshold override, hard-limit
+    // edits) always route to Authoriser regardless of who drafted them.
+    // Otherwise, Reviewer and above can self-publish; Drafters route to
+    // National for review.
+    const routedTo = entry.highRisk
+      ? "aaron"
+      : access.canPublish
+      ? persona
+      : "national";
+    const reviewState: PendingChange["reviewState"] = entry.highRisk && persona !== "aaron"
+      ? "needs_authoriser"
+      : access.canPublish
+      ? "approved"
+      : "awaiting_review";
     const newChange: PendingChange = {
       id: `PC-${Date.now()}`,
       draftedBy: personaMeta.label,
       draftedById: persona,
       draftedAt: "Just now",
-      changeType: "goal-control",
-      target: description,
-      before: "(prior value)",
-      after: "(new value)",
-      scope: "Demo session",
-      blastRadius: "1 workflow · prototype scope",
-      reviewState: access.canPublish ? "approved" : "awaiting_review",
-      routedTo: access.canPublish ? persona : "national",
-      notes: "Added via prototype demo flow.",
+      changeType: entry.changeType,
+      target: entry.target,
+      before: entry.before,
+      after: entry.after,
+      scope: openGoal ? `${openGoal.name} · ${openGoal.usedInWorkflows.length} workflows` : "Standalone commitment",
+      blastRadius: openGoal ? `${openGoal.usedInWorkflows.length} workflow${openGoal.usedInWorkflows.length === 1 ? "" : "s"} · prototype scope` : "1 commitment · prototype scope",
+      reviewState,
+      routedTo,
+      notes: entry.notes,
     };
     setPendingChanges(curr => [newChange, ...curr]);
     setOpenGoal(null);
     setOpenStandalone(null);
-    setToast(`Draft added to Pending Changes`);
+    setToast(reviewState === "approved" ? "Published — added to audit" : "Draft added to Pending Changes");
     setTimeout(() => setToast(null), 2400);
   };
 

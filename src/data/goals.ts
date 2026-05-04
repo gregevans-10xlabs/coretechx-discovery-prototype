@@ -88,6 +88,19 @@ export type StandaloneCommitment = GoalCommitment & {
   usedInWorkflows: string[];
 };
 
+// ─── Autonomy promotion thresholds ──────────────────────────────────────────
+// Discovery OS principle: AI earns autonomy through measured accuracy. Each
+// promotion has an accuracy floor; promotion below threshold requires an
+// explicit policy override from the Authoriser.
+//
+// L1 has no floor (always available — operator decides). L4 mirrors the spec
+// requirement of 95%+ sustained accuracy for full autonomy.
+export const AUTONOMY_THRESHOLDS: Record<2 | 3 | 4, number> = {
+  2: 0.75,   // L2 Recommend — AI surfaces recommendation, human approves
+  3: 0.88,   // L3 Act + Notify — AI acts, human can override
+  4: 0.95,   // L4 Full Auto — AI handles end-to-end, human sees exceptions only
+};
+
 // ─── Universal Stage labels ─────────────────────────────────────────────────
 // Re-exported here so the configuration view can label stage columns without
 // importing from jobs.ts (keeps the configuration layer's dependencies tight).
