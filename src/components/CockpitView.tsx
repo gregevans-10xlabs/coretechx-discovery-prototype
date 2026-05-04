@@ -12,6 +12,7 @@ import TradeLink from "./TradeLink";
 import ShadowPlanPill from "./ShadowPlanPill";
 import CountdownPill from "./CountdownPill";
 import TradeChain from "./TradeChain";
+import ConfidencePanel from "./ConfidencePanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned" | "audit";
@@ -199,14 +200,29 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
         </div>
         <div className="text-right flex-shrink-0">
           <RiskBadge conf={job.conf} />
-          <button
-            onClick={onAskWhy}
-            className="text-[10px] mt-1 text-[#00BDFE] hover:text-[#0099d4] hover:underline font-medium block ml-auto"
-          >
-            Why is this here?
-          </button>
+          {/* If no narrative is populated, fall back to the legacy AskAI link
+              so jobs without modelled breakdown still have an affordance. */}
+          {!job.riskNarrative && (
+            <button
+              onClick={onAskWhy}
+              className="text-[10px] mt-1 text-[#00BDFE] hover:text-[#0099d4] hover:underline font-medium block ml-auto"
+            >
+              Why is this here?
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Confidence panel — narrative + structured signal breakdown.
+          Replaces the bare "Why is this here?" link for modelled jobs. */}
+      {(job.riskNarrative || job.confidenceBreakdown) && (
+        <ConfidencePanel
+          narrative={job.riskNarrative}
+          breakdown={job.confidenceBreakdown}
+          conf={job.conf}
+          onAskFollowUp={onAskWhy}
+        />
+      )}
 
       {/* Read-only notice */}
       {isReadOnly && job.readOnlyReason && (

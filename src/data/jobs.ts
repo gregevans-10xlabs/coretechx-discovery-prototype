@@ -103,6 +103,14 @@ export type Job = {
   nextAction?: string;
   nextTradeDate?: string;
 
+  // Risk narrative — plain-English synthesis of why this job is in its
+  // current risk state. Always rendered when present; the structured
+  // confidenceBreakdown sits behind a "View signals" expander for operators
+  // who want to verify the underlying model output. The two layers
+  // complement each other and answer different questions.
+  riskNarrative?: string;
+  confidenceBreakdown?: ConfidenceBreakdown;
+
   // Shadow Plan — pre-computed backup trade reserved at booking time. The
   // 60-second cancellation-to-replacement guarantee depends on this being
   // ready before the primary trade fails, not computed in response.
@@ -152,6 +160,39 @@ export type TradeActor = {
   stage: string;       // current stage / detail line, e.g. "Frame · Day 4/28"
   status: TradeActorStatus;
   dependsOn?: string[]; // trade names this actor is waiting on
+};
+
+// ─── Confidence Drivers ─────────────────────────────────────────────────────
+// "Why is this risk state?" — structured decomposition of the confidence
+// score into the per-step model signals that contribute to it. Lets operators
+// verify the model's read, challenge wrong signals, and feed training
+// feedback. Sits alongside the plain-English riskNarrative on Job, which is
+// the synthesis layer the operator reads first.
+export type ConfidenceDriverCategory =
+  | "trade_history"   // prior performance of this trade (no-shows, accuracy, completion)
+  | "compliance"      // current compliance state of the trade
+  | "workload"        // trade's current job load / capacity
+  | "geo"             // distance, drive time, regional coverage
+  | "weather"         // weather/environmental risk in window
+  | "equipment"       // equipment/logistics readiness (links to equipment[])
+  | "pattern"         // detected pattern flag relevant to this job
+  | "time"            // time pressure relative to window/SLA
+  | "customer"        // customer history (callbacks, complaints)
+  | "other";
+
+export type ConfidenceDriver = {
+  id: string;
+  category: ConfidenceDriverCategory;
+  label: string;                    // short label, e.g. "Trade history at this location"
+  weight: number;                   // signed contribution, -1..+1
+  explanation: string;              // plain-English explanation
+  evidence?: string;                // underlying data ref e.g. "Pattern P-039 active"
+};
+
+export type ConfidenceBreakdown = {
+  drivers: ConfidenceDriver[];
+  modelRefs: string[];              // ["Trade-Match v3.4", "Allocation v2.1"]
+  retrainedAt: string;
 };
 
 // ─── Shadow Plan ─────────────────────────────────────────────────────────────
@@ -305,6 +346,20 @@ export const JOBS: Job[] = [
     actionDeadlineMin: 4,
     autoExecuteOption: "Activate shadow plan",
     shadowTrade: { name: "Metro Handyman Services Pty Ltd", etaMin: 22, softReserved: true, rating: 4.8 },
+    riskNarrative: "Shane's Handyman Service was due here 18 minutes ago and we haven't heard from them. They've also no-showed once before in this corridor in the last 14 days. Metro Handyman is ready as a shadow trade — that's probably your call.",
+    confidenceBreakdown: {
+      modelRefs: ["Starlink-Allocate v3.4", "Trade-Performance v2.8"],
+      retrainedAt: "12 Apr 2026",
+      drivers: [
+        { id: "d1", category: "trade_history", weight: -0.31, label: "Trade history at this location", explanation: "Shane's Handyman has 1 no-show in the Mid North Coast corridor in the last 14 days.", evidence: "Pattern P-039 active for this trade in this region" },
+        { id: "d2", category: "time", weight: -0.18, label: "Time pressure", explanation: "Window opened 18 minutes ago. No GPS ping received from the trade.", evidence: "Last known location: 34 min from site at 07:52am" },
+        { id: "d3", category: "workload", weight: -0.14, label: "Trade workload", explanation: "Chekku capacity is at 92% — Shane's Handyman has 4 other jobs scheduled today.", evidence: "Chekku capacity report 09:00" },
+        { id: "d4", category: "pattern", weight: -0.08, label: "Regional jeopardy uplift", explanation: "Mid North Coast jeopardy rate is +12% above baseline this week." },
+        { id: "d5", category: "compliance", weight: 0.08, label: "Compliance currency", explanation: "Public liability and SWMS valid through August 2026." },
+        { id: "d6", category: "geo", weight: 0.06, label: "Trade proximity", explanation: "Trade home base 6km from site — short drive on a normal day." },
+        { id: "d7", category: "customer", weight: -0.03, label: "Customer history", explanation: "First-time customer — no prior baseline to draw on." },
+      ],
+    },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -337,6 +392,18 @@ export const JOBS: Job[] = [
     actionOptions: ["Confirm York Digital Solutions", "Search alternate trades", "Reschedule job"],
     actionDeadlineMin: 12,
     autoExecuteOption: "Confirm York Digital Solutions",
+    riskNarrative: "No compliant trade in the 2295 postcode — the model extended the search to 40km and surfaced York Digital Solutions as the only candidate. Their soft reservation expires in 90 minutes. This is a known pattern (P-039) for the Mid North Coast corridor, not a one-off.",
+    confidenceBreakdown: {
+      modelRefs: ["Starlink-Allocate v3.4", "Coverage-Predict v1.6"],
+      retrainedAt: "12 Apr 2026",
+      drivers: [
+        { id: "d1", category: "pattern", weight: -0.34, label: "Coverage gap pattern", explanation: "Pattern P-039 active — 0 compliant trades in 2295 postcode within standard 20km radius.", evidence: "Pattern P-039 (Mid North Coast)" },
+        { id: "d2", category: "trade_history", weight: -0.18, label: "Candidate trade evidence pattern", explanation: "York Digital Solutions has 3 prior completed jobs with 0 photos submitted.", evidence: "Photo non-submission pattern, 90-day window" },
+        { id: "d3", category: "time", weight: -0.10, label: "Soft reservation decay", explanation: "Soft reservation with York Digital expires in 90 minutes." },
+        { id: "d4", category: "geo", weight: -0.08, label: "Distance to site", explanation: "York Digital home base is 28km from site — outside standard radius." },
+        { id: "d5", category: "compliance", weight: 0.08, label: "Candidate compliance currency", explanation: "York Digital compliance docs all currently valid." },
+      ],
+    },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -366,6 +433,18 @@ export const JOBS: Job[] = [
     actionRequired: null,
     actionOptions: [],
     shadowTrade: { name: "Coastline Antennas Pty Ltd", etaMin: 28, softReserved: true, rating: 4.6 },
+    riskNarrative: "Metro Handyman Services geo-confirmed en route 78 minutes ago and is tracking comfortably within window. Compliance is current and the shadow trade (Coastline Antennas) is pre-computed if needed. Nothing requires your attention.",
+    confidenceBreakdown: {
+      modelRefs: ["Starlink-Allocate v3.4", "Trade-Performance v2.8"],
+      retrainedAt: "12 Apr 2026",
+      drivers: [
+        { id: "d1", category: "trade_history", weight: 0.30, label: "Trade reliability", explanation: "Metro Handyman 99% completion rate, zero no-shows in last 90 days." },
+        { id: "d2", category: "time", weight: 0.18, label: "Timing on track", explanation: "Trade geo-confirmed en route 78 minutes ago, ETA 8:05am — comfortably within window." },
+        { id: "d3", category: "compliance", weight: 0.10, label: "Compliance currency", explanation: "All compliance docs current through August 2026." },
+        { id: "d4", category: "geo", weight: 0.08, label: "Trade proximity", explanation: "Trade home base 4km from site — short, predictable drive." },
+        { id: "d5", category: "workload", weight: -0.02, label: "Trade workload", explanation: "Trade has 3 other jobs today — typical Tuesday load." },
+      ],
+    },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -400,6 +479,18 @@ export const JOBS: Job[] = [
     actionDeadlineMin: 6,
     autoExecuteOption: "Activate shadow plan",
     shadowTrade: { name: "Fadi Ezzeddine T/A Air Securitel", distanceKm: 18, softReserved: true, rating: 4.7 },
+    riskNarrative: "Newcastle TV is most likely running a few minutes late — last GPS ping was 34 minutes from site at 7:52am. Their track record is solid (94% on-time over 90 days). The shadow plan is pre-computed if needed, but a quick call is usually the faster path at this stage.",
+    confidenceBreakdown: {
+      modelRefs: ["Starlink-Allocate v3.4", "Trade-Performance v2.8"],
+      retrainedAt: "12 Apr 2026",
+      drivers: [
+        { id: "d1", category: "time", weight: -0.22, label: "Time pressure", explanation: "Window opened 18 minutes ago. Last GPS ping was 34 min from site at 07:52am." },
+        { id: "d2", category: "trade_history", weight: 0.18, label: "Trade reliability", explanation: "Newcastle TV has 94% on-time rate over 90 days. Late occasionally but consistently shows up." },
+        { id: "d3", category: "compliance", weight: 0.08, label: "Compliance currency", explanation: "All compliance docs current." },
+        { id: "d4", category: "geo", weight: 0.04, label: "Trade proximity", explanation: "Trade home base 12km from site." },
+        { id: "d5", category: "workload", weight: -0.03, label: "Trade workload", explanation: "Standard load — 3 other jobs today." },
+      ],
+    },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -515,6 +606,17 @@ export const JOBS: Job[] = [
     actionRequired: "Confirm Sandbar will submit SWMS before attending — or reallocate",
     actionOptions: ["Request SWMS urgently", "Reallocate to alternate trade", "Log and monitor"],
     shadowTrade: { name: "DRC Solar & Electrical Pty Ltd", etaMin: 45, softReserved: true, rating: 4.4 },
+    riskNarrative: "Sandbar Electrical has been pulled from new allocations because their SWMS expired, but this job was assigned before the gap was detected. Their public liability is fine and their performance history is strong. The decision is whether to chase the SWMS submission urgently or reallocate to DRC Solar (45 min ETA).",
+    confidenceBreakdown: {
+      modelRefs: ["Starlink-Allocate v3.4", "Compliance-Check v4.2"],
+      retrainedAt: "15 Apr 2026",
+      drivers: [
+        { id: "d1", category: "compliance", weight: -0.42, label: "Compliance gap", explanation: "Sandbar Electrical SWMS expired 2 weeks ago. Public liability still valid.", evidence: "Compliance check 09:00 today" },
+        { id: "d2", category: "trade_history", weight: 0.18, label: "Trade performance", explanation: "Sandbar 96% completion rate over last 90 days. Zero quality issues." },
+        { id: "d3", category: "time", weight: 0.12, label: "Window distance", explanation: "Job window 222 minutes away — adequate time to resolve." },
+        { id: "d4", category: "pattern", weight: -0.06, label: "Allocation pause", explanation: "Sandbar paused from new allocations — this job assigned before the gap was detected." },
+      ],
+    },
     visibleTo: ["logan", "national", "aaron"],
     actionableBy: ["logan", "national", "aaron"],
     readOnlyFor: [],
@@ -816,6 +918,17 @@ export const JOBS: Job[] = [
     readOnlyReason: "Insurance — escalate to Kerrie (your skill level: Learning)",
     nextAction: "Compliance exception decision",
     nextTradeDate: "Wed 11 Apr",
+    riskNarrative: "There's no compliant roofer in the 2444 postcode — Shane's Roofing is the only option but their SWMS isn't on file, and roofing is a higher-risk trade type for an exception approval. The job window is 2 days away, so manual procurement (onboarding a new trade for this corridor) is on the table.",
+    confidenceBreakdown: {
+      modelRefs: ["Insurance-Allocate v2.8", "Compliance-Check v4.2", "Coverage-Predict v1.6"],
+      retrainedAt: "12 Apr 2026",
+      drivers: [
+        { id: "d1", category: "pattern", weight: -0.45, label: "Coverage gap (severe)", explanation: "90% Chekku no-match rate for roofing trades in the Port Macquarie corridor.", evidence: "Coverage gap pattern, 60-day rolling" },
+        { id: "d2", category: "compliance", weight: -0.28, label: "Compliance gap", explanation: "Shane's Roofing SWMS not on file — required for higher-risk roofing work." },
+        { id: "d3", category: "trade_history", weight: -0.05, label: "Limited prior data", explanation: "Shane's Roofing has done only 2 prior jobs in this region — limited evidence base." },
+        { id: "d4", category: "time", weight: 0.15, label: "Window distance", explanation: "Job window 2 days away — time available for manual procurement if needed." },
+      ],
+    },
   },
 
   {
@@ -854,6 +967,17 @@ export const JOBS: Job[] = [
     nextAction: "Scope change approval",
     nextTradeDate: "Today",
     tags: ["Needs Variation"],
+    riskNarrative: "TAYLOR MADE found additional water damage during makesafe and submitted a +$1,800 variation. The original $6,600 scope is paused. Financial decisions over $1k are a hard limit — this needs your sign-off, there's no AI-handled path. The trade's track record on variations is strong; photos are attached.",
+    confidenceBreakdown: {
+      modelRefs: ["Insurance-Variation v3.1", "Trade-Performance v2.8"],
+      retrainedAt: "12 Apr 2026",
+      drivers: [
+        { id: "d1", category: "pattern", weight: -0.38, label: "Hard-limit triggered", explanation: "Financial decision >$1k — hard limit requires human sign-off, no AI path available." },
+        { id: "d2", category: "trade_history", weight: 0.22, label: "Variation track record", explanation: "TAYLOR MADE 99% completion rate. Strong scope-variation history with photographic evidence." },
+        { id: "d3", category: "compliance", weight: 0.10, label: "Documentation quality", explanation: "Variation request submitted with required photos and itemised cost breakdown." },
+        { id: "d4", category: "time", weight: -0.06, label: "Allianz SLA pressure", explanation: "Allianz expects scope sign-off within 4h — 47 minutes remaining." },
+      ],
+    },
     commitments: [
       { id: "C-CG36069-01", state: "closed", klass: "client_provider", type: "staged",
         promise: "Claim received from Allianz portal and ingested",

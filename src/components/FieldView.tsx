@@ -11,6 +11,7 @@ import TradeLink from "./TradeLink";
 import ShadowPlanPill from "./ShadowPlanPill";
 import CountdownPill from "./CountdownPill";
 import TradeChain from "./TradeChain";
+import ConfidencePanel from "./ConfidencePanel";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -87,12 +88,14 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
           </h2>
           <div className="text-right flex-shrink-0">
             <RiskBadge conf={job.conf} />
-            <button
-              onClick={onAskWhy}
-              className="text-[10px] mt-1 text-[#00BDFE] hover:text-[#0099d4] hover:underline font-medium block ml-auto"
-            >
-              Why is this here?
-            </button>
+            {!job.riskNarrative && (
+              <button
+                onClick={onAskWhy}
+                className="text-[10px] mt-1 text-[#00BDFE] hover:text-[#0099d4] hover:underline font-medium block ml-auto"
+              >
+                Why is this here?
+              </button>
+            )}
           </div>
         </div>
         <p className="text-slate-500 text-xs mt-0.5">{job.suburb} · {job.window}</p>
@@ -100,6 +103,15 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-thin">
+        {/* Confidence panel — narrative + signal breakdown for modelled jobs */}
+        {(job.riskNarrative || job.confidenceBreakdown) && (
+          <ConfidencePanel
+            narrative={job.riskNarrative}
+            breakdown={job.confidenceBreakdown}
+            conf={job.conf}
+            onAskFollowUp={onAskWhy}
+          />
+        )}
         {/* Metadata */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-slate-50 rounded-lg p-3">
