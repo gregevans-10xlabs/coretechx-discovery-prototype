@@ -9,6 +9,7 @@ import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
 import EquipmentPanel from "./EquipmentPanel";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
+import { BUSINESS_OUTCOMES, STRATEGIC_PATTERNS, type BusinessOutcome, type StrategicPattern } from "../data/outcomes";
 import AskAI from "./AskAI";
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -58,6 +59,8 @@ type FocusState =
   | { type: "decision"; dec: DecisionItem }
   | { type: "jobtype"; jtLabel: string }
   | { type: "briefing"; msg: string; icon: string }
+  | { type: "outcome"; outcome: BusinessOutcome }
+  | { type: "strategic_pattern"; pattern: StrategicPattern }
   | null;
 
 // ─── Confidence helpers ───────────────────────────────────────────────────────
@@ -635,6 +638,255 @@ function BriefingDetailPanel({ msg, icon, onClose }: { msg: string; icon: string
   );
 }
 
+// ─── Business Outcomes — Aaron's outcomes-led PortfolioView (Column 1 + 2) ──
+// Per Pending Changes Item [1]: PortfolioView leads with business outcomes
+// (revenue, margin, work orders, capacity, KPI/lifecycle, satisfaction,
+// safety, compliance) rather than operational/platform health. Phase 1
+// outcomes are demonstrable from current data; Phase 2 outcomes are honestly
+// framed as pending production instrumentation rather than faking numbers.
+
+const OUTCOME_ICON: Record<string, string> = {
+  revenue:       "$",
+  work_orders:   "✓",
+  margin:        "△",
+  capacity:      "▭",
+  kpi:           "◷",
+  satisfaction:  "♡",
+  safety:        "⛨",
+  compliance:    "✓",
+};
+
+function OutcomeCard({ outcome, selected, onClick }: { outcome: BusinessOutcome; selected: boolean; onClick: () => void }) {
+  const isPhase2 = outcome.phase === "phase_2";
+  const trendArrow = outcome.trend?.direction === "up" ? "↑" : outcome.trend?.direction === "down" ? "↓" : "→";
+  const trendColor = !outcome.trend ? "text-slate-400" : outcome.trend.good ? "text-green-600" : "text-amber-600";
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left rounded-lg border bg-white p-3 transition-all ${
+        selected ? "border-[#00BDFE] shadow-sm" : "border-slate-200 hover:border-slate-300 hover:shadow-sm"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-5 h-5 rounded bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center flex-shrink-0">{OUTCOME_ICON[outcome.category] ?? "•"}</span>
+          <p className="text-xs font-semibold text-slate-700 leading-tight truncate">{outcome.title}</p>
+        </div>
+        {isPhase2 && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold border bg-slate-100 text-slate-500 border-slate-200 flex-shrink-0">Phase 2</span>
+        )}
+      </div>
+      <div className="flex items-baseline gap-2 mt-1.5">
+        <p className={`text-lg font-bold ${isPhase2 ? "text-slate-300" : "text-slate-800"}`}>{outcome.primaryValue}</p>
+        <p className="text-[10px] text-slate-400 uppercase tracking-wide">{outcome.primaryLabel}</p>
+      </div>
+      {outcome.trend && (
+        <p className={`text-[10px] mt-0.5 ${trendColor}`}>
+          <span className="font-semibold">{trendArrow}</span> {outcome.trend.detail}
+        </p>
+      )}
+    </button>
+  );
+}
+
+function OutcomeDetailPanel({ outcome, onClose }: { outcome: BusinessOutcome; onClose: () => void }) {
+  const isPhase2 = outcome.phase === "phase_2";
+  return (
+    <div className="h-full flex flex-col animate-fadeIn">
+      <div className="px-5 pt-5 pb-3 border-b border-slate-200 flex-shrink-0">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Business Outcome</p>
+            <h2 className="text-base font-bold text-slate-800 mt-0.5">{outcome.title}</h2>
+            <div className="flex items-baseline gap-2 mt-2">
+              <p className={`text-3xl font-black ${isPhase2 ? "text-slate-300" : "text-slate-800"}`}>{outcome.primaryValue}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wide">{outcome.primaryLabel}</p>
+            </div>
+            {outcome.trend && (
+              <p className={`text-xs mt-1 font-medium ${outcome.trend.good ? "text-green-600" : "text-amber-600"}`}>
+                {outcome.trend.direction === "up" ? "↑" : outcome.trend.direction === "down" ? "↓" : "→"} {outcome.trend.detail}
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs">✕ close</button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin space-y-4 max-w-3xl mx-auto w-full">
+
+        {/* Phase 2 honest framing */}
+        {isPhase2 && outcome.phase2Note && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-1">Phase 2 — instrumentation pending</p>
+            <p className="text-xs text-slate-600 leading-snug">{outcome.phase2Note}</p>
+          </div>
+        )}
+
+        {/* Secondary stats */}
+        {outcome.secondary && outcome.secondary.length > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {outcome.secondary.map(s => (
+              <div key={s.label} className="bg-white border border-slate-200 rounded-lg p-3">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400">{s.label}</p>
+                <p className={`text-base font-bold mt-1 ${isPhase2 ? "text-slate-300" : "text-slate-800"}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Breakdowns */}
+        {outcome.breakdownByDepartment && (
+          <BreakdownTable title="By Department" rows={outcome.breakdownByDepartment} />
+        )}
+        {outcome.breakdownByClient && (
+          <BreakdownTable title="By Client" rows={outcome.breakdownByClient} />
+        )}
+        {outcome.breakdownByRegion && (
+          <BreakdownTable title="By Region" rows={outcome.breakdownByRegion} />
+        )}
+
+        {/* Drill-down hint */}
+        {outcome.drillDown && (
+          <div className="bg-[#e0f7ff]/40 border border-[#00BDFE]/20 rounded-lg p-3">
+            <p className="text-[10px] uppercase tracking-wider font-semibold text-[#0077a8] mb-1">Drill-down</p>
+            <p className="text-xs text-slate-700 leading-snug">{outcome.drillDown}</p>
+          </div>
+        )}
+
+        {/* Phase 2 caveat at bottom for outcomes that have it but show data */}
+        {!isPhase2 && outcome.phase2Note && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-[11px] text-slate-500 italic leading-snug">
+            <span className="font-semibold not-italic">Note:</span> {outcome.phase2Note}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BreakdownTable({ title, rows }: { title: string; rows: { label: string; value: string; pct?: number }[] }) {
+  return (
+    <div>
+      <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">{title}</p>
+      <div className="border border-slate-200 rounded-lg bg-white">
+        {rows.map((r, i) => (
+          <div key={r.label} className={`flex items-center gap-3 px-3 py-2 text-xs ${i < rows.length - 1 ? "border-b border-slate-100" : ""}`}>
+            <span className="text-slate-700 flex-1 truncate">{r.label}</span>
+            {r.pct != null && (
+              <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-[#00BDFE]/70 rounded-full" style={{ width: `${Math.min(r.pct, 100)}%` }} />
+              </div>
+            )}
+            <span className="text-slate-800 font-semibold tabular-nums flex-shrink-0">{r.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Strategic Patterns (Item [2]) ──────────────────────────────────────────
+// Distinct from operational patterns Logan sees — these aggregate across
+// departments / clients / regions / workflows / time and surface concerns
+// at the executive tier with AI-recommended action.
+
+const STRATEGIC_CATEGORY_LABEL: Record<string, string> = {
+  department_kpi:      "Department KPI",
+  client_margin:       "Client margin",
+  region_quality:      "Region quality",
+  workflow_bottleneck: "Workflow bottleneck",
+  capacity:            "Capacity",
+  revenue_forecast:    "Revenue forecast",
+  satisfaction:        "Satisfaction",
+  compliance:          "Compliance",
+  lifecycle:           "Lifecycle",
+};
+
+function StrategicPatternCard({ pattern, selected, onClick }: { pattern: StrategicPattern; selected: boolean; onClick: () => void }) {
+  const sevColor = pattern.severity === "high" ? "border-l-red-400" : pattern.severity === "medium" ? "border-l-amber-400" : "border-l-slate-300";
+  const sevPill = pattern.severity === "high" ? "bg-red-100 text-red-700 border-red-300" : pattern.severity === "medium" ? "bg-amber-100 text-amber-700 border-amber-300" : "bg-slate-100 text-slate-600 border-slate-200";
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left rounded-lg border bg-white p-3 border-l-4 transition-all ${sevColor} ${
+        selected ? "border-[#00BDFE] shadow-sm" : "border-y-slate-200 border-r-slate-200 hover:shadow-sm"
+      }`}
+    >
+      <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+        <span className="text-[9px] uppercase tracking-wider font-bold text-violet-700 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded">Strategic</span>
+        <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">{STRATEGIC_CATEGORY_LABEL[pattern.category]}</span>
+        <span className={`text-[9px] uppercase tracking-wider font-bold border px-1.5 py-0.5 rounded ${sevPill}`}>{pattern.severity}</span>
+      </div>
+      <p className="text-xs font-semibold text-slate-700 leading-snug">{pattern.title}</p>
+      <p className="text-[10px] text-slate-500 mt-1 leading-snug">{pattern.scope}</p>
+    </button>
+  );
+}
+
+function StrategicPatternDetail({ pattern, onClose }: { pattern: StrategicPattern; onClose: () => void }) {
+  return (
+    <div className="h-full flex flex-col animate-fadeIn">
+      <div className="px-5 pt-5 pb-3 border-b border-slate-200 flex-shrink-0">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded">Strategic Pattern</span>
+              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{STRATEGIC_CATEGORY_LABEL[pattern.category]}</span>
+              <span className={`text-[10px] uppercase tracking-wider font-bold border px-2 py-0.5 rounded ${pattern.severity === "high" ? "bg-red-100 text-red-700 border-red-300" : pattern.severity === "medium" ? "bg-amber-100 text-amber-700 border-amber-300" : "bg-slate-100 text-slate-600 border-slate-200"}`}>{pattern.severity}</span>
+              {pattern.phase === "phase_2" && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold border bg-slate-100 text-slate-500 border-slate-200">Phase 2 data</span>
+              )}
+            </div>
+            <h2 className="text-base font-bold text-slate-800 leading-snug">{pattern.title}</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs flex-shrink-0">✕ close</button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-thin space-y-4 max-w-3xl mx-auto w-full">
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Scope</p>
+            <p className="text-xs text-slate-700 mt-1 leading-snug">{pattern.scope}</p>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Trend</p>
+            <p className="text-xs text-slate-700 mt-1 leading-snug">{pattern.trend}</p>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">Context</p>
+          <div className="bg-white border border-slate-200 rounded-lg p-3">
+            <p className="text-sm text-slate-700 leading-snug">{pattern.context}</p>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">AI-recommended action</p>
+          <div className="bg-[#e0f7ff]/40 border border-[#00BDFE]/30 rounded-lg p-3">
+            <p className="text-sm text-slate-700 leading-snug">{pattern.aiRecommendedAction}</p>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">Supporting data</p>
+          <div className="border border-slate-200 rounded-lg bg-white">
+            {pattern.supportingData.map((d, i) => (
+              <div key={i} className={`grid grid-cols-3 gap-3 px-3 py-2 text-xs ${i < pattern.supportingData.length - 1 ? "border-b border-slate-100" : ""}`}>
+                <span className="text-slate-600">{d.metric}</span>
+                <span className="text-slate-800 font-semibold tabular-nums">{d.current}</span>
+                <span className="text-slate-400 italic">{d.historical}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Platform Health (Column 3) ───────────────────────────────────────────────
 // ─── Settlement panel — Settle-stage visibility for portfolio personas ───────
 // Pulls real Settle-stage refs from the JOBS dataset so Aaron can drill in,
@@ -1029,6 +1281,10 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
   const isAaron = persona === "aaron";
   const exceptions = buildExceptions(isAaron);
   const [focus, setFocus] = useState<FocusState>(null);
+  // Outer column-1 tab: Outcomes (default per Aaron's spec) vs Exceptions.
+  // Outcomes leads — business outcomes + strategic patterns. Exceptions
+  // preserves the existing operational queue, one click away.
+  const [columnTab, setColumnTab] = useState<"outcomes" | "exceptions">("outcomes");
   const [filter, setFilter] = useState<"all" | "high" | "decisions" | "patterns">("all");
   // Prefill question fired into the AI bar by the "Why is this here?" button.
   const [aiTrigger, setAiTrigger] = useState<{ text: string; nonce: number } | undefined>(undefined);
@@ -1101,6 +1357,10 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
     ? `${isAaron ? "Aaron" : "National"} reviewing AI-detected pattern ${focus.pattern.id}: "${focus.pattern.title}". Severity: ${focus.pattern.severity}. ${focus.pattern.detail}`
     : focus?.type === "decision"
     ? `${isAaron ? "Aaron" : "National"} reviewing decision ${focus.dec.id}: ${focus.dec.label}. AI recommendation: ${focus.dec.rec}.`
+    : focus?.type === "outcome"
+    ? `${isAaron ? "Aaron" : "National"} reviewing business outcome "${focus.outcome.title}" — ${focus.outcome.primaryValue} ${focus.outcome.primaryLabel}.${focus.outcome.trend ? ` Trend: ${focus.outcome.trend.detail}.` : ""}${focus.outcome.phase === "phase_2" ? " Phase 2 outcome — instrumentation pending." : ""}`
+    : focus?.type === "strategic_pattern"
+    ? `${isAaron ? "Aaron" : "National"} reviewing strategic pattern ${focus.pattern.id}: "${focus.pattern.title}". Severity: ${focus.pattern.severity}. ${focus.pattern.context} AI recommendation: ${focus.pattern.aiRecommendedAction}`
     : `${isAaron ? "Aaron (CEO/Founder)" : "National Operations"} — portfolio view. ${exceptions.filter(e => e.kind === "decision").length} decisions pending, ${exceptions.filter(e => e.kind === "pattern").length} AI patterns detected, ${exceptions.filter(e => e.severity === "high").length} high-severity items.${isAaron ? " Has workflow configuration access." : ""}`)
     + portfolioBlock;
 
@@ -1125,6 +1385,10 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
     ? `Pattern ${focus.pattern.id}`
     : focus?.type === "decision"
     ? `Decision ${focus.dec.id}`
+    : focus?.type === "outcome"
+    ? `Outcome: ${focus.outcome.title}`
+    : focus?.type === "strategic_pattern"
+    ? `Strategic: ${focus.pattern.id}`
     : "Watching portfolio";
 
   return (
@@ -1138,36 +1402,103 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
 
       <div className="flex-1 flex min-h-0 mx-4 mt-4 mb-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
 
-        {/* Column 1 — Exceptions Queue */}
+        {/* Column 1 — Outcomes (default) or Exceptions Queue
+            Per Aaron's spec: lead with business outcomes + strategic
+            patterns. Operational exceptions remain accessible one click
+            away. */}
         <div className="w-72 xl:w-80 2xl:w-96 flex-shrink-0 flex flex-col border-r border-slate-200">
-          <div className="px-4 py-3 border-b border-slate-200 flex-shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-bold text-slate-800">Exceptions Queue</h2>
-              {highCount > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{highCount}</span>
-              )}
-            </div>
-            <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
-              {(["all", "high", "decisions", "patterns"] as const).map(f => (
-                <button key={f} onClick={() => setFilter(f)}
-                  className={`flex-1 text-[10px] font-semibold py-1 rounded-md transition-all capitalize ${
-                    filter === f ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}>
-                  {f === "all" ? "All" : f === "high" ? "Urgent" : f === "decisions" ? "Decisions" : "Patterns"}
-                </button>
-              ))}
+
+          {/* Top-level tab — Outcomes vs Exceptions */}
+          <div className="px-4 pt-3 pb-2 border-b border-slate-200 flex-shrink-0 bg-slate-50">
+            <div className="flex bg-white rounded-lg p-0.5 gap-0.5 border border-slate-200">
+              <button
+                onClick={() => setColumnTab("outcomes")}
+                className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-all ${
+                  columnTab === "outcomes" ? "bg-[#00BDFE] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Outcomes
+              </button>
+              <button
+                onClick={() => setColumnTab("exceptions")}
+                className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-all relative ${
+                  columnTab === "exceptions" ? "bg-[#00BDFE] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Exceptions
+                {highCount > 0 && columnTab !== "exceptions" && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1 py-0 rounded-full leading-tight">{highCount}</span>
+                )}
+              </button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
-            {filtered.map(e => (
-              <ExceptionCard
-                key={e.id}
-                item={e}
-                selected={isSelected(e)}
-                onClick={() => handleClick(e)}
-              />
-            ))}
-          </div>
+
+          {columnTab === "outcomes" ? (
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 scrollbar-thin">
+
+              {/* Strategic patterns */}
+              <div>
+                <div className="flex items-baseline justify-between px-1 mb-1.5">
+                  <p className="text-[10px] uppercase tracking-wider font-semibold text-violet-700">Strategic Patterns</p>
+                  <p className="text-[9px] text-slate-400">{STRATEGIC_PATTERNS.length} active</p>
+                </div>
+                <div className="space-y-1.5">
+                  {STRATEGIC_PATTERNS.map(p => (
+                    <StrategicPatternCard
+                      key={p.id}
+                      pattern={p}
+                      selected={focus?.type === "strategic_pattern" && focus.pattern.id === p.id}
+                      onClick={() => setFocus({ type: "strategic_pattern", pattern: p })}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Business outcomes */}
+              <div>
+                <div className="flex items-baseline justify-between px-1 mb-1.5">
+                  <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Business Outcomes</p>
+                  <p className="text-[9px] text-slate-400">{BUSINESS_OUTCOMES.filter(o => o.phase === "phase_1").length} live · {BUSINESS_OUTCOMES.filter(o => o.phase === "phase_2").length} phase 2</p>
+                </div>
+                <div className="space-y-1.5">
+                  {BUSINESS_OUTCOMES.map(o => (
+                    <OutcomeCard
+                      key={o.id}
+                      outcome={o}
+                      selected={focus?.type === "outcome" && focus.outcome.id === o.id}
+                      onClick={() => setFocus({ type: "outcome", outcome: o })}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Exceptions queue — preserved from previous design */}
+              <div className="px-3 py-2 border-b border-slate-100 flex-shrink-0">
+                <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
+                  {(["all", "high", "decisions", "patterns"] as const).map(f => (
+                    <button key={f} onClick={() => setFilter(f)}
+                      className={`flex-1 text-[10px] font-semibold py-1 rounded-md transition-all capitalize ${
+                        filter === f ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      }`}>
+                      {f === "all" ? "All" : f === "high" ? "Urgent" : f === "decisions" ? "Decisions" : "Patterns"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
+                {filtered.map(e => (
+                  <ExceptionCard
+                    key={e.id}
+                    item={e}
+                    selected={isSelected(e)}
+                    onClick={() => handleClick(e)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Column 2 — AI Assistant + Current Focus
@@ -1222,10 +1553,10 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
             {!focus ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-8 py-12">
                 <div className="w-14 h-14 rounded-full bg-[#00BDFE]/10 flex items-center justify-center mb-4">
-                  <span className="text-2xl">📋</span>
+                  <span className="text-2xl">⌘</span>
                 </div>
-                <p className="text-slate-700 font-semibold text-sm mb-1">Select an exception</p>
-                <p className="text-slate-400 text-xs leading-relaxed">Click any item in the queue to see full context, AI activity log, and available actions.</p>
+                <p className="text-slate-700 font-semibold text-sm mb-1">{columnTab === "outcomes" ? "Select an outcome or strategic pattern" : "Select an exception"}</p>
+                <p className="text-slate-400 text-xs leading-relaxed max-w-xs">{columnTab === "outcomes" ? "Click any business outcome or strategic pattern to drill into the supporting data and AI-recommended actions." : "Click any item in the queue to see full context, AI activity log, and available actions."}</p>
               </div>
             ) : focus.type === "job" ? (
               <JobDetailPanel
@@ -1248,6 +1579,10 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
               <JobTypeDetailPanel jtLabel={focus.jtLabel} onClose={() => setFocus(null)} tagsByJob={tagsByJob} onSelectTrade={onSelectTrade} />
             ) : focus.type === "briefing" ? (
               <BriefingDetailPanel msg={focus.msg} icon={focus.icon} onClose={() => setFocus(null)} />
+            ) : focus.type === "outcome" ? (
+              <OutcomeDetailPanel outcome={focus.outcome} onClose={() => setFocus(null)} />
+            ) : focus.type === "strategic_pattern" ? (
+              <StrategicPatternDetail pattern={focus.pattern} onClose={() => setFocus(null)} />
             ) : null}
           </div>
 
