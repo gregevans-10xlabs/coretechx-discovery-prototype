@@ -1170,11 +1170,54 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
           </div>
         </div>
 
-        {/* Column 2 — Current Focus */}
+        {/* Column 2 — AI Assistant + Current Focus
+            AI repositioned to first-class prominence at the top of column 2
+            per Aaron's feedback. */}
         <div className="flex-1 flex flex-col min-w-0 border-r border-slate-200">
-          <div className="px-5 py-3 border-b border-slate-200 flex-shrink-0">
-            <h2 className="text-sm font-bold text-slate-800">Current Focus</h2>
+
+          {/* Sticky AI bar at the top */}
+          <div className="flex-shrink-0 border-b border-slate-200 bg-white shadow-sm">
+            <div className="bg-slate-800 px-4 py-2 flex items-center gap-2.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00BDFE] animate-pulse flex-shrink-0" />
+              <span className="text-[#00BDFE] text-xs font-semibold">CoreTechX AI</span>
+              <span className="text-slate-300 text-xs">·</span>
+              <span className="text-slate-200 text-xs truncate flex-1">{aiContextLabel}</span>
+              <button
+                onClick={() => setAiResetCounter(c => c + 1)}
+                title="Clear conversation"
+                className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
+                  aiHasConversation
+                    ? "bg-white/10 hover:bg-white/20 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                ↻ Clear
+              </button>
+            </div>
+            <div className="bg-white px-4 pt-3 pb-3">
+              <AskAI
+                key={`${persona}-${aiResetCounter}`}
+                context={aiContext}
+                placeholder={focus ? `Ask, search, or instruct about this ${focus.type}...` : "Ask, search, or instruct..."}
+                trigger={aiTrigger}
+                suggestions={aiSuggestions}
+                onConversationChange={setAiHasConversation}
+              />
+            </div>
           </div>
+
+          {/* Focus subhead */}
+          <div className="px-5 py-2 border-b border-slate-100 flex-shrink-0 bg-slate-50">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Current focus</span>
+              {focus ? (
+                <span className="text-xs text-slate-600 capitalize">{focus.type === "job" ? `${focus.job.customer} · ${focus.job.suburb}` : focus.type}</span>
+              ) : (
+                <span className="text-xs text-slate-400 italic">— select an item from the queue —</span>
+              )}
+            </div>
+          </div>
+
           <div className="flex-1 overflow-hidden flex flex-col min-h-0">
             {!focus ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-8 py-12">
@@ -1208,35 +1251,6 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
             ) : null}
           </div>
 
-          {/* ── AI Bar: pinned to bottom of column 2 ─────────────────────── */}
-          <div className="flex-shrink-0 border-t border-slate-200">
-            <div className="bg-slate-800 px-4 py-2 flex items-center gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00BDFE] animate-pulse flex-shrink-0" />
-              <span className="text-[#00BDFE] text-xs font-semibold">CoreTechX AI</span>
-              <span className="text-slate-400 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
-              <button
-                onClick={() => setAiResetCounter(c => c + 1)}
-                title="Clear conversation"
-                className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
-                  aiHasConversation
-                    ? "bg-white/10 hover:bg-white/20 text-white"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                ↻ Clear
-              </button>
-            </div>
-            <div className="bg-white px-4 pt-2 pb-3">
-              <AskAI
-                key={`${persona}-${aiResetCounter}`}
-                context={aiContext}
-                placeholder={focus ? `Ask about this ${focus.type}...` : "Ask about your portfolio..."}
-                trigger={aiTrigger}
-                suggestions={aiSuggestions}
-                onConversationChange={setAiHasConversation}
-              />
-            </div>
-          </div>
         </div>
 
         {/* Column 3 — Platform Health */}

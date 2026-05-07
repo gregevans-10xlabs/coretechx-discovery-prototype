@@ -110,20 +110,30 @@ export default function AskAI({ context, placeholder, trigger, suggestions, onCo
 
   return (
     <div>
-      <div className="overflow-y-auto space-y-2 mb-3 pr-1" style={{maxHeight:"160px"}}>
-        {msgs.length===0&&<p className="text-slate-400 text-xs italic">{placeholder||"Ask..."}</p>}
-        {msgs.map((m,i)=>(
-          <div key={i} className={`text-sm rounded-lg px-3 py-2 ${m.role==="user"?"bg-slate-100 text-slate-800 ml-6":"bg-[#e0f7ff] text-slate-700 mr-6 border border-[#00BDFE]/30"}`}>
-            <span className="font-semibold text-xs uppercase tracking-wide opacity-60 block mb-1">{m.role==="user"?"You":"CoreTechX AI"}</span>
-            {m.role==="assistant" ? <FormatAI text={m.content}/> : m.content}
-          </div>
-        ))}
-        {loading&&<div className="bg-[#e0f7ff] border border-[#00BDFE]/30 rounded-lg px-3 py-2 text-[#0099d4] text-sm mr-6 animate-pulse">Thinking...</div>}
-        <div ref={bot}/>
+      {/* Input — primary control surface, sits at the top so it's the first
+          thing operators see. Larger and slightly more affordant than a
+          classic chat widget — the AI is a control point, not a help bubble. */}
+      <div className="flex gap-2">
+        <input
+          className="flex-1 bg-white text-slate-800 rounded-lg px-3.5 py-2.5 text-sm border border-slate-300 focus:outline-none focus:border-[#00BDFE] focus:ring-2 focus:ring-[#00BDFE]/20"
+          placeholder={placeholder||"Ask, search, or instruct..."}
+          value={q}
+          onChange={e=>setQ(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&ask()}
+        />
+        <button
+          onClick={()=>ask()}
+          disabled={loading||!q.trim()}
+          className="bg-[#00BDFE] hover:bg-[#0099d4] disabled:opacity-40 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+        >
+          Ask
+        </button>
       </div>
-      {/* Suggestion chips — only shown before the conversation starts */}
-      {suggestions && suggestions.length > 0 && msgs.length === 0 && !loading && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
+      {/* Suggestion chips — persistent. Quick-access shortcuts during
+          conversation, not just initial prompts. Operators can jump to a
+          common query at any point. */}
+      {suggestions && suggestions.length > 0 && !loading && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
           {suggestions.map((s,i)=>(
             <button
               key={i}
@@ -136,22 +146,20 @@ export default function AskAI({ context, placeholder, trigger, suggestions, onCo
           ))}
         </div>
       )}
-      <div className="flex gap-2">
-        <input
-          className="flex-1 bg-white text-slate-800 rounded-lg px-3 py-2 text-sm border border-slate-300 focus:outline-none focus:border-[#00BDFE]"
-          placeholder={placeholder||"Ask..."}
-          value={q}
-          onChange={e=>setQ(e.target.value)}
-          onKeyDown={e=>e.key==="Enter"&&ask()}
-        />
-        <button
-          onClick={()=>ask()}
-          disabled={loading||!q.trim()}
-          className="bg-[#00BDFE] hover:bg-[#0099d4] disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          Ask
-        </button>
-      </div>
+      {/* Conversation history — grows below the controls only when there's
+          something to show. Capped height so it never crowds the page. */}
+      {(msgs.length > 0 || loading) && (
+        <div className="overflow-y-auto space-y-2 mt-3 pr-1" style={{maxHeight:"200px"}}>
+          {msgs.map((m,i)=>(
+            <div key={i} className={`text-sm rounded-lg px-3 py-2 ${m.role==="user"?"bg-slate-100 text-slate-800 ml-6":"bg-[#e0f7ff] text-slate-700 mr-6 border border-[#00BDFE]/30"}`}>
+              <span className="font-semibold text-xs uppercase tracking-wide opacity-60 block mb-1">{m.role==="user"?"You":"CoreTechX AI"}</span>
+              {m.role==="assistant" ? <FormatAI text={m.content}/> : m.content}
+            </div>
+          ))}
+          {loading&&<div className="bg-[#e0f7ff] border border-[#00BDFE]/30 rounded-lg px-3 py-2 text-[#0099d4] text-sm mr-6 animate-pulse">Thinking...</div>}
+          <div ref={bot}/>
+        </div>
+      )}
     </div>
   );
 }

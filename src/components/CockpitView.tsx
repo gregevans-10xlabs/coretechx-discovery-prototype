@@ -1383,13 +1383,56 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
         </div>
       </div>
 
-      {/* ── Column 2: Current Focus ───────────────────────────────────────────── */}
+      {/* ── Column 2: AI Assistant + Current Focus ────────────────────────────
+          AI is repositioned to first-class prominence per Aaron's feedback —
+          it's a core control point, not a chat widget at the bottom of the
+          page. The bar carries both the AI controls and the focus context
+          line (replacing the standalone "Current Focus" header). */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="px-5 pt-4 pb-3 border-b border-slate-200 flex-shrink-0">
-          <h2 className="text-slate-700 font-semibold text-sm">Current Focus</h2>
-          {selectedJob && (
-            <p className="text-slate-400 text-xs mt-0.5">{selectedJob.customer} · {selectedJob.suburb}</p>
-          )}
+
+        {/* Sticky AI bar at the top of column 2 */}
+        <div className="flex-shrink-0 border-b border-slate-200 bg-white shadow-sm">
+          <div className="bg-slate-800 px-4 py-2 flex items-center gap-2.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00BDFE] animate-pulse flex-shrink-0" />
+            <span className="text-[#00BDFE] text-xs font-semibold">CoreTechX AI</span>
+            <span className="text-slate-300 text-xs">·</span>
+            <span className="text-slate-200 text-xs truncate flex-1">{aiContextLabel}</span>
+            <button
+              onClick={() => setAiResetCounter(c => c + 1)}
+              title="Clear conversation"
+              className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
+                aiHasConversation
+                  ? "bg-white/10 hover:bg-white/20 text-white"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              ↻ Clear
+            </button>
+          </div>
+          <div className="bg-white px-4 pt-3 pb-3">
+            <AskAI
+              key={`${persona}-${aiResetCounter}`}
+              context={aiContext}
+              placeholder={selectedJob ? `Ask, search, or instruct about ${selectedJob.id}...` : "Ask, search, or instruct..."}
+              trigger={aiTrigger}
+              suggestions={aiSuggestions}
+              onConversationChange={setAiHasConversation}
+            />
+          </div>
+        </div>
+
+        {/* Focus subhead — light strip under the AI bar showing what the
+            operator is working on. Replaces the previous "Current Focus"
+            standalone header. */}
+        <div className="px-5 py-2 border-b border-slate-100 flex-shrink-0 bg-slate-50">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Current focus</span>
+            {selectedJob ? (
+              <span className="text-xs text-slate-600">{selectedJob.customer} · {selectedJob.suburb} · <span className="font-mono text-slate-400">{selectedJob.id}</span></span>
+            ) : (
+              <span className="text-xs text-slate-400 italic">— select an item from the queue —</span>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 min-h-0">
@@ -1475,36 +1518,6 @@ export default function CockpitView({ persona, onPersonaSwitch, tagsByJob, onAdd
               />
             </div>
           )}
-          </div>
-        </div>
-
-        {/* ── AI Bar: pinned to bottom of column 2 ─────────────────────────── */}
-        <div className="flex-shrink-0 border-t border-slate-200">
-          <div className="bg-slate-800 px-4 py-2 flex items-center gap-2.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00BDFE] animate-pulse flex-shrink-0" />
-            <span className="text-[#00BDFE] text-xs font-semibold">CoreTechX AI</span>
-            <span className="text-slate-400 text-[10px] ml-auto truncate hidden lg:block">{aiContextLabel}</span>
-            <button
-              onClick={() => setAiResetCounter(c => c + 1)}
-              title="Clear conversation"
-              className={`text-[10px] px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
-                aiHasConversation
-                  ? "bg-white/10 hover:bg-white/20 text-white"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              ↻ Clear
-            </button>
-          </div>
-          <div className="bg-white px-4 pt-2 pb-3">
-            <AskAI
-              key={`${persona}-${aiResetCounter}`}
-              context={aiContext}
-              placeholder={selectedJob ? `Ask about ${selectedJob.id}...` : "Ask about your queue..."}
-              trigger={aiTrigger}
-              suggestions={aiSuggestions}
-              onConversationChange={setAiHasConversation}
-            />
           </div>
         </div>
 
