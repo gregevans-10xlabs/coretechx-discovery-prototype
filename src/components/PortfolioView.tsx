@@ -1047,7 +1047,6 @@ function PlatformHealth({ persona, isAaron, onWorkflowConfig, deferrals, modelFe
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Reporting Line</p>
           <div className="space-y-1 text-xs text-slate-500">
             <p className="font-semibold text-slate-700">Aaron Aitken — CEO, Circl</p>
-            <p className="pl-3 border-l-2 border-slate-200">Ben Burns — COO, 10x Labs</p>
             <p className="pl-3 border-l-2 border-slate-200">Alex Retzlaff — CTO, Unify Ventures</p>
           </div>
         </div>
