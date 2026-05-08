@@ -135,7 +135,7 @@ export default function App() {
           {PERSONAS.map(p=>(
             <button key={p.id} onClick={()=>setPersona(p.id)} className={`text-sm px-3 py-2 rounded-lg font-medium border transition-colors ${persona===p.id?"bg-[#00BDFE] border-[#00BDFE] text-white":"bg-white border-slate-200 text-slate-600 hover:border-[#00BDFE]"}`}>
               <span className="font-semibold">{p.label}</span>
-              <span className={`block text-xs mt-0.5 ${persona===p.id?"text-white/80":"text-slate-400"}`}>{p.region}</span>
+              <span className={`block text-xs mt-0.5 ${persona===p.id?"text-white/80":"text-slate-400"}`}>{p.title}</span>
             </button>
           ))}
         </div>
