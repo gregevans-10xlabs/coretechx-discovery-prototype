@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { JOBS, type Job, journeyMapForJob } from "../data/jobs";
+import { JOBS, type Job } from "../data/jobs";
 import JourneyBar from "./JourneyBar";
 import CommitmentAnatomy from "./CommitmentAnatomy";
 import TradeLink from "./TradeLink";
@@ -8,8 +8,9 @@ import CountdownPill from "./CountdownPill";
 import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
 import EquipmentPanel from "./EquipmentPanel";
-import { MORNING, ALL_DECISIONS, ALL_PATTERNS, SUPERVISORS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
+import { MORNING, ALL_DECISIONS, ALL_PATTERNS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import { BUSINESS_OUTCOMES, STRATEGIC_PATTERNS, type BusinessOutcome, type StrategicPattern } from "../data/outcomes";
+import { PENDING_CHANGES } from "../data/goals";
 import AskAI from "./AskAI";
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -64,10 +65,10 @@ type FocusState =
   | null;
 
 // ─── Confidence helpers ───────────────────────────────────────────────────────
-// cc/cb retained for executive AGGREGATE views (avg confidence across many jobs).
-// Per-job displays use riskState/riskBadgeClass via RiskBadge — see Discovery OS
-// decision 17 Apr 2026 (raw scores not shown to operators).
-const cc = (s: number) => s >= 0.80 ? "text-green-600" : s >= 0.60 ? "text-amber-600" : "text-red-600";
+// cb retained for the few aggregate-view places that still show coloured
+// confidence pills. Per-job displays use riskState/riskBadgeClass via
+// RiskBadge — see Discovery OS decision 17 Apr 2026 (raw scores not shown
+// to operators). cc was dropped when JobTypeHealth left PlatformHealth.
 const cb = (s: number) => s >= 0.80 ? "bg-green-100 border-green-300 text-green-700" : s >= 0.60 ? "bg-amber-100 border-amber-300 text-amber-700" : "bg-red-100 border-red-300 text-red-700";
 
 function CardTags({ tags }: { tags: string[] }) {
@@ -656,36 +657,66 @@ const OUTCOME_ICON: Record<string, string> = {
   compliance:    "✓",
 };
 
-function OutcomeCard({ outcome, selected, onClick }: { outcome: BusinessOutcome; selected: boolean; onClick: () => void }) {
+// ─── OutcomesScoreboard — top-of-page strip on PortfolioView ───────────────
+// Per Aaron's feedback: business outcomes deserve top prominence, not "below
+// the fold in column 1." The scoreboard sits above the 3-column working area,
+// always visible. Each card is clickable and opens the full OutcomeDetailPanel
+// in column 2. Phase 2 cards visibly muted with "P2" tag rather than mocked.
+function OutcomeScoreCard({ outcome, selected, onClick }: { outcome: BusinessOutcome; selected: boolean; onClick: () => void }) {
   const isPhase2 = outcome.phase === "phase_2";
   const trendArrow = outcome.trend?.direction === "up" ? "↑" : outcome.trend?.direction === "down" ? "↓" : "→";
   const trendColor = !outcome.trend ? "text-slate-400" : outcome.trend.good ? "text-green-600" : "text-amber-600";
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-lg border bg-white p-3 transition-all ${
-        selected ? "border-[#00BDFE] shadow-sm" : "border-slate-200 hover:border-slate-300 hover:shadow-sm"
+      className={`text-left rounded-lg border p-2.5 transition-all ${
+        selected
+          ? "border-[#00BDFE] shadow-sm bg-[#e0f7ff]/40"
+          : isPhase2
+          ? "border-slate-200 bg-slate-50 hover:border-slate-300"
+          : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
       }`}
     >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="w-5 h-5 rounded bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center flex-shrink-0">{OUTCOME_ICON[outcome.category] ?? "•"}</span>
-          <p className="text-xs font-semibold text-slate-700 leading-tight truncate">{outcome.title}</p>
-        </div>
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <span className="w-4 h-4 rounded bg-slate-100 text-slate-500 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{OUTCOME_ICON[outcome.category] ?? "•"}</span>
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 truncate flex-1">{outcome.title}</p>
         {isPhase2 && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold border bg-slate-100 text-slate-500 border-slate-200 flex-shrink-0">Phase 2</span>
+          <span className="text-[8px] px-1 py-0 rounded font-semibold border bg-slate-100 text-slate-500 border-slate-200 flex-shrink-0">P2</span>
         )}
       </div>
-      <div className="flex items-baseline gap-2 mt-1.5">
-        <p className={`text-lg font-bold ${isPhase2 ? "text-slate-300" : "text-slate-800"}`}>{outcome.primaryValue}</p>
-        <p className="text-[10px] text-slate-400 uppercase tracking-wide">{outcome.primaryLabel}</p>
-      </div>
+      <p className={`text-xl font-bold leading-tight ${isPhase2 ? "text-slate-300" : "text-slate-800"}`}>{outcome.primaryValue}</p>
+      <p className="text-[10px] text-slate-400 leading-tight truncate">{outcome.primaryLabel}</p>
       {outcome.trend && (
-        <p className={`text-[10px] mt-0.5 ${trendColor}`}>
+        <p className={`text-[10px] mt-1 leading-tight truncate ${trendColor}`}>
           <span className="font-semibold">{trendArrow}</span> {outcome.trend.detail}
         </p>
       )}
     </button>
+  );
+}
+
+function OutcomesScoreboard({ outcomes, focusedId, onSelect }: {
+  outcomes: BusinessOutcome[];
+  focusedId: string | null;
+  onSelect: (outcome: BusinessOutcome) => void;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
+      <div className="flex items-baseline justify-between mb-2 px-1">
+        <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Today's Business</p>
+        <p className="text-[10px] text-slate-400">Click any card to drill down</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        {outcomes.map(o => (
+          <OutcomeScoreCard
+            key={o.id}
+            outcome={o}
+            selected={focusedId === o.id}
+            onClick={() => onSelect(o)}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -887,347 +918,128 @@ function StrategicPatternDetail({ pattern, onClose }: { pattern: StrategicPatter
   );
 }
 
-// ─── Platform Health (Column 3) ───────────────────────────────────────────────
-// ─── Settlement panel — Settle-stage visibility for portfolio personas ───────
-// Pulls real Settle-stage refs from the JOBS dataset so Aaron can drill in,
-// but the aggregate volume figures are illustrative (the prototype dataset is
-// a regional slice, not the full population).
-function SettlementPanel() {
-  // Identify Settle-stage jobs by mapping each job's journeyStep through its
-  // type's JourneyMap to the universal-stage index. universal stage 7 = Settle.
-  const settleJobs = JOBS.filter(j => {
-    const map = journeyMapForJob(j);
-    const clamped = Math.min(j.journeyStep, map.toUniversal.length - 1);
-    return map.toUniversal[clamped] === 7;
-  });
-  const exceptions = settleJobs.filter(j => j.actionRequired !== null);
-  const settling   = settleJobs.filter(j => j.actionRequired === null);
+// ─── Platform Health (Column 3) — CEO-focused ────────────────────────────────
+// Per Aaron's feedback: column 3 was carrying low-level operational detail
+// (recent settlement activity, individual equipment items, full team
+// deferrals, per-supervisor scores) that doesn't belong on a CEO surface.
+// Trimmed to: platform automation top-line, items awaiting THIS persona's
+// authority, AI improvement signal, workflow configuration entry. Settlement
+// and Equipment health panels are removed — their aggregate signal is
+// covered by the outcome scoreboard at the top of the page; their per-job
+// detail belongs in CockpitView/FieldView for the people who actually act
+// on those items.
+function PlatformHealth({ persona, isAaron, onWorkflowConfig, deferrals, modelFeedback }: { persona: string; isAaron: boolean; onWorkflowConfig?: () => void; deferrals: FieldDeferral[]; modelFeedback: ModelFeedback[] }) {
+  // Items awaiting this persona's authority — config drafts routed to them
+  // plus operational deferrals currently held with them. The actionable
+  // queue, not the entire roll-up.
+  const pendingForMe = PENDING_CHANGES.filter(c => c.routedTo === persona);
+  const deferralsForMe = deferrals.filter(d => d.currentHolder === persona);
+  const authorityCount = pendingForMe.length + deferralsForMe.length;
+
+  // AI improvement — single compact signal, not a per-model breakdown
+  const totalFlags7d = MODEL_STATS.reduce((a, m) => a + m.flagsLast7d, 0);
+  const totalRetrains30d = MODEL_STATS.reduce((a, m) => a + m.retrainsLast30d, 0);
+  const sessionFlags = modelFeedback.filter(f => f.isFlag).length;
+  const queuedRetrains = MODEL_STATS.filter(m => m.lastRetrainDays === null).length;
 
   return (
-    <div>
-      <div className="flex items-baseline justify-between mb-2">
-        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Settle — Lifecycle Close</p>
-        <p className="text-slate-400 text-[10px]">AI Settlement Agent</p>
-      </div>
-      <div className="grid grid-cols-3 gap-2 mb-2">
-        <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
-          <p className="text-lg font-black text-slate-800">312</p>
-          <p className="text-[10px] text-slate-400 leading-tight">Settled this week</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
-          <p className="text-lg font-black text-slate-800">18</p>
-          <p className="text-[10px] text-slate-400 leading-tight">Settling now</p>
-        </div>
-        <div className={`rounded-xl border p-2.5 text-center ${exceptions.length > 0 ? "bg-red-50 border-red-200" : "bg-white border-slate-200"}`}>
-          <p className={`text-lg font-black ${exceptions.length > 0 ? "text-red-600" : "text-green-600"}`}>{exceptions.length}</p>
-          <p className="text-[10px] text-slate-400 leading-tight">Exceptions</p>
-        </div>
-      </div>
+    <div className="h-full overflow-y-auto scrollbar-thin px-4 py-4 space-y-4">
 
-      {/* Recent — show real refs (exceptions first, then completed) so the
-          panel reads as live operational data, not a placeholder. */}
-      {settleJobs.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl p-2.5">
-          <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide mb-1.5">Recent</p>
-          <div className="space-y-1">
-            {[...exceptions, ...settling].slice(0, 5).map(j => {
-              const isException = j.actionRequired !== null;
-              return (
-                <div key={j.id} className="flex items-center gap-2 text-xs">
-                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isException ? "bg-red-500" : "bg-green-500"}`} />
-                  <span className="font-mono text-slate-400 text-[10px] flex-shrink-0 w-14">{j.id}</span>
-                  <span className="text-slate-600 flex-1 truncate">{j.type.replace(" Install", "")} · ${j.value.toLocaleString()}</span>
-                  <span className={`text-[10px] flex-shrink-0 ${isException ? "text-red-600 font-semibold" : "text-green-600"}`}>
-                    {isException ? "⚠ exception" : "✓ settled"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Equipment Health panel — Settle-stage analogue for the 4th actor ───────
-// Aggregates equipment items across all jobs so portfolio personas can see
-// the logistics state at a glance. Counts on-hand / in-transit / delayed,
-// and surfaces recent items with real refs from JOBS for drill-in.
-function EquipmentHealthPanel() {
-  // Flatten all equipment items across the dataset, attaching the job ID for
-  // drill-in context.
-  const allItems = JOBS.flatMap(j => (j.equipment ?? []).map(item => ({ ...item, jobId: j.id })));
-
-  const onHand     = allItems.filter(i => i.status === "on_hand" || i.status === "delivered");
-  const inTransit  = allItems.filter(i => i.status === "in_transit" || i.status === "at_destination" || i.status === "ordered");
-  const delayed    = allItems.filter(i => i.status === "delayed" || i.status === "exception");
-
-  // Recent — exceptions first (always interesting), then in-transit, then a
-  // sample of on-hand. Keeps the panel small but representative.
-  const recent = [...delayed, ...inTransit, ...onHand].slice(0, 4);
-
-  return (
-    <div>
-      <div className="flex items-baseline justify-between mb-2">
-        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Equipment Health</p>
-        <p className="text-slate-400 text-[10px]">AI Logistics Agent</p>
-      </div>
-      <div className="grid grid-cols-3 gap-2 mb-2">
-        <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
-          <p className="text-lg font-black text-slate-800">{onHand.length}</p>
-          <p className="text-[10px] text-slate-400 leading-tight">On hand</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
-          <p className="text-lg font-black text-slate-800">{inTransit.length}</p>
-          <p className="text-[10px] text-slate-400 leading-tight">In transit</p>
-        </div>
-        <div className={`rounded-xl border p-2.5 text-center ${delayed.length > 0 ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
-          <p className={`text-lg font-black ${delayed.length > 0 ? "text-amber-600" : "text-green-600"}`}>{delayed.length}</p>
-          <p className="text-[10px] text-slate-400 leading-tight">Delayed</p>
-        </div>
-      </div>
-      {recent.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl p-2.5">
-          <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide mb-1.5">Recent</p>
-          <div className="space-y-1">
-            {recent.map(item => {
-              const isException = item.status === "delayed" || item.status === "exception";
-              const dotColor = isException ? "bg-amber-500" : item.status === "in_transit" ? "bg-sky-500" : "bg-green-500";
-              const statusLabel = item.status === "delayed" ? "delayed" : item.status === "exception" ? "exception" : item.status === "in_transit" ? "in transit" : item.status === "on_hand" ? "on hand" : item.status;
-              return (
-                <div key={item.id + item.jobId} className="flex items-center gap-2 text-xs">
-                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotColor}`} />
-                  <span className="font-mono text-slate-400 text-[10px] flex-shrink-0 w-14">{item.jobId}</span>
-                  <span className="text-slate-600 flex-1 truncate">{item.description}</span>
-                  <span className={`text-[10px] flex-shrink-0 ${isException ? "text-amber-600 font-semibold" : "text-slate-500"}`}>
-                    {isException ? `⚠ ${statusLabel}` : statusLabel}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PlatformHealth({ isAaron, onWorkflowConfig, deferrals, modelFeedback }: { isAaron: boolean; onWorkflowConfig?: () => void; deferrals: FieldDeferral[]; modelFeedback: ModelFeedback[] }) {
-  // Team deferrals visible at portfolio level — Discovery OS roll-up requirement
-  // (17 Apr 2026): every deferral remains visible at tier N+1 and N+2 with
-  // the full reason chain. Sort: items currently with the senior tier first
-  // (escalated up), then everything still with the Ops Manager.
-  const teamDeferrals = [...deferrals].sort((a, b) => {
-    const aWithSenior = a.currentHolder === "aaron" || a.currentHolder === "national" ? 0 : 1;
-    const bWithSenior = b.currentHolder === "aaron" || b.currentHolder === "national" ? 0 : 1;
-    return aWithSenior - bWithSenior;
-  });
-
-  return (
-    <div className="h-full overflow-y-auto scrollbar-thin px-4 py-4 space-y-5">
+      {/* Platform Automation top-line — kept as the headline platform efficacy
+          metric. Slightly smaller than before; the scoreboard at the top of
+          the page now carries the broader business-outcome story. */}
       <div className="bg-gradient-to-br from-[#00BDFE]/10 to-[#00BDFE]/5 border border-[#00BDFE]/30 rounded-xl p-4">
-        <p className="text-xs font-semibold text-[#00BDFE] uppercase tracking-wider mb-1">Platform Automation Rate</p>
-        <p className="text-4xl font-black text-[#00BDFE]">96%</p>
+        <p className="text-xs font-semibold text-[#00BDFE] uppercase tracking-wider mb-1">Platform Automation</p>
+        <p className="text-3xl font-black text-[#00BDFE]">96%</p>
         <p className="text-xs text-slate-500 mt-1">of all job actions taken by AI today</p>
         <div className="mt-3 h-2 bg-slate-200 rounded-full overflow-hidden">
           <div className="h-full bg-[#00BDFE] rounded-full" style={{ width: "96%" }} />
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: "Active", value: "3,450", color: "text-slate-800" },
-          { label: "Needs Decision", value: "339", color: "text-amber-600" },
-          { label: "Automated", value: "3,111", color: "text-green-600" },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
-            <p className={`text-lg font-black ${s.color}`}>{s.value}</p>
-            <p className="text-[10px] text-slate-400 leading-tight">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      <div>
-        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Job Type Health</p>
-        <div className="space-y-1.5">
-          {JOB_TYPES.map(jt => (
-            <div key={jt.id} className="flex items-center gap-2">
-              <span className="text-xs text-slate-600 flex-1 truncate">{jt.label}</span>
-              <span className="text-xs text-slate-400">{jt.trend}</span>
-              <span className={`text-xs font-semibold font-mono ${cc(jt.avgConf)}`}>{(jt.avgConf * 100).toFixed(0)}%</span>
-              <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${jt.avgConf >= 0.80 ? "bg-green-400" : jt.avgConf >= 0.60 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${jt.avgConf * 100}%` }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Settle stage — proves the lifecycle close is alive. Volumes are
-          illustrative (full population isn't in the prototype dataset);
-          recent items are real refs from the JOBS array so Aaron can drill
-          in. Demonstrates the universal-stage backbone runs end to end —
-          AI Settlement Agent generates RCTIs, remits payment, and only
-          surfaces exceptions like CG36245 (RCTI portal sync failed). */}
-      <SettlementPanel />
-
-      {/* Equipment health — the 4th actor at portfolio level. Same shape as
-          the Settle panel: counts + recent items with real refs for drill-in.
-          Surfaces logistics exceptions (delivery delays) that would
-          otherwise be invisible at the portfolio level. */}
-      <EquipmentHealthPanel />
-
-      {/* Team deferrals — full roll-up: every record where the senior tier is
-          part of the path, i.e. visible to portfolio personas. Items currently
-          escalated up sort first; the rest stay visible per the roll-up rule. */}
-      {teamDeferrals.length > 0 && (
-        <div>
-          <div className="flex items-baseline justify-between mb-2">
-            <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Team Deferrals</p>
-            <p className="text-slate-400 text-[10px]">{teamDeferrals.filter(d => d.currentHolder === "aaron" || d.currentHolder === "national").length} need senior call</p>
-          </div>
-          <div className="space-y-2">
-            {teamDeferrals.map((d, i) => {
-              const escalated = (d.escalations?.length ?? 0) > 0;
-              const senior = d.currentHolder === "aaron" || d.currentHolder === "national";
-              return (
-                <div key={i} className={`rounded-xl border bg-white p-2.5 text-xs ${
-                  senior ? "border-orange-300 border-l-4 border-l-orange-400" : "border-slate-200 border-l-4 border-l-amber-300"
-                }`}>
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <p className="font-semibold text-slate-700 leading-snug">{d.task}</p>
-                    {d.urgent && <span className="text-[9px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded font-medium uppercase flex-shrink-0">urgent</span>}
-                  </div>
-                  {/* Chain row */}
-                  <p className="text-slate-500 text-[10px] mb-1.5">
-                    {d.who} <span className="text-slate-400">({d.role.split(" — ")[0]})</span>
-                    {escalated && d.escalations!.map((e, idx) => (
-                      <span key={idx} className="text-slate-400"> → {e.by}</span>
-                    ))}
-                    {senior ? <span className="text-orange-600 font-semibold"> → with you</span> : <span className="text-slate-400"> → Ops Mgr</span>}
-                  </p>
-                  {/* Reason chain */}
-                  <div className="space-y-0.5">
-                    <p className="text-slate-600 text-[10px] italic leading-snug">"{d.who.split(" ")[0]}: {d.reason}"</p>
-                    {escalated && d.escalations!.map((e, idx) => (
-                      <p key={idx} className="text-slate-600 text-[10px] italic leading-snug">"{e.by.split(" ")[0]}: {e.reason}"</p>
-                    ))}
-                  </div>
-                  <p className="text-slate-400 text-[10px] mt-1.5">{d.jobId} · since {d.time}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Training Feedback — closes the loop on AI Audit. Operator flags from
-          across all queues become labelled training examples for the per-step
-          CNN models (Discovery OS req 22 Apr 2026 architecture). Aaron sees
-          the loop is alive: flags → labels → retrain → accuracy delta. */}
+      {/* Awaiting your authority — drafts + deferrals routed to this persona.
+          Replaces the previous full team-deferrals roll-up with just the
+          actionable subset. CEO-actionable, not operational reference. */}
       <div>
         <div className="flex items-baseline justify-between mb-2">
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Training Feedback</p>
-          <p className="text-slate-400 text-[10px]">last 7 days</p>
+          <p className="text-slate-700 text-xs font-semibold uppercase tracking-wider">Awaiting Your Authority</p>
+          {authorityCount > 0 && (
+            <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-bold">{authorityCount}</span>
+          )}
         </div>
-        {(() => {
-          const newFlags = modelFeedback.filter(f => f.isFlag).length;
-          const newConfirms = modelFeedback.filter(f => !f.isFlag).length;
-          return (
-            <div className="bg-white border border-slate-200 rounded-xl p-2.5 mb-2 grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-base font-bold text-slate-800">{newFlags}</p>
-                <p className="text-[10px] text-slate-400">Flags this session</p>
+        {authorityCount === 0 ? (
+          <p className="text-slate-400 text-xs italic px-1">Nothing waiting on you.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {pendingForMe.map(c => (
+              <div key={c.id} className="bg-white border border-slate-200 border-l-4 border-l-amber-400 rounded-lg p-2.5 text-xs">
+                <p className="text-[9px] uppercase tracking-wider font-semibold text-amber-700 mb-1">Configuration draft</p>
+                <p className="text-slate-700 font-semibold leading-snug">{c.target}</p>
+                <p className="text-slate-500 text-[10px] mt-1 leading-snug">
+                  <span className="text-slate-400">{c.before}</span>
+                  <span className="text-slate-400 mx-1">→</span>
+                  <span className="text-slate-700 font-medium">{c.after}</span>
+                </p>
+                <p className="text-slate-400 text-[10px] mt-1">By {c.draftedBy} · {c.draftedAt}</p>
               </div>
-              <div>
-                <p className="text-base font-bold text-slate-800">{newConfirms}</p>
-                <p className="text-[10px] text-slate-400">Confirmations</p>
+            ))}
+            {deferralsForMe.map((d, i) => (
+              <div key={`def-${i}`} className="bg-white border border-slate-200 border-l-4 border-l-orange-400 rounded-lg p-2.5 text-xs">
+                <p className="text-[9px] uppercase tracking-wider font-semibold text-orange-700 mb-1">Operational deferral</p>
+                <p className="text-slate-700 font-semibold leading-snug">{d.task}</p>
+                <p className="text-slate-500 text-[10px] mt-1 leading-snug italic">"{d.who.split(" ")[0]}: {d.reason}"</p>
+                <p className="text-slate-400 text-[10px] mt-1">{d.jobId} · since {d.time}</p>
               </div>
-              <div>
-                <p className="text-base font-bold text-slate-800">{MODEL_STATS.reduce((a, m) => a + m.flagsLast7d, 0) + newFlags}</p>
-                <p className="text-[10px] text-slate-400">Total labels (7d)</p>
-              </div>
-            </div>
-          );
-        })()}
-        <div className="space-y-1">
-          {MODEL_STATS.map(m => {
-            const sessionFlags = modelFeedback.filter(f => f.isFlag).length; // not per-step yet — illustrative
-            void sessionFlags;
-            const queued = m.lastRetrainDays === null;
-            return (
-              <div key={m.step} className="bg-white border border-slate-200 rounded-lg p-2 text-xs">
-                <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                  <span className="text-slate-700 font-medium truncate">{m.label}</span>
-                  <span className={`text-[10px] font-mono ${m.trend === "down" ? "text-orange-600" : m.trend === "up" ? "text-green-600" : "text-slate-500"}`}>
-                    {(m.accuracy * 100).toFixed(1)}% {m.trend === "up" ? "↑" : m.trend === "down" ? "↓" : "→"}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between text-[10px] text-slate-400">
-                  <span>{m.flagsLast7d} flag{m.flagsLast7d === 1 ? "" : "s"} · {m.retrainsLast30d} retrain{m.retrainsLast30d === 1 ? "" : "s"}/30d</span>
-                  <span className={queued ? "text-amber-600 font-medium" : ""}>
-                    {queued ? "queued for retrain" : `last retrain ${m.lastRetrainDays}d ago`}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <p className="text-slate-400 text-[10px] mt-2 leading-relaxed italic">
-          Operator flags from AI Audit feed each model's training queue. Auto-retrain triggers when patterns shift (~$10–20 per cycle).
-        </p>
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* AI Improvement — single compact signal that "AI is getting better".
+          Was previously a per-model breakdown with per-step flag counts;
+          that level of detail belongs in CockpitView's AI Audit tab, not on
+          a CEO surface. */}
       <div>
-        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Field Supervisors</p>
-        <div className="space-y-2">
-          {SUPERVISORS.map(s => {
-            const safetyPct = s.safety.done / s.safety.target;
-            const qualityPct = s.quality.done / s.quality.target;
-            const atRisk = safetyPct < 0.5 || qualityPct < 0.5;
-            return (
-              <div key={s.id} className={`rounded-xl border p-3 text-xs ${atRisk ? "bg-red-50 border-red-200" : "bg-white border-slate-200"}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-slate-700">{s.name}</span>
-                  {atRisk && <span className="text-red-500 text-[10px] font-semibold">BELOW THRESHOLD</span>}
-                </div>
-                <p className="text-slate-400 text-[10px] mb-2">{s.region}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-slate-400 text-[10px]">Safety</p>
-                    <p className={`font-bold text-sm ${safetyPct < 0.5 ? "text-red-600" : "text-slate-700"}`}>{s.safety.done}/{s.safety.target}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-400 text-[10px]">Quality</p>
-                    <p className={`font-bold text-sm ${qualityPct < 0.5 ? "text-red-600" : "text-slate-700"}`}>{s.quality.done}/{s.quality.target}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <p className="text-slate-700 text-xs font-semibold uppercase tracking-wider mb-2">AI Improvement</p>
+        <div className="bg-white border border-slate-200 rounded-xl p-3">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-base font-bold text-slate-800">{totalFlags7d + sessionFlags}</p>
+              <p className="text-[10px] text-slate-400 leading-tight">Flags / 7d</p>
+            </div>
+            <div>
+              <p className="text-base font-bold text-slate-800">{totalRetrains30d}</p>
+              <p className="text-[10px] text-slate-400 leading-tight">Retrains / 30d</p>
+            </div>
+            <div>
+              <p className={`text-base font-bold ${queuedRetrains > 0 ? "text-amber-600" : "text-green-600"}`}>{queuedRetrains}</p>
+              <p className="text-[10px] text-slate-400 leading-tight">Queued</p>
+            </div>
+          </div>
+          <p className="text-slate-400 text-[10px] mt-2 leading-snug">Operator flags from AI Audit feed each model's training queue. Auto-retrain triggers when patterns shift.</p>
         </div>
       </div>
 
-      <div>
-        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Team Scores</p>
-        <div className="space-y-1.5">
-          {[
-            { name: "Blake", score: 94 },
-            { name: "Conner", score: 88 },
-            { name: "Logan", score: 88 },
-            { name: "Tom H.", score: 87 },
-            { name: "Kerrie", score: 74 },
-          ].map(t => (
-            <div key={t.name} className="flex items-center gap-2">
-              <span className="text-xs text-slate-600 w-16">{t.name}</span>
-              <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${t.score >= 85 ? "bg-green-400" : t.score >= 70 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${t.score}%` }} />
-              </div>
-              <span className="text-xs font-semibold text-slate-600 w-8 text-right">{t.score}</span>
-            </div>
-          ))}
+      {/* Workflow configuration entry — preserved. Aaron is the Authoriser. */}
+      <div className={`rounded-xl border p-3 ${isAaron ? "bg-[#e0f7ff] border-[#00BDFE]/40" : "bg-white border-slate-200"}`}>
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div>
+            <p className="text-slate-800 text-xs font-semibold">Workflow Configuration</p>
+            <p className="text-slate-400 text-[10px] mt-0.5">Goals, commitments, autonomy levels. Audit-logged.</p>
+          </div>
+          {onWorkflowConfig && (
+            <button
+              onClick={onWorkflowConfig}
+              className={`text-xs underline flex-shrink-0 ${isAaron ? "text-[#0099d4] hover:text-[#00BDFE]" : "text-slate-400 hover:text-slate-600"}`}
+            >
+              {isAaron ? "Configure →" : "View →"}
+            </button>
+          )}
         </div>
+        {isAaron
+          ? <p className="text-green-600 text-[10px]">Authoriser tier — full configuration access.</p>
+          : <p className="text-slate-400 text-[10px]">Reviewer tier — publish low-risk, route high-risk to Aaron.</p>
+        }
       </div>
 
       {isAaron && (
@@ -1240,28 +1052,6 @@ function PlatformHealth({ isAaron, onWorkflowConfig, deferrals, modelFeedback }:
           </div>
         </div>
       )}
-
-      {/* Workflow configuration entry point */}
-      <div className={`rounded-xl border p-3 ${isAaron ? "bg-[#e0f7ff] border-[#00BDFE]/40" : "bg-white border-slate-200"}`}>
-        <div className="flex items-start justify-between gap-2 mb-1.5">
-          <div>
-            <p className="text-slate-800 text-xs font-semibold">Workflow Configuration</p>
-            <p className="text-slate-400 text-[10px] mt-0.5">Autonomy levels per step, per job type. Accuracy-tracked. Audit-logged.</p>
-          </div>
-          {onWorkflowConfig && (
-            <button
-              onClick={onWorkflowConfig}
-              className={`text-xs underline flex-shrink-0 ${isAaron ? "text-[#0099d4] hover:text-[#00BDFE]" : "text-slate-400 hover:text-slate-600"}`}
-            >
-              {isAaron ? "Configure →" : "View →"}
-            </button>
-          )}
-        </div>
-        {isAaron
-          ? <p className="text-green-600 text-[10px]">You have configuration access. All changes are immutably logged.</p>
-          : <p className="text-slate-400 text-[10px]">Adjusting autonomy levels requires Aaron sign-off.</p>
-        }
-      </div>
 
     </div>
   );
@@ -1281,10 +1071,11 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
   const isAaron = persona === "aaron";
   const exceptions = buildExceptions(isAaron);
   const [focus, setFocus] = useState<FocusState>(null);
-  // Outer column-1 tab: Outcomes (default per Aaron's spec) vs Exceptions.
-  // Outcomes leads — business outcomes + strategic patterns. Exceptions
-  // preserves the existing operational queue, one click away.
-  const [columnTab, setColumnTab] = useState<"outcomes" | "exceptions">("outcomes");
+  // Column-1 tab: Patterns (default) vs Exceptions. Business outcomes moved
+  // out of column 1 entirely and now live in the OutcomesScoreboard strip
+  // at the top of the view (per Aaron's feedback round 2 — outcomes deserve
+  // top prominence, not below-the-fold-in-a-column).
+  const [columnTab, setColumnTab] = useState<"patterns" | "exceptions">("patterns");
   const [filter, setFilter] = useState<"all" | "high" | "decisions" | "patterns">("all");
   // Prefill question fired into the AI bar by the "Why is this here?" button.
   const [aiTrigger, setAiTrigger] = useState<{ text: string; nonce: number } | undefined>(undefined);
@@ -1400,24 +1191,35 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
         </div>
       )}
 
+      {/* Outcomes scoreboard — top of view, full-width strip. Aaron's "today's
+          business" view is the first thing he sees. Click any card to open
+          the OutcomeDetailPanel in column 2. */}
+      <div className="mx-4 mt-4 flex-shrink-0">
+        <OutcomesScoreboard
+          outcomes={BUSINESS_OUTCOMES}
+          focusedId={focus?.type === "outcome" ? focus.outcome.id : null}
+          onSelect={(o) => setFocus({ type: "outcome", outcome: o })}
+        />
+      </div>
+
       <div className="flex-1 flex min-h-0 mx-4 mt-4 mb-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
 
-        {/* Column 1 — Outcomes (default) or Exceptions Queue
-            Per Aaron's spec: lead with business outcomes + strategic
-            patterns. Operational exceptions remain accessible one click
-            away. */}
+        {/* Column 1 — Patterns (default) or Exceptions Queue.
+            Outcomes moved out — they live in the scoreboard above. */}
         <div className="w-72 xl:w-80 2xl:w-96 flex-shrink-0 flex flex-col border-r border-slate-200">
 
-          {/* Top-level tab — Outcomes vs Exceptions */}
+          {/* Top-level tab — Patterns vs Exceptions. Outcomes moved to the
+              top-of-page scoreboard, so column 1 now has only the two
+              attention-shaped lists. */}
           <div className="px-4 pt-3 pb-2 border-b border-slate-200 flex-shrink-0 bg-slate-50">
             <div className="flex bg-white rounded-lg p-0.5 gap-0.5 border border-slate-200">
               <button
-                onClick={() => setColumnTab("outcomes")}
+                onClick={() => setColumnTab("patterns")}
                 className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-all ${
-                  columnTab === "outcomes" ? "bg-[#00BDFE] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  columnTab === "patterns" ? "bg-[#00BDFE] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                Outcomes
+                Patterns
               </button>
               <button
                 onClick={() => setColumnTab("exceptions")}
@@ -1433,44 +1235,20 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
             </div>
           </div>
 
-          {columnTab === "outcomes" ? (
-            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 scrollbar-thin">
-
-              {/* Strategic patterns */}
-              <div>
-                <div className="flex items-baseline justify-between px-1 mb-1.5">
-                  <p className="text-[10px] uppercase tracking-wider font-semibold text-violet-700">Strategic Patterns</p>
-                  <p className="text-[9px] text-slate-400">{STRATEGIC_PATTERNS.length} active</p>
-                </div>
-                <div className="space-y-1.5">
-                  {STRATEGIC_PATTERNS.map(p => (
-                    <StrategicPatternCard
-                      key={p.id}
-                      pattern={p}
-                      selected={focus?.type === "strategic_pattern" && focus.pattern.id === p.id}
-                      onClick={() => setFocus({ type: "strategic_pattern", pattern: p })}
-                    />
-                  ))}
-                </div>
+          {columnTab === "patterns" ? (
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 scrollbar-thin">
+              <div className="flex items-baseline justify-between px-1 mb-1.5">
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-violet-700">Strategic Patterns</p>
+                <p className="text-[9px] text-slate-400">{STRATEGIC_PATTERNS.length} active</p>
               </div>
-
-              {/* Business outcomes */}
-              <div>
-                <div className="flex items-baseline justify-between px-1 mb-1.5">
-                  <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Business Outcomes</p>
-                  <p className="text-[9px] text-slate-400">{BUSINESS_OUTCOMES.filter(o => o.phase === "phase_1").length} live · {BUSINESS_OUTCOMES.filter(o => o.phase === "phase_2").length} phase 2</p>
-                </div>
-                <div className="space-y-1.5">
-                  {BUSINESS_OUTCOMES.map(o => (
-                    <OutcomeCard
-                      key={o.id}
-                      outcome={o}
-                      selected={focus?.type === "outcome" && focus.outcome.id === o.id}
-                      onClick={() => setFocus({ type: "outcome", outcome: o })}
-                    />
-                  ))}
-                </div>
-              </div>
+              {STRATEGIC_PATTERNS.map(p => (
+                <StrategicPatternCard
+                  key={p.id}
+                  pattern={p}
+                  selected={focus?.type === "strategic_pattern" && focus.pattern.id === p.id}
+                  onClick={() => setFocus({ type: "strategic_pattern", pattern: p })}
+                />
+              ))}
             </div>
           ) : (
             <>
@@ -1555,8 +1333,8 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
                 <div className="w-14 h-14 rounded-full bg-[#00BDFE]/10 flex items-center justify-center mb-4">
                   <span className="text-2xl">⌘</span>
                 </div>
-                <p className="text-slate-700 font-semibold text-sm mb-1">{columnTab === "outcomes" ? "Select an outcome or strategic pattern" : "Select an exception"}</p>
-                <p className="text-slate-400 text-xs leading-relaxed max-w-xs">{columnTab === "outcomes" ? "Click any business outcome or strategic pattern to drill into the supporting data and AI-recommended actions." : "Click any item in the queue to see full context, AI activity log, and available actions."}</p>
+                <p className="text-slate-700 font-semibold text-sm mb-1">{columnTab === "patterns" ? "Pick something to drill into" : "Select an exception"}</p>
+                <p className="text-slate-400 text-xs leading-relaxed max-w-xs">{columnTab === "patterns" ? "Click any business outcome above, any strategic pattern on the left, or switch to Exceptions to see the operational queue." : "Click any item in the queue to see full context, AI activity log, and available actions."}</p>
               </div>
             ) : focus.type === "job" ? (
               <JobDetailPanel
@@ -1594,7 +1372,7 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
             <h2 className="text-sm font-bold text-slate-800">Platform Health</h2>
           </div>
           <div className="flex-1 overflow-hidden">
-            <PlatformHealth isAaron={isAaron} onWorkflowConfig={onWorkflowConfig} deferrals={deferrals} modelFeedback={modelFeedback} />
+            <PlatformHealth persona={persona} isAaron={isAaron} onWorkflowConfig={onWorkflowConfig} deferrals={deferrals} modelFeedback={modelFeedback} />
           </div>
         </div>
 
