@@ -5,6 +5,7 @@ import CockpitView from "./components/CockpitView";
 import PortfolioView from "./components/PortfolioView";
 import FieldView from "./components/FieldView";
 import FieldSupervisorView from "./components/FieldSupervisorView";
+import ServiceView from "./components/ServiceView";
 import TradeDrawer from "./components/TradeDrawer";
 import ConfigurationView from "./components/ConfigurationView";
 
@@ -88,6 +89,7 @@ export default function App() {
   const isPortfolio = persona === "aaron" || persona === "national";
   const isField     = persona === "conner" || persona === "blake";
   const isTroy      = persona === "troy";
+  const isMaya      = persona === "maya";
 
   const P = PERSONAS.find(p=>p.id===persona)!;
   const decisions = ALL_DECISIONS.filter(d=>{
@@ -185,6 +187,18 @@ export default function App() {
       <FieldSupervisorView onPersonaSwitch={setPersona} deferrals={deferrals} onAddDeferral={addDeferral} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
+  );
+
+  // ── Maya — Service Officer view (Hubspot-sourced ticket queue) ─────────────
+  if (isMaya) return (
+    <>
+    <div className={bg}><div className={maxW + " space-y-5"}>
+      {sharedHeader}
+      <ServiceView persona={persona} />
+      <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
+    </div></div>
+    <TradeDrawer tradeName={selectedTradeName} onClose={() => setSelectedTradeName(null)} onSelectJob={() => setSelectedTradeName(null)} />
+    </>
   );
 
   // ── Decisions view ─────────────────────────────────────────────────────────

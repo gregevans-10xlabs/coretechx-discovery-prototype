@@ -13,6 +13,7 @@ import CountdownPill from "./CountdownPill";
 import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
 import EquipmentPanel from "./EquipmentPanel";
+import ServiceActivityPanel from "./ServiceActivityPanel";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -150,6 +151,9 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
         {job.equipment && job.equipment.length > 0 && (
           <EquipmentPanel items={job.equipment} />
         )}
+
+        {/* Service activity — Hubspot tickets attached to this job */}
+        <ServiceActivityPanel jobId={job.id} />
 
         {/* Journey */}
         <div>

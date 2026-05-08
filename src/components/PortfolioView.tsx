@@ -8,6 +8,7 @@ import CountdownPill from "./CountdownPill";
 import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
 import EquipmentPanel from "./EquipmentPanel";
+import ServiceActivityPanel from "./ServiceActivityPanel";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import { BUSINESS_OUTCOMES, STRATEGIC_PATTERNS, type BusinessOutcome, type StrategicPattern } from "../data/outcomes";
 import { PENDING_CHANGES } from "../data/goals";
@@ -472,6 +473,9 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, o
         {job.equipment && job.equipment.length > 0 && (
           <EquipmentPanel items={job.equipment} />
         )}
+
+        {/* Service activity — Hubspot tickets attached to this job */}
+        <ServiceActivityPanel jobId={job.id} />
 
         {/* Journey */}
         <div>

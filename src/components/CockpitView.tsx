@@ -14,6 +14,7 @@ import CountdownPill from "./CountdownPill";
 import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
 import EquipmentPanel from "./EquipmentPanel";
+import ServiceActivityPanel from "./ServiceActivityPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned" | "audit";
@@ -303,6 +304,12 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
       {job.equipment && job.equipment.length > 0 && (
         <EquipmentPanel items={job.equipment} />
       )}
+
+      {/* Service activity — Hubspot tickets attached to this job. Surfaces
+          complaints / queries / trade events so the operator sees them
+          alongside the operational state. The "first signal" surface for
+          complaints on previously-clean jobs. */}
+      <ServiceActivityPanel jobId={job.id} />
 
       {/* Journey */}
       <div>
