@@ -77,7 +77,7 @@ export const TRADES: Trade[] = [
     region: "NSW Mid North Coast (2428–2440)",
     abn: "12 345 678 901",
     primaryContact: "Brett Sandford · 0421 ··· ···",
-    narrative: "Solid mid-corridor electrician with antenna specialty. Public liability renewed but SWMS lapsed mid-March — flagged on 3 active jobs.",
+    narrative: "Solid mid-corridor electrician with antenna specialty. Public liability renewed; SWMS lapsed mid-March and flagged on 3 active jobs. Brett has been notified via Chekku — remediation in progress through the trade's document library. The compliance gap reads as a primary jeopardy hook in Brett's app and feeds Logan's decision here.",
     compliance: [
       { type: "electrical_licence_nsw",   label: "NSW Electrical Licence (Qualified Supervisor)", authority: "NSW Fair Trading",   status: "valid",       expiry: "Mar 2027" },
       { type: "public_liability",         label: "Public Liability — $10M",                       authority: "icare insurance",    status: "valid",       expiry: "Jul 2026" },
