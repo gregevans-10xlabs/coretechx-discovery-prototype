@@ -6,6 +6,7 @@ import PortfolioView from "./components/PortfolioView";
 import FieldView from "./components/FieldView";
 import FieldSupervisorView from "./components/FieldSupervisorView";
 import ServiceView from "./components/ServiceView";
+import FinanceView from "./components/FinanceView";
 import TradeDrawer from "./components/TradeDrawer";
 import ConfigurationView from "./components/ConfigurationView";
 
@@ -90,6 +91,7 @@ export default function App() {
   const isField     = persona === "conner" || persona === "blake";
   const isTroy      = persona === "troy";
   const isMaya      = persona === "maya";
+  const isMei       = persona === "mei";
 
   const P = PERSONAS.find(p=>p.id===persona)!;
   const decisions = ALL_DECISIONS.filter(d=>{
@@ -195,6 +197,18 @@ export default function App() {
     <div className={bg}><div className={maxW + " space-y-5"}>
       {sharedHeader}
       <ServiceView persona={persona} />
+      <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
+    </div></div>
+    <TradeDrawer tradeName={selectedTradeName} onClose={() => setSelectedTradeName(null)} onSelectJob={() => setSelectedTradeName(null)} />
+    </>
+  );
+
+  // ── Mei — Finance Officer view (Xero sync surface, billing/payment state) ──
+  if (isMei) return (
+    <>
+    <div className={bg}><div className={maxW + " space-y-5"}>
+      {sharedHeader}
+      <FinanceView persona={persona} />
       <p className="text-slate-400 text-xs text-center mt-8 pb-8">Concept prototype · v7 · Data illustrative · AI live via Anthropic API</p>
     </div></div>
     <TradeDrawer tradeName={selectedTradeName} onClose={() => setSelectedTradeName(null)} onSelectJob={() => setSelectedTradeName(null)} />

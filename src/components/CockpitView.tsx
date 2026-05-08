@@ -15,6 +15,8 @@ import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
 import EquipmentPanel from "./EquipmentPanel";
 import ServiceActivityPanel from "./ServiceActivityPanel";
+import FinanceSection from "./FinanceSection";
+import type { FinancialState } from "../data/finance";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type QueueFilter = "action" | "browse" | "planned" | "audit";
@@ -310,6 +312,13 @@ function JobDetail({ job, persona, onAction, onAskWhy, tags, onAddTag, onRemoveT
           alongside the operational state. The "first signal" surface for
           complaints on previously-clean jobs. */}
       <ServiceActivityPanel jobId={job.id} />
+
+      {/* Financial state — Mei's primary surface, but every operator
+          benefits from a glanceable view of billing / trade payment / Xero
+          sync. Compact when uneventful; auto-expands on exception. */}
+      {job.financial && (
+        <FinanceSection jobValue={job.value} financial={job.financial as FinancialState} />
+      )}
 
       {/* Journey */}
       <div>

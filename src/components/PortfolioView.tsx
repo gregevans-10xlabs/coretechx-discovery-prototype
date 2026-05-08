@@ -9,6 +9,8 @@ import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
 import EquipmentPanel from "./EquipmentPanel";
 import ServiceActivityPanel from "./ServiceActivityPanel";
+import FinanceSection from "./FinanceSection";
+import type { FinancialState } from "../data/finance";
 import { MORNING, ALL_DECISIONS, ALL_PATTERNS, JOB_TYPES, TAG_VOCABULARY, MODEL_STATS, type FieldDeferral, type ModelFeedback, riskState, riskBadgeClass } from "../data/scenarios";
 import { BUSINESS_OUTCOMES, STRATEGIC_PATTERNS, type BusinessOutcome, type StrategicPattern } from "../data/outcomes";
 import { PENDING_CHANGES } from "../data/goals";
@@ -477,6 +479,11 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, o
         {/* Service activity — Hubspot tickets attached to this job */}
         <ServiceActivityPanel jobId={job.id} />
 
+        {/* Financial state */}
+        {job.financial && (
+          <FinanceSection jobValue={job.value} financial={job.financial as FinancialState} />
+        )}
+
         {/* Journey */}
         <div>
           <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Journey</p>
@@ -652,6 +659,7 @@ function BriefingDetailPanel({ msg, icon, onClose }: { msg: string; icon: string
 
 const OUTCOME_ICON: Record<string, string> = {
   revenue:       "$",
+  cashflow:      "↻",
   work_orders:   "✓",
   margin:        "△",
   capacity:      "▭",

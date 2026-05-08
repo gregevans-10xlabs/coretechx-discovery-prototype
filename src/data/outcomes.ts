@@ -21,7 +21,7 @@
 export type OutcomePhase = "phase_1" | "phase_2";
 
 export type OutcomeCategory =
-  | "revenue" | "work_orders" | "capacity" | "kpi"
+  | "revenue" | "cashflow" | "work_orders" | "capacity" | "kpi"
   | "margin" | "satisfaction" | "safety" | "compliance";
 
 export type OutcomeBreakdown = {
@@ -88,6 +88,28 @@ export const BUSINESS_OUTCOMES: BusinessOutcome[] = [
       { label: "Other",                   value: "$337k",  pct: 10 },
     ],
     drillDown: "Top contributors today: 42 Starlink installs, 8 insurance scopes signed off, 1 AHO milestone.",
+  },
+  {
+    id: "O-cashflow",
+    category: "cashflow",
+    title: "Cashflow",
+    phase: "phase_1",
+    primaryValue: "$487k",
+    primaryLabel: "Open invoices",
+    secondary: [
+      { label: "Collected today",  value: "$280" },
+      { label: "Invoiced today",    value: "$639" },
+      { label: "Overdue (>0d)",     value: "$2,400" },
+      { label: "DSO (overall)",     value: "21 days" },
+    ],
+    trend: { direction: "down", detail: "Allianz DSO 18d trending up vs 14d target", good: false },
+    breakdownByClient: [
+      { label: "Allianz",      value: "DSO 18d · $4,800 open" },
+      { label: "Harvey Norman", value: "DSO 11d · $280 open" },
+      { label: "AHO",           value: "DSO 27d · $0 open" },
+      { label: "Home Repair",   value: "$2,400 overdue (5d)" },
+    ],
+    drillDown: "1 invoice overdue (CG36031, $2,400, 5 days). 1 RCTI sync exception (CG36245). 1 variation awaiting Authoriser sign-off ($1,800 — CG36069). Mei is the operational owner; pending changes also visible in Aaron's Awaiting Your Authority.",
   },
   {
     id: "O-work-orders",

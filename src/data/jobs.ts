@@ -116,6 +116,16 @@ export type Job = {
   // Exception jobs: delayed/missing equipment that may block install.
   equipment?: EquipmentItem[];
 
+  // Financial state — populated by the post-processing pass in finance.ts.
+  // Carries billing, trade-payment, pricing, Xero-sync state for the
+  // operational finance perspective (Mei, Finance Officer). Phase 1
+  // captures sync/billing/payment state; Phase 2 (margin/cost) awaits
+  // production cost instrumentation. The actual type lives in finance.ts
+  // to keep the financial concern co-located with the data; here we just
+  // declare the field's existence.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  financial?: any;
+
   // Shadow Plan — pre-computed backup trade reserved at booking time. The
   // 60-second cancellation-to-replacement guarantee depends on this being
   // ready before the primary trade fails, not computed in response.

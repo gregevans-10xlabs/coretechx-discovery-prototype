@@ -14,6 +14,8 @@ import TradeChain from "./TradeChain";
 import ConfidencePanel from "./ConfidencePanel";
 import EquipmentPanel from "./EquipmentPanel";
 import ServiceActivityPanel from "./ServiceActivityPanel";
+import FinanceSection from "./FinanceSection";
+import type { FinancialState } from "../data/finance";
 
 // Background volume (illustrative — dataset is a subset)
 const FIELD_REGION_TOTAL: Record<string, number> = {
@@ -154,6 +156,11 @@ function JobDetailPanel({ job, onClose, onAskWhy, tags, onAddTag, onRemoveTag, a
 
         {/* Service activity — Hubspot tickets attached to this job */}
         <ServiceActivityPanel jobId={job.id} />
+
+        {/* Financial state — billing / trade payment / Xero sync */}
+        {job.financial && (
+          <FinanceSection jobValue={job.value} financial={job.financial as FinancialState} />
+        )}
 
         {/* Journey */}
         <div>
