@@ -22,7 +22,7 @@ export type OutcomePhase = "phase_1" | "phase_2";
 
 export type OutcomeCategory =
   | "revenue" | "cashflow" | "work_orders" | "capacity" | "kpi"
-  | "margin" | "satisfaction" | "safety" | "compliance";
+  | "margin" | "satisfaction" | "quality" | "safety" | "compliance";
 
 export type OutcomeBreakdown = {
   label: string;
@@ -205,6 +205,35 @@ export const BUSINESS_OUTCOMES: BusinessOutcome[] = [
     drillDown: "Recent dips track to no-checkin events on Starlink installs. See pattern P-NSW-Sat.",
   },
   {
+    id: "O-quality",
+    category: "quality",
+    title: "Quality",
+    phase: "phase_1",
+    primaryValue: "94%",
+    primaryLabel: "First-time-right rate",
+    secondary: [
+      { label: "Return trips this week",     value: "4 of 183 jobs" },
+      { label: "Evidence-pack pass rate",     value: "93%" },
+      { label: "Active complaints",            value: "1" },
+      { label: "Defect rate (30d)",            value: "0.8%" },
+    ],
+    trend: { direction: "down", detail: "FTR 96% → 94% over 30 days — return trips trending up", good: false },
+    breakdownByDepartment: [
+      { label: "Installations (Starlink)",  value: "FTR 95% · 2 returns" },
+      { label: "Installations (HN/JB)",     value: "FTR 96% · 1 return" },
+      { label: "Insurance Repair",          value: "FTR 91% · 1 return" },
+      { label: "Construction",              value: "FTR 100% · 0 returns" },
+      { label: "Facilities Management",     value: "FTR 97% · 0 returns" },
+    ],
+    breakdownByClient: [
+      { label: "Starlink",   value: "FTR 95%" },
+      { label: "Allianz",    value: "FTR 91% · 1 return-trip cost absorbed" },
+      { label: "Harvey Norman", value: "FTR 96%" },
+      { label: "AHO",         value: "FTR 100%" },
+    ],
+    drillDown: "1 active complaint: HS-44755 (UNITED INFOCOM, TV mounted off-level — CG35958). Return trips this week mostly traceable to no-checkin events. Insurance FTR 91% drag is also showing in customer satisfaction outcome — likely correlated.",
+  },
+  {
     id: "O-safety",
     category: "safety",
     title: "Safety",
@@ -357,6 +386,36 @@ export const STRATEGIC_PATTERNS: StrategicPattern[] = [
       { metric: "SWMS expiry events / month", current: "37", historical: "26" },
       { metric: "Active compliance gaps",     current: "11", historical: "6 typical" },
       { metric: "Expiring next 30 days",      current: "23", historical: "—" },
+    ],
+  },
+  {
+    id: "SP-INS-BOTTLENECK",
+    category: "workflow_bottleneck",
+    title: "Insurance virtual-assessment stage backlog forming",
+    severity: "medium",
+    context: "Insurance jobs in the Assessment stage are accumulating — 11 in queue today vs 4–6 typical. Average wait time has risen from 2h to 6h over the last 10 days. Allianz 1h KPI window starting to be missed (3 events this week) which feeds into the SLA strategic pattern. Suggests assessor capacity, AI Triage Agent threshold, or both need attention.",
+    scope: "Workflow: Insurance Repair · Stage: Virtual assessment · 10 days emerging",
+    trend: "Assessment-stage queue: 4–6 baseline → 11 today · Avg wait: 2h → 6h",
+    aiRecommendedAction: "Two paths to evaluate with Kerrie: (1) Add assessor capacity — third specialist hire OR cross-train Sharon's T1 team for triage of clear-cut cases. (2) Tighten the AI Triage Agent's auto-assignment threshold so fewer cases queue for human virtual assessment. Recommend a 14-day measurement window after intervention.",
+    supportingData: [
+      { metric: "Jobs in assessment queue",  current: "11",         historical: "4–6 typical" },
+      { metric: "Avg wait time",              current: "6h",         historical: "2h baseline" },
+      { metric: "Allianz 1h KPI misses",     current: "3 this week", historical: "0–1 typical" },
+    ],
+  },
+  {
+    id: "SP-REVENUE-FORECAST",
+    category: "revenue_forecast",
+    title: "Q2 Starlink revenue forecast at risk — completion rate slipping",
+    severity: "medium",
+    context: "Starlink completion rate has trended down 8 points over the last 30 days vs plan (96% → 88%). Multiple contributing factors stack: Mid North Coast coverage gap (P-039, escalated), trade reliability declining in NSW corridor, equipment delivery delays. Compound effect: Q2 revenue forecast is now ~$240k below original plan if trend continues unchecked.",
+    scope: "Workflow: Starlink Install · Region: NSW · Time horizon: Q2 (60 days)",
+    trend: "Completion rate: 96% → 88% over 30 days · Q2 variance: -$240k vs plan",
+    aiRecommendedAction: "This is a compound issue — three contributing strategic patterns are already active (Mid North Coast coverage gap, NSW Starlink CSAT, T1 capacity strain). Address root causes via those patterns. Specifically, approving Logan's procurement request (already routed to your Awaiting Authority panel) addresses the largest single contributor.",
+    supportingData: [
+      { metric: "Starlink completion rate",  current: "88%",      historical: "96% baseline" },
+      { metric: "Q2 revenue variance",        current: "-$240k",   historical: "0 vs plan" },
+      { metric: "Contributing patterns",       current: "3 active", historical: "—" },
     ],
   },
   {

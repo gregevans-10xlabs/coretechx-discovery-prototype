@@ -665,6 +665,7 @@ const OUTCOME_ICON: Record<string, string> = {
   capacity:      "▭",
   kpi:           "◷",
   satisfaction:  "♡",
+  quality:       "★",
   safety:        "⛨",
   compliance:    "✓",
 };
