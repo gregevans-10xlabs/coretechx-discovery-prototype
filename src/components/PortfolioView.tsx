@@ -1138,34 +1138,55 @@ export default function PortfolioView({ persona, onWorkflowConfig, tagsByJob, on
 
   const highCount = exceptions.filter(e => e.severity === "high").length;
 
-  // Portfolio-level summary block — appended to every AI context so synthesis
-  // questions ("which job type is declining most?", "where am I exposed?") work
-  // without needing the AI to traverse separate data calls.
-  const jobTypeBlock = JOB_TYPES.map(jt =>
-    `- ${jt.label}: ${jt.total} active · avg conf ${(jt.avgConf*100).toFixed(0)}% · trend ${jt.trend} · ${jt.atRisk} at risk · ${jt.critical} critical · ${jt.needsDecision} need decision`
+  // Executive-tier context block — Aaron and National operate at portfolio
+  // level, not the operational level. The previous portfolio block dumped
+  // ALL_DECISIONS (operational queue items like "CG36102 FM emergency") into
+  // their context, which led the AI to recommend job-level actions ("call
+  // this trade", "follow up CG36102") that belong to their team, not them.
+  // This block leads with outcomes + strategic patterns + authority items,
+  // and prepends explicit role framing so the AI answers at the right level.
+  const outcomesSummary = BUSINESS_OUTCOMES.map(o => {
+    if (o.phase === "phase_2") return `- ${o.title}: Phase 2 — pending instrumentation`;
+    const trendBit = o.trend ? ` (${o.trend.direction === "up" ? "↑" : o.trend.direction === "down" ? "↓" : "→"} ${o.trend.detail})` : "";
+    return `- ${o.title}: ${o.primaryValue} ${o.primaryLabel}${trendBit}`;
+  }).join("\n");
+  const strategicPatternsSummary = STRATEGIC_PATTERNS.map(p =>
+    `- ${p.id} [${p.severity}] ${p.title} — scope: ${p.scope}; trend: ${p.trend}; AI recommends: ${p.aiRecommendedAction}`
   ).join("\n");
-  const patternBlock = ALL_PATTERNS.map(p =>
-    `- ${p.id} (${p.severity}) · ${p.title} · affects ${p.affected} · suggested action: ${p.action}`
-  ).join("\n");
-  const decisionBlock = ALL_DECISIONS.map(d =>
-    `- ${d.id} (autonomy L${d.autonomyLevel}) · ${d.type} · ${d.label} · AI recommends: ${d.rec}`
-  ).join("\n");
-  const portfolioBlock = `\nJob type health:\n${jobTypeBlock}\n\nActive AI-detected patterns:\n${patternBlock}\n\nDecisions awaiting human:\n${decisionBlock}`;
+  const authorityItems = [
+    ...PENDING_CHANGES.filter(c => c.routedTo === persona).map(c => `- Config draft from ${c.draftedBy}: ${c.target} (${c.before} → ${c.after}). Scope: ${c.scope}. ${c.notes ?? ""}`),
+    ...deferrals.filter(d => d.currentHolder === persona).map(d => `- Operational escalation from ${d.who}: ${d.task} — "${d.reason}"`),
+  ];
+  const authorityBlock = authorityItems.length > 0 ? authorityItems.join("\n") : "(nothing currently awaiting your authority)";
 
-  // AI bar: context tracks the current focus item, but the portfolio block is
-  // always appended so platform-level questions can be answered.
+  const executiveContextBlock = `
+
+ROLE FRAMING (IMPORTANT): ${isAaron ? "Aaron is the CEO and Founder of Circl" : "National Operations is the senior cross-region oversight role for Circl"}. Answer at the strategic / business level. Synthesize across outcomes, strategic patterns, and items awaiting authority. Do NOT recommend job-level operational actions like "call this trade", "follow up CG36102", or "escalate to Paul / Kerrie immediately" — those belong to ${isAaron ? "his" : "her"} team and are appropriate for the operations-manager view, not here. Instead identify business themes, strategic moves, capacity / capability decisions, and where ${isAaron ? "Aaron's" : "National's"} authority is the unblocker. Reference outcomes and strategic patterns by name when relevant; reference the operational queue only as backdrop, never as a to-do list.
+
+Today's business outcomes:
+${outcomesSummary}
+
+Active strategic patterns (executive-tier — aggregated across departments / clients / regions / workflows / time):
+${strategicPatternsSummary}
+
+Awaiting ${isAaron ? "Aaron's" : "National's"} authority (the actual to-do list at this tier):
+${authorityBlock}
+`;
+
+  // AI bar: context tracks the current focus item, with the executive-level
+  // block appended so the AI synthesizes at the right tier.
   const aiContext = (focus?.type === "job"
-    ? `${isAaron ? "Aaron (CEO)" : "National Operations"} reviewing job ${focus.job.id} — ${focus.job.type}, ${focus.job.suburb}. Priority: ${focus.job.priority}. Confidence: ${focus.job.conf.toFixed(2)}. Action: ${focus.job.actionRequired ?? "AI handling"}.`
+    ? `${isAaron ? "Aaron (CEO)" : "National Operations"} drilled into job ${focus.job.id} from the portfolio view — ${focus.job.type}, ${focus.job.suburb}. This is operational drill-down for context; answers should still be framed strategically (what does this job tell us about a pattern / outcome / capacity issue), not as a job-level to-do list.`
     : focus?.type === "pattern"
-    ? `${isAaron ? "Aaron" : "National"} reviewing AI-detected pattern ${focus.pattern.id}: "${focus.pattern.title}". Severity: ${focus.pattern.severity}. ${focus.pattern.detail}`
+    ? `${isAaron ? "Aaron" : "National"} drilled into operational pattern ${focus.pattern.id}: "${focus.pattern.title}". Severity: ${focus.pattern.severity}. ${focus.pattern.detail}. Frame the answer strategically — what's the broader implication, who in the team should own a response, where might executive intervention be needed.`
     : focus?.type === "decision"
-    ? `${isAaron ? "Aaron" : "National"} reviewing decision ${focus.dec.id}: ${focus.dec.label}. AI recommendation: ${focus.dec.rec}.`
+    ? `${isAaron ? "Aaron" : "National"} drilled into operational decision ${focus.dec.id}: ${focus.dec.label}. AI recommendation: ${focus.dec.rec}. Frame the answer at the level appropriate for the executive — is this a pattern, does it warrant policy change, is there a strategic implication.`
     : focus?.type === "outcome"
     ? `${isAaron ? "Aaron" : "National"} reviewing business outcome "${focus.outcome.title}" — ${focus.outcome.primaryValue} ${focus.outcome.primaryLabel}.${focus.outcome.trend ? ` Trend: ${focus.outcome.trend.detail}.` : ""}${focus.outcome.phase === "phase_2" ? " Phase 2 outcome — instrumentation pending." : ""}`
     : focus?.type === "strategic_pattern"
     ? `${isAaron ? "Aaron" : "National"} reviewing strategic pattern ${focus.pattern.id}: "${focus.pattern.title}". Severity: ${focus.pattern.severity}. ${focus.pattern.context} AI recommendation: ${focus.pattern.aiRecommendedAction}`
-    : `${isAaron ? "Aaron (CEO/Founder)" : "National Operations"} — portfolio view. ${exceptions.filter(e => e.kind === "decision").length} decisions pending, ${exceptions.filter(e => e.kind === "pattern").length} AI patterns detected, ${exceptions.filter(e => e.severity === "high").length} high-severity items.${isAaron ? " Has workflow configuration access." : ""}`)
-    + portfolioBlock;
+    : `${isAaron ? "Aaron (CEO/Founder)" : "National Operations"} — portfolio view, no specific item selected. ${exceptions.filter(e => e.severity === "high").length} high-severity operational items in the team's queue (backdrop only — not actions for ${isAaron ? "Aaron" : "National"}).${isAaron ? " Has workflow configuration Authoriser access." : " Has Reviewer-tier configuration access."}`)
+    + executiveContextBlock;
 
   // Suggestion chips — Aaron/National operate at portfolio level, so chips ask
   // synthesis questions (where's the exposure, what's slipping, what needs my
