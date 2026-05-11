@@ -7,6 +7,7 @@ import {
 import { CONFIG_ACCESS_META, PERSONAS, type ConfigAccessTier } from "../data/scenarios";
 import GoalDrawer, { type DraftEntry } from "./GoalDrawer";
 import SimulationModal from "./SimulationModal";
+import NewClientWizard, { type NewClientPublish } from "./NewClientWizard";
 
 // ConfigurationView — the workflow canvas + library entry point + Pending
 // Changes panel. Read-only for most personas; edit affordances appear when
@@ -190,6 +191,8 @@ export default function ConfigurationView({ persona, onBack }: Props) {
   // Simulation modal — open when an operator clicks Simulate (or Approve &
   // publish, which goes through simulation as the default path).
   const [simulating, setSimulating] = useState<PendingChange | null>(null);
+  // New client wizard — open from the workflow selector "+ New client" button.
+  const [wizardOpen, setWizardOpen] = useState(false);
   // Toast feedback when a draft is added.
   const [toast, setToast] = useState<string | null>(null);
 
@@ -200,6 +203,35 @@ export default function ConfigurationView({ persona, onBack }: Props) {
 
   // Open simulation modal for a given pending change.
   const handleSimulate = (change: PendingChange) => setSimulating(change);
+
+  // New client wizard — publishing creates an audit entry. In production this
+  // would also instantiate the cloned workflow, wire intake channels, and
+  // create the client record. Prototype scope: the audit log entry is the
+  // visible artefact.
+  const handleNewClientPublish = (payload: NewClientPublish) => {
+    const baseLabels: Record<string, string> = {
+      starlink:     "Starlink Install",
+      hn:           "Harvey Norman Install",
+      insurance:    "Insurance Repair",
+      construction: "AHO Construction",
+      fm:           "Facilities Management",
+      blank:        "universal-only baseline",
+    };
+    const baseLabel = baseLabels[payload.workflowBase] ?? payload.workflowBase;
+    const entry: ConfigAuditEntry = {
+      id: `CA-${Date.now()}`,
+      publishedBy: personaMeta.label,
+      publishedAt: "Just now",
+      changeType: "new-goal",
+      target: `New client onboarded — ${payload.clientName}`,
+      summary: `Cloned ${baseLabel} workflow as base. ABN ${payload.abn} · ${payload.billingTerms} · ${payload.integrationChannel} · projected volume ${payload.volumeEstimate}. Initial autonomy posture conservative (L2 across AI commitments). ${payload.notes ? `Note: ${payload.notes}` : ""}`,
+      version: "v1.0",
+    };
+    setAuditEntries(curr => [entry, ...curr]);
+    setWizardOpen(false);
+    setToast(`Client onboarded — ${payload.clientName}`);
+    setTimeout(() => setToast(null), 2800);
+  };
 
   // Publish from within the simulation modal — moves the draft to the audit
   // log, removes it from pending, and shows confirmation.
@@ -301,14 +333,21 @@ export default function ConfigurationView({ persona, onBack }: Props) {
         </div>
       </div>
 
-      {/* Workflow selector — only Starlink in MVP */}
+      {/* Workflow selector + new-client wizard entry */}
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-slate-400 text-xs uppercase tracking-wider font-semibold mr-1">Workflow:</span>
         <button className="px-3 py-1.5 rounded-lg text-sm font-medium border bg-[#00BDFE] border-[#00BDFE] text-white">📡 Starlink Install</button>
         <button disabled className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-300 bg-slate-50">📺 Harvey Norman</button>
         <button disabled className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-300 bg-slate-50">🛡 Insurance</button>
         <button disabled className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-300 bg-slate-50">🏗 Construction</button>
-        <span className="text-[10px] text-slate-400 ml-2">Other workflows: same model, deferred for prototype scope</span>
+        <span className="text-slate-200 mx-1">·</span>
+        <button
+          onClick={() => setWizardOpen(true)}
+          className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-dashed border-[#00BDFE] text-[#0077a8] hover:bg-[#e0f7ff] transition-colors"
+          title="Onboard a new client / workflow"
+        >
+          + New client
+        </button>
       </div>
 
       <div className="flex gap-4 items-start">
@@ -440,6 +479,18 @@ export default function ConfigurationView({ persona, onBack }: Props) {
           canPublish={access.canPublish}
           onCancel={() => setSimulating(null)}
           onPublish={handlePublishFromSimulation}
+        />
+      )}
+
+      {/* New client wizard — opens from the "+ New client" button in the
+          workflow selector row. Demonstrates the Configuration-not-Code
+          claim: a new client is configured (cloned + customised) rather
+          than coded. */}
+      {wizardOpen && (
+        <NewClientWizard
+          accessTier={accessTier}
+          onCancel={() => setWizardOpen(false)}
+          onPublish={handleNewClientPublish}
         />
       )}
 

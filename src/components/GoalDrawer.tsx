@@ -58,13 +58,16 @@ function autonomyMeta(level: 1 | 2 | 3 | 4) {
   } as const)[level];
 }
 
+// ─── Format helper — single source of truth for value rendering ────────────
+function formatControlValue(value: string | number | boolean | string[]): string {
+  if (Array.isArray(value)) return value.length > 0 ? value.join(" + ") : "(none)";
+  if (typeof value === "boolean") return value ? "On" : "Off";
+  return String(value);
+}
+
 // ─── Goal-level control widget (read-only render + simulated edit) ──────────
 function ControlRow({ control, canEdit, onEdit }: { control: GoalControl; canEdit: boolean; onEdit: () => void }) {
-  const valueLabel = (() => {
-    if (Array.isArray(control.value)) return control.value.join(" + ");
-    if (typeof control.value === "boolean") return control.value ? "On" : "Off";
-    return String(control.value);
-  })();
+  const valueLabel = formatControlValue(control.value);
   return (
     <div className="border border-slate-200 rounded-lg px-3 py-2.5 bg-white">
       <div className="flex items-baseline justify-between gap-2 mb-1">
@@ -294,9 +297,158 @@ function AutonomyEditor({ commitment, accessTier, personaName, onCancel, onSubmi
   );
 }
 
+// ─── ControlEditor — real value editing for goal-level controls ─────────────
+// Replaces the previous "draft this change" placeholder. For each control
+// kind (toggle / select / multiselect / duration), renders the appropriate
+// widget, captures the new value, shows the before/after diff, and routes
+// the actual draft through to Pending Changes.
+function ControlEditor({ goal, control, accessTier, personaName, onCancel, onSubmit }: {
+  goal: { name: string; usedInWorkflows: string[] };
+  control: GoalControl;
+  accessTier: ConfigAccessTier;
+  personaName: string;
+  onCancel: () => void;
+  onSubmit: (newValue: string | number | boolean | string[]) => void;
+}) {
+  const [draftValue, setDraftValue] = useState<string | number | boolean | string[]>(control.value);
+  const access = CONFIG_ACCESS_META[accessTier];
+
+  const valuesEqual = (a: string | number | boolean | string[], b: string | number | boolean | string[]): boolean => {
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      const sortedA = [...a].sort();
+      const sortedB = [...b].sort();
+      return sortedA.every((v, i) => v === sortedB[i]);
+    }
+    return a === b;
+  };
+  const changed = !valuesEqual(control.value, draftValue);
+
+  const renderEditor = () => {
+    if (control.kind === "toggle") {
+      return (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setDraftValue(!draftValue)}
+            className={`relative w-12 h-6 rounded-full transition-colors ${draftValue ? "bg-[#00BDFE]" : "bg-slate-300"}`}
+            role="switch"
+            aria-checked={Boolean(draftValue)}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${draftValue ? "translate-x-6" : "translate-x-0.5"}`} />
+          </button>
+          <span className="text-sm text-slate-700 font-medium">{draftValue ? "On" : "Off"}</span>
+        </div>
+      );
+    }
+    if (control.kind === "select" || control.kind === "duration") {
+      return (
+        <div className="space-y-1">
+          {(control.options ?? []).map(opt => {
+            const isCurrent = draftValue === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => setDraftValue(opt)}
+                className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
+                  isCurrent ? "border-[#00BDFE] bg-[#e0f7ff]" : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full border ${isCurrent ? "bg-[#00BDFE] border-[#00BDFE]" : "bg-white border-slate-300"}`} />
+                  <span className="text-sm text-slate-700">{opt}</span>
+                  {opt === control.value && <span className="text-[10px] text-slate-400 italic ml-auto">current</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+    if (control.kind === "multiselect") {
+      const selected = Array.isArray(draftValue) ? draftValue : [];
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {(control.options ?? []).map(opt => {
+            const isOn = selected.includes(opt);
+            const wasOn = Array.isArray(control.value) ? control.value.includes(opt) : false;
+            return (
+              <button
+                key={opt}
+                onClick={() => {
+                  setDraftValue(isOn ? selected.filter(v => v !== opt) : [...selected, opt]);
+                }}
+                className={`text-xs px-2.5 py-1.5 rounded-full border font-medium transition-colors ${
+                  isOn
+                    ? "bg-[#00BDFE] border-[#00BDFE] text-white"
+                    : "bg-white border-slate-300 text-slate-600 hover:border-slate-400"
+                }`}
+              >
+                {opt}
+                {wasOn && !isOn && <span className="ml-1 text-[10px] opacity-70">(removed)</span>}
+                {!wasOn && isOn && <span className="ml-1 text-[10px] opacity-70">(added)</span>}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const blastWorkflows = goal.usedInWorkflows.length;
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5">
+        <p className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Edit goal control</p>
+        <h3 className="text-slate-800 font-bold text-base mt-1">{control.label}</h3>
+        {control.description && (
+          <p className="text-slate-500 text-xs mt-1.5 leading-snug">{control.description}</p>
+        )}
+
+        {/* Editor */}
+        <div className="mt-4">
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-2">New value</p>
+          {renderEditor()}
+        </div>
+
+        {/* Before → After diff */}
+        <div className={`mt-4 rounded-lg border px-3 py-2 ${changed ? "bg-[#e0f7ff] border-[#00BDFE]/30" : "bg-slate-50 border-slate-200"}`}>
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-1">Diff</p>
+          <p className="text-xs">
+            <span className="text-slate-500">{formatControlValue(control.value)}</span>
+            <span className="text-slate-400 mx-2">→</span>
+            <span className={changed ? "text-slate-800 font-semibold" : "text-slate-400 italic"}>{formatControlValue(draftValue)}{!changed && " (unchanged)"}</span>
+          </p>
+        </div>
+
+        {/* Affects + routing */}
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 mt-3 text-xs text-slate-600 space-y-0.5">
+          <p><span className="text-slate-400">Affects:</span> {blastWorkflows} workflow{blastWorkflows === 1 ? "" : "s"} ({goal.usedInWorkflows.join(", ")})</p>
+          {control.affects.length > 0 && (
+            <p><span className="text-slate-400">Writes through to:</span> {control.affects.length} commitment{control.affects.length === 1 ? "" : "s"}</p>
+          )}
+          <p><span className="text-slate-400">Routes to:</span> {access.canPublish ? `${personaName} can publish directly (with simulation)` : "Senior tier review"}</p>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onCancel} className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
+          <button
+            onClick={() => onSubmit(draftValue)}
+            disabled={!changed}
+            className="text-sm px-3 py-1.5 rounded-lg bg-[#00BDFE] hover:bg-[#0099d4] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium"
+          >
+            Add to Pending Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function GoalDrawer({ open, goal, standalone, accessTier, personaName, onClose, onDraftChange }: Props) {
   const [showCommitments, setShowCommitments] = useState(false);
-  const [confirmEdit, setConfirmEdit] = useState<{ controlId: string; controlLabel: string } | null>(null);
+  const [editingControl, setEditingControl] = useState<GoalControl | null>(null);
   const [autonomyTarget, setAutonomyTarget] = useState<GoalCommitment | null>(null);
 
   if (!open) return null;
@@ -322,17 +474,17 @@ export default function GoalDrawer({ open, goal, standalone, accessTier, persona
   const usedIn    = goal?.usedInWorkflows ?? standalone!.usedInWorkflows;
   const blastWorkflows = usedIn.length;
 
-  const handleConfirmEdit = () => {
-    if (!confirmEdit) return;
+  const handleControlEditSubmit = (newValue: string | number | boolean | string[]) => {
+    if (!editingControl) return;
     onDraftChange({
-      target: `${name} — ${confirmEdit.controlLabel}`,
-      before: "(prior value)",
-      after: "(new value)",
+      target: `${name} — ${editingControl.label}`,
+      before: formatControlValue(editingControl.value),
+      after: formatControlValue(newValue),
       changeType: "goal-control",
       highRisk: false,
-      notes: `Goal-control edit drafted by ${personaName}.`,
+      notes: `Goal-control edit drafted by ${personaName}.${editingControl.affects.length > 0 ? ` Writes through to ${editingControl.affects.length} commitment${editingControl.affects.length === 1 ? "" : "s"}.` : ""}`,
     });
-    setConfirmEdit(null);
+    setEditingControl(null);
   };
 
   const handleAutonomySubmit = (entry: DraftEntry) => {
@@ -383,7 +535,7 @@ export default function GoalDrawer({ open, goal, standalone, accessTier, persona
               <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">Goal Controls</p>
               <div className="space-y-2">
                 {goal.controls.map(ctrl => (
-                  <ControlRow key={ctrl.id} control={ctrl} canEdit={canEditHere} onEdit={() => setConfirmEdit({ controlId: ctrl.id, controlLabel: ctrl.label })} />
+                  <ControlRow key={ctrl.id} control={ctrl} canEdit={canEditHere} onEdit={() => setEditingControl(ctrl)} />
                 ))}
               </div>
             </div>
@@ -471,26 +623,18 @@ export default function GoalDrawer({ open, goal, standalone, accessTier, persona
         />
       )}
 
-      {/* Confirm-edit modal — drafts the change to Pending Changes rather than
-          mutating directly. Demonstrates the draft-first machinery. */}
-      {confirmEdit && (
-        <div className="fixed inset-0 bg-slate-900/40 z-[60] flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-5">
-            <p className="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Draft change</p>
-            <h3 className="text-slate-800 font-bold text-base mt-1">{confirmEdit.controlLabel}</h3>
-            <p className="text-slate-500 text-xs mt-1.5 leading-snug">
-              In the production prototype, you'd edit the value here. For the MVP demo, confirming below adds this change to the Pending Changes panel as a draft authored by you ({personaName}).
-            </p>
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 mt-3 text-xs text-slate-600">
-              <p><span className="text-slate-400">Affects:</span> {blastWorkflows} workflow{blastWorkflows === 1 ? "" : "s"}</p>
-              <p className="mt-0.5"><span className="text-slate-400">Routes to:</span> {access.canPublish ? `${personaName} can publish directly` : "Senior tier review"}</p>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setConfirmEdit(null)} className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button onClick={handleConfirmEdit} className="text-sm px-3 py-1.5 rounded-lg bg-[#00BDFE] hover:bg-[#0099d4] text-white font-medium">Add to Pending Changes</button>
-            </div>
-          </div>
-        </div>
+      {/* Control editor — real value editing for goal-level controls.
+          Renders the appropriate widget per control kind, captures new value,
+          shows before/after diff, drafts the change to Pending Changes. */}
+      {editingControl && goal && (
+        <ControlEditor
+          goal={{ name: goal.name, usedInWorkflows: goal.usedInWorkflows }}
+          control={editingControl}
+          accessTier={accessTier}
+          personaName={personaName}
+          onCancel={() => setEditingControl(null)}
+          onSubmit={handleControlEditSubmit}
+        />
       )}
     </>
   );
